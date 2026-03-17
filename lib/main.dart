@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:settly_mobile/pages/homePage.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
   await initializeDateFormatting('pl', null);
   runApp(const MyApp());
 }
