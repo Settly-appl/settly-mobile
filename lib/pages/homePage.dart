@@ -430,7 +430,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        "Funkcja otwierania przypietych bedzie dostepna wkrótce!",
+                        "Funkcja otwierania przypiętych będzie dostępna wkrótce!",
                       ),
                     ),
                   );
