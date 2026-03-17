@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:settly_mobile/models/PinnedCard.dart';
-import 'package:settly_mobile/models/RecentExpense.dart';
-import 'package:settly_mobile/projectColors/AppColors.dart';
+import 'package:settly_mobile/models/pinned_card.dart';
+import 'package:settly_mobile/models/recent_expense.dart';
+import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:intl/intl.dart';
 
 class HomePage extends StatefulWidget {
@@ -658,7 +658,7 @@ class _HomePageState extends State<HomePage> {
           Icon(
             Icons.receipt_long_outlined,
             size: 64,
-            color: AppColors.greetingLight.withOpacity(0.5),
+            color: AppColors.greetingLight.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -674,7 +674,7 @@ class _HomePageState extends State<HomePage> {
             'Twoje ostatnie transakcje pojawią się tutaj.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.greetingLight.withOpacity(0.7),
+              color: AppColors.greetingLight.withValues(alpha: 0.7),
             ),
           ),
         ],

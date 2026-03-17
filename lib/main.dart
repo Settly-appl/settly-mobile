@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:settly_mobile/pages/homePage.dart';
+import 'package:settly_mobile/pages/home_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {

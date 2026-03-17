@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/RecentExpense.dart';
+import 'package:settly_mobile/models/recent_expense.dart';
 
 class PinnedCard extends RecentExpense {
   final Color amountColor;
