@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:settly_mobile/pages/homePage.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
-  initializeDateFormatting('pl', null).then((_) => runApp(MyApp()));
+Future<void> main() async {
+  await initializeDateFormatting('pl', null);
   runApp(const MyApp());
 }
 
