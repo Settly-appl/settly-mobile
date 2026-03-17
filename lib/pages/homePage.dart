@@ -188,7 +188,7 @@ class _HomePageState extends State<HomePage> {
 
   // ── Karta podsumowania ───────────────────────────────────────────────────────
   Widget _summaryCard() {
-    String formatedDate = DateFormat('MMMM yyyy', 'pl').format(DateTime.now());
+    String formattedDate = DateFormat('MMMM yyyy', 'pl').format(DateTime.now());
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -208,7 +208,7 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Podsumowanie — $formatedDate',
+            'Podsumowanie — $formattedDate',
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
