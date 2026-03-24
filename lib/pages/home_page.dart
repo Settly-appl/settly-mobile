@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/models/pinned_card.dart';
 import 'package:settly_mobile/models/recent_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
@@ -16,7 +17,9 @@ class _HomePageState extends State<HomePage> {
   //Zmienne do zmiany gdy bedzie dostep do Api
   String userName = "Mateusz";
   String firstLettersFromUserInAvatarCircle = "MD";
-  int _currentTab = -1;
+  int _currentTab = 0;
+
+  bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
   final List<Map<String, dynamic>> _navIcons = [
     {'icon': Icons.grid_view_rounded, 'label': 'Główna'},
@@ -36,9 +39,9 @@ class _HomePageState extends State<HomePage> {
         leadingWidth: 70,
         scrolledUnderElevation: 0,
         backgroundColor: Colors.transparent,
-        systemOverlayStyle: const SystemUiOverlayStyle(
+        systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +51,7 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.normal,
-                color: AppColors.greetingLight,
+                color: AppColors.greeting(isDark),
               ),
             ),
             Text(
@@ -56,7 +59,7 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.usernameLight,
+                color: AppColors.username(isDark),
               ),
             ),
           ],
@@ -65,12 +68,12 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.only(left: 15.0),
           child: Center(
             child: CircleAvatar(
-              backgroundColor: AppColors.avatarBgLight,
+              backgroundColor: AppColors.avatarBg(isDark),
               radius: 23,
               child: Text(
                 firstLettersFromUserInAvatarCircle,
                 style: TextStyle(
-                  color: AppColors.avatarFgLight,
+                  color: AppColors.avatarFg(isDark),
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -79,11 +82,21 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.dark_mode_outlined),
+            tooltip: 'Change app theme',
+            onPressed: () {
+              MyApp.of(
+                context,
+              ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
+            }, // Brak funckjonalnosci narazie
+          ),
+          const SizedBox(width: 8),
           CircleAvatar(
-            backgroundColor: AppColors.bellBgLight,
+            backgroundColor: AppColors.bellBg(isDark),
             child: IconButton(
               icon: const Icon(Icons.notifications_none_rounded),
-              color: AppColors.bellIconLight,
+              color: AppColors.bellIcon(isDark),
               onPressed: () {}, // Brak funckjonalnosci narazie
             ),
           ),
@@ -128,7 +141,7 @@ class _HomePageState extends State<HomePage> {
         child: Container(
           decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: AppColors.navBorderLight, width: 1.0),
+              top: BorderSide(color: AppColors.navBorder(isDark), width: 1.0),
             ),
           ),
           child: BottomAppBar(
@@ -151,8 +164,8 @@ class _HomePageState extends State<HomePage> {
                         Icon(
                           item['icon'],
                           color: isSelected
-                              ? AppColors.navActiveLight
-                              : AppColors.navInactiveLight,
+                              ? AppColors.navActive(isDark)
+                              : AppColors.navInactive(isDark),
                           size: 24,
                         ),
                         const SizedBox(height: 4),
@@ -161,8 +174,8 @@ class _HomePageState extends State<HomePage> {
                           style: TextStyle(
                             fontSize: 10,
                             color: isSelected
-                                ? AppColors.navActiveLight
-                                : AppColors.navInactiveLight,
+                                ? AppColors.navActive(isDark)
+                                : AppColors.navInactive(isDark),
                             fontWeight: isSelected
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -175,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isSelected
-                                ? AppColors.navActiveLight
+                                ? AppColors.navActive(isDark)
                                 : Colors.transparent,
                           ),
                         ),
@@ -298,18 +311,18 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.sectionTitleLight,
+              color: AppColors.sectionTitle(isDark),
             ),
           ),
           if (action != null)
             Text(
               action,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.sectionActionLight,
+                color: AppColors.sectionAction(isDark),
               ),
             ),
         ],
@@ -327,8 +340,8 @@ class _HomePageState extends State<HomePage> {
             child: _actionButton(
               label: 'Dodaj',
               icon: Icons.add,
-              iconColor: AppColors.actionAddIconLight,
-              iconBg: AppColors.actionAddIconBgLight,
+              iconColor: AppColors.actionAddIcon(isDark),
+              iconBg: AppColors.actionAddIconBg(isDark),
               onTap: () {},
             ),
           ),
@@ -337,8 +350,8 @@ class _HomePageState extends State<HomePage> {
             child: _actionButton(
               label: 'Skanuj',
               icon: Icons.camera_alt_outlined,
-              iconColor: AppColors.actionScanIconLight,
-              iconBg: AppColors.actionScanIconBgLight,
+              iconColor: AppColors.actionScanIcon(isDark),
+              iconBg: AppColors.actionScanIconBg(isDark),
               onTap: () {},
             ),
           ),
@@ -347,8 +360,8 @@ class _HomePageState extends State<HomePage> {
             child: _actionButton(
               label: 'Projekt',
               icon: Icons.group_outlined,
-              iconColor: AppColors.actionProjectIconLight,
-              iconBg: AppColors.actionProjectIconBgLight,
+              iconColor: AppColors.actionProjectIcon(isDark),
+              iconBg: AppColors.actionProjectIconBg(isDark),
               onTap: () {},
             ),
           ),
@@ -357,11 +370,11 @@ class _HomePageState extends State<HomePage> {
             child: _actionButton(
               label: 'Rozlicz',
               icon: Icons.check_box_outlined,
-              iconColor: AppColors.actionSettleIconLight,
-              iconBg: AppColors.actionSettleIconBgLight,
+              iconColor: AppColors.actionSettleIcon(isDark),
+              iconBg: AppColors.actionSettleIconBg(isDark),
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  const SnackBar(
                     content: Text(
                       "Funkcja Skanowania będzie dostępna wkrótce!",
                     ),
@@ -388,9 +401,9 @@ class _HomePageState extends State<HomePage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.actionBtnBgLight,
+          color: AppColors.actionBtnBg(isDark),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.actionBtnBorderLight),
+          border: Border.all(color: AppColors.actionBtnBorder(isDark)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -407,10 +420,10 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: AppColors.actionBtnLabelLight,
+                color: AppColors.actionBtnLabel(isDark),
               ),
             ),
           ],
@@ -433,7 +446,7 @@ class _HomePageState extends State<HomePage> {
               child: GestureDetector(
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Text(
                         "Funkcja otwierania przypiętych będzie dostępna wkrótce!",
                       ),
@@ -457,9 +470,9 @@ class _HomePageState extends State<HomePage> {
       width: 140,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.cardBgLight,
+        color: AppColors.cardBg(isDark),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorderLight),
+        border: Border.all(color: AppColors.cardBorder(isDark)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,19 +509,19 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 8),
           Text(
             item.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.cardTitleLight,
+              color: AppColors.cardTitle(isDark),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
             item.subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: AppColors.cardSubtitleLight,
+              color: AppColors.cardSubtitle(isDark),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -535,10 +548,10 @@ class _HomePageState extends State<HomePage> {
         width: 140,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.pinnedEmptyBgLight,
+          color: AppColors.pinnedEmptyBg(isDark),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: AppColors.pinnedEmptyBorderLight,
+            color: AppColors.pinnedEmptyBorder(isDark),
             style: BorderStyle.solid,
           ),
         ),
@@ -549,13 +562,13 @@ class _HomePageState extends State<HomePage> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: AppColors.pinnedEmptyCircleBgLight,
+                color: AppColors.pinnedEmptyCircleBg(isDark),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.add,
                 size: 14,
-                color: AppColors.pinnedEmptyIconLight,
+                color: AppColors.pinnedEmptyIcon(isDark),
               ),
             ),
             const SizedBox(height: 6),
@@ -564,7 +577,7 @@ class _HomePageState extends State<HomePage> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10,
-                color: AppColors.pinnedEmptyTextLight,
+                color: AppColors.pinnedEmptyText(isDark),
               ),
             ),
           ],
@@ -578,9 +591,9 @@ class _HomePageState extends State<HomePage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.cardBgLight,
+        color: AppColors.cardBg(isDark),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorderLight),
+        border: Border.all(color: AppColors.cardBorder(isDark)),
       ),
       child: Row(
         children: [
@@ -600,17 +613,17 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Text(
                   item.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.cardTitleLight,
+                    color: AppColors.cardTitle(isDark),
                   ),
                 ),
                 Text(
                   item.subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.cardSubtitleLight,
+                    color: AppColors.cardSubtitle(isDark),
                   ),
                 ),
               ],
@@ -621,10 +634,10 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 item.totalAmount,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.cardAmountLight,
+                  color: AppColors.cardAmount(isDark),
                 ),
               ),
               const SizedBox(height: 3),
@@ -658,7 +671,7 @@ class _HomePageState extends State<HomePage> {
           Icon(
             Icons.receipt_long_outlined,
             size: 64,
-            color: AppColors.greetingLight.withValues(alpha: 0.5),
+            color: AppColors.greeting(isDark).withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -666,7 +679,7 @@ class _HomePageState extends State<HomePage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: AppColors.greetingLight,
+              color: AppColors.greeting(isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -674,7 +687,7 @@ class _HomePageState extends State<HomePage> {
             'Twoje ostatnie transakcje pojawią się tutaj.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.greetingLight.withValues(alpha: 0.7),
+              color: AppColors.greeting(isDark).withValues(alpha: 0.7),
             ),
           ),
         ],
