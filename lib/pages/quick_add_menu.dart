@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/pages/single_expense_add_page.dart';
 
 import '../models/sheet_option.dart';
 
@@ -49,7 +50,12 @@ class QuickAddMenu extends StatelessWidget {
                 titleColor: Color(0xFF00C896),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: nawigacja do formularza wydatku
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SingleExpenseAddPage(),
+                    ),
+                  );
                 },
               ),
             ),
