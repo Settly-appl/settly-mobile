@@ -8,16 +8,24 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:intl/intl.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String userName;
+  final String userInitials;
+  final VoidCallback onLogout;
+
+  const HomePage({
+    super.key,
+    required this.userName,
+    required this.userInitials,
+    required this.onLogout,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  //Zmienne do zmiany gdy bedzie dostep do Api
-  String userName = "Mateusz";
-  String firstLettersFromUserInAvatarCircle = "MD";
+  String get userName => widget.userName;
+  String get firstLettersFromUserInAvatarCircle => widget.userInitials;
   int _currentTab = 0;
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
@@ -102,7 +110,13 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {}, // Brak funckjonalnosci narazie
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Wyloguj się',
+            onPressed: widget.onLogout,
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
