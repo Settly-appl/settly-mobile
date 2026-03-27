@@ -2,20 +2,22 @@ import 'dart:convert';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:http/http.dart' as http;
 import 'package:settly_mobile/const/api_url.dart';
+import 'package:settly_mobile/services/auth_service.dart';
 
 class SingleExpenseApi {
+  final _authService = AuthService();
+
   Future<bool> sendExpense(ExpenseRequest expense) async {
     final url = Uri.parse('${ProjectApiConst.baseUrl}/expenses');
-    //final url = Uri.parse('http://localhost:8080/api/expenses');
-    //final String tokenPostman = "wL4TwfN-0QEHkPaR8vMfTTC9gQpQbQ";
+    final token = await _authService.getAccessToken();
 
     try {
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          // Tutaj możesz dodać np. Bearer Token jeśli masz logowanie
-          //'Authorization': 'Bearer $tokenPostman',
+          'ngrok-skip-browser-warning': 'true',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode(expense.toJson()),
       );
