@@ -8,6 +8,7 @@ class SheetOption {
   final String title;
   final String subtitle;
   final Color titleColor;
+  final Color subtitleColor;
   final VoidCallback onTap;
 
   const SheetOption({
@@ -18,6 +19,7 @@ class SheetOption {
     required this.title,
     required this.subtitle,
     required this.titleColor,
+    required this.subtitleColor,
     required this.onTap,
   });
 }

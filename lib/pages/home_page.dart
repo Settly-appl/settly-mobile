@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/models/pinned_card.dart';
 import 'package:settly_mobile/models/recent_expense.dart';
+import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:intl/intl.dart';
 
@@ -35,6 +36,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         leadingWidth: 70,
         scrolledUnderElevation: 0,
@@ -119,86 +121,79 @@ class _HomePageState extends State<HomePage> {
           _sectionHeader('Ostatnie', action: 'Zobacz wszystkie'),
           const SizedBox(height: 10),
 
-          // Lista OSTATNIE (zajmuje resztę ekranu i scrolluje)
           Expanded(
             child: recentItems.isEmpty
-                ? _buildEmptyRecentCard() // Jeśli pusta -> pokaż komunikat
+                ? _buildEmptyRecentCard()
                 : ListView.separated(
-                    // Jeśli ma elementy -> pokaż listę
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 20,
+                    ),
                     itemCount: recentItems.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = recentItems[index];
-                      return _recentCard(item);
-                    },
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) =>
+                        _recentCard(recentItems[index]),
                   ),
           ),
         ],
       ),
-      bottomNavigationBar: PreferredSize(
-        preferredSize: const Size.fromHeight(1.0),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: AppColors.navBorder(isDark), width: 1.0),
-            ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.navBorder(isDark), width: 1.0),
           ),
-          child: BottomAppBar(
-            color: Colors.transparent,
-            elevation: 0,
-            child: SizedBox(
-              height: 60,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: _navIcons.asMap().entries.map((entry) {
-                  int idx = entry.key;
-                  var item = entry.value;
-                  bool isSelected = _currentTab == idx;
+        ),
+        height: 60, // dokładna wysokość, bez żadnych paddingów
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: _navIcons.asMap().entries.map((entry) {
+            int idx = entry.key;
+            var item = entry.value;
+            bool isSelected = _currentTab == idx;
 
-                  return GestureDetector(
-                    onTap: () => setState(() => _currentTab = idx),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          item['icon'],
-                          color: isSelected
-                              ? AppColors.navActive(isDark)
-                              : AppColors.navInactive(isDark),
-                          size: 24,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item['label'],
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isSelected
-                                ? AppColors.navActive(isDark)
-                                : AppColors.navInactive(isDark),
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected
-                                ? AppColors.navActive(isDark)
-                                : Colors.transparent,
-                          ),
-                        ),
-                      ],
+            return GestureDetector(
+              onTap: () => setState(() => _currentTab = idx),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    item['icon'],
+                    color: isSelected
+                        ? AppColors.navActive(isDark)
+                        : AppColors.navInactive(isDark),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item['label'],
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isSelected
+                          ? AppColors.navActive(isDark)
+                          : AppColors.navInactive(isDark),
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
-                  );
-                }).toList(),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected
+                          ? AppColors.navActive(isDark)
+                          : Colors.transparent,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -342,7 +337,13 @@ class _HomePageState extends State<HomePage> {
               icon: Icons.add,
               iconColor: AppColors.actionAddIcon(isDark),
               iconBg: AppColors.actionAddIconBg(isDark),
-              onTap: () {},
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) => QuickAddMenu(isDark: isDark),
+                );
+              },
             ),
           ),
           const SizedBox(width: 8),

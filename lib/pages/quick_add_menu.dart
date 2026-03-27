@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/pages/single_expense_add_page.dart';
+import 'package:settly_mobile/dto/expense_request.dart';
+import 'package:settly_mobile/projectColors/app_colors.dart';
 
+import '../api/single_expense/single_expense_api.dart';
 import '../models/sheet_option.dart';
+import 'expense_form_dialog.dart';
 
 class QuickAddMenu extends StatelessWidget {
+  final bool isDark;
+  const QuickAddMenu({super.key, required this.isDark});
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B1723), // ← TŁO POPUPU
+      decoration: BoxDecoration(
+        color: AppColors.scaffold(isDark),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Padding(
@@ -27,35 +33,47 @@ class QuickAddMenu extends StatelessWidget {
             SizedBox(height: 16),
             Text(
               'Co chcesz dodać?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 4),
             Text(
               'Wybierz typ, który chcesz utworzyć',
-              style: TextStyle(color: Color(0xFF4A6A85), fontSize: 12),
+              style: TextStyle(fontSize: 12),
             ),
             SizedBox(height: 20),
             _SheetOption(
               option: SheetOption(
                 icon: Icons.receipt_long,
-                iconColor: Color(0xFF00C896),
-                iconBackground: Color(0xFF0d2a20),
-                borderColor: Color(0xFF1a4a35),
+                iconColor: AppColors.actionScanIcon(isDark),
+                iconBackground: AppColors.actionScanIconBg(isDark),
+                borderColor: AppColors.sheetOptionExpenseBorder(isDark),
                 title: 'Pojedynczy wydatek',
                 subtitle: 'Sklep, restauracja, transport…',
-                titleColor: Color(0xFF00C896),
-                onTap: () {
+                titleColor: AppColors.amountCurrency(isDark),
+                subtitleColor: AppColors.cardSubtitle(isDark),
+                onTap: () async {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SingleExpenseAddPage(),
-                    ),
+
+                  // 2. Otwieramy wysepkę i CZEKAMY na wynik (ExpenseDto)
+                  final result = await showDialog<ExpenseRequest>(
+                    context: context,
+                    builder: (context) => ExpenseFormDialog(isDark: isDark),
                   );
+
+                  // 3. Sprawdzamy, czy użytkownik faktycznie zapisał, czy tylko zamknął krzyżykiem
+                  if (result != null) {
+                    print("Mamy dane! Wysyłam do backendu...");
+
+                    // 4. STRZAŁ DO BACKENDU
+                    final apiService = SingleExpenseApi();
+                    bool success = await apiService.sendExpense(result);
+
+                    if (success) {
+                      print("Wydatek zapisany w bazie!");
+                    } else {
+                      print("Błąd wysyłki!");
+                    }
+                  }
                 },
               ),
             ),
@@ -63,12 +81,13 @@ class QuickAddMenu extends StatelessWidget {
             _SheetOption(
               option: SheetOption(
                 icon: Icons.group,
-                iconColor: Color(0xFF60B8F5),
-                iconBackground: Color(0xFF0a1e32),
-                borderColor: Color(0xFF1a3060),
+                iconColor: AppColors.actionAddIcon(isDark),
+                iconBackground: AppColors.actionProjectIconBg(isDark),
+                borderColor: AppColors.sheetOptionProjectBorder(isDark),
                 title: 'Projekt grupowy',
                 subtitle: 'Wyjazd, impreza, wspólne zakupy…',
-                titleColor: Color(0xFF60B8F5),
+                titleColor: AppColors.iconProject(isDark),
+                subtitleColor: AppColors.cardSubtitle(isDark),
                 onTap: () {
                   Navigator.pop(context);
                   // TODO: nawigacja do formularza projektu
@@ -82,14 +101,14 @@ class QuickAddMenu extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Color(0xFF132233),
+                  color: AppColors.sheetCancel(isDark),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
                   'Anuluj',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xFF4A6A85),
+                    color: AppColors.cardSubtitle(isDark),
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),

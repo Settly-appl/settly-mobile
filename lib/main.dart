@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:settly_mobile/pages/home_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pl', null);
+  await initializeDateFormatting('pl_PL', null);
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // Ta metoda pozwoli nam znaleźć stan MyApp w dowolnym miejscu aplikacji
   static _MyAppState of(BuildContext context) =>
       context.findAncestorStateOfType<_MyAppState>()!;
 
@@ -22,10 +21,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Domyślnie ustawiamy na systemowy
   ThemeMode _themeMode = ThemeMode.system;
 
-  // Funkcja do zmiany motywu
   void changeTheme(ThemeMode themeMode) {
     setState(() {
       _themeMode = themeMode;
@@ -36,6 +33,16 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('pl', 'PL')],
+      locale: const Locale('pl', 'PL'),
+
+      // ----------------------------------------------
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
