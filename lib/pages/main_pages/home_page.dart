@@ -54,6 +54,8 @@ class HomePageState extends State<HomePage> {
     _fetchRecentExpenses();
   }
 
+  void switchTab(int index) => setState(() => _currentTab = index);
+
   // ── Strony dla zakładek ──────────────────────────────────────────────────────
   List<Widget> get _pages => [
     _HomeBody(state: this),
@@ -313,7 +315,7 @@ class _HomeBody extends StatelessWidget {
           'Ostatnie',
           action: 'Zobacz wszystkie',
           // "Zobacz wszystkie" przełącza na zakładkę Wydatki (idx 1)
-          onActionTap: () => state.setState(() => state._currentTab = 1),
+          onActionTap: () => state.switchTab(1),
         ),
         const SizedBox(height: 10),
         Expanded(
