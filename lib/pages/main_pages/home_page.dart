@@ -9,6 +9,7 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 
 import '../../models/single_expense.dart';
 import '../../services/api_service/api_service_request.dart';
+import '../all_expenses_page.dart';
 import 'home_page_widgets/pinned_scroll.dart';
 import 'home_page_widgets/quick_actions_row.dart';
 import 'home_page_widgets/recent_expenses_card.dart';
@@ -53,46 +54,22 @@ class HomePageState extends State<HomePage> {
     _fetchRecentExpenses();
   }
 
+  // ── Strony dla zakładek ──────────────────────────────────────────────────────
+  List<Widget> get _pages => [
+    _HomeBody(state: this),
+    const ExpensesPage(),
+    const _PlaceholderTab(label: 'Grupy'),
+    const _PlaceholderTab(label: 'Analiza'),
+    const _PlaceholderTab(label: 'Profil'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: _buildAppBar(),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SummaryCard(),
-          const SizedBox(height: 16),
-          _sectionHeader('Szybkie akcje'),
-          const SizedBox(height: 10),
-          QuickActionsRow(isDark: isDark, onExpenseAdded: _fetchRecentExpenses),
-          const SizedBox(height: 16),
-          _sectionHeader('Przypięte', action: 'Edytuj'),
-          const SizedBox(height: 10),
-          PinnedScroll(isDark: isDark, pinnedItems: pinnedItems),
-          const SizedBox(height: 16),
-          _sectionHeader('Ostatnie', action: 'Zobacz wszystkie'),
-          const SizedBox(height: 10),
-          Expanded(
-            child: recentItems.isEmpty
-                ? EmptyRecentCard(isDark: isDark)
-                : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      bottom: 20,
-                    ),
-                    itemCount: recentItems.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) => RecentExpenseCard(
-                      item: recentItems[index],
-                      isDark: isDark,
-                    ),
-                  ),
-          ),
-        ],
-      ),
+      // AppBar tylko dla zakładki Główna (idx 0)
+      appBar: _currentTab == 0 ? _buildAppBar() : null,
+      body: IndexedStack(index: _currentTab, children: _pages),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -176,7 +153,11 @@ class HomePageState extends State<HomePage> {
   }
 
   // ── Nagłówek sekcji ──────────────────────────────────────────────────────────
-  Widget _sectionHeader(String title, {String? action}) {
+  Widget _sectionHeader(
+    String title, {
+    String? action,
+    VoidCallback? onActionTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -191,11 +172,18 @@ class HomePageState extends State<HomePage> {
             ),
           ),
           if (action != null)
-            Text(
-              action,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.sectionAction(isDark),
+            GestureDetector(
+              onTap: onActionTap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Text(
+                  action,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.sectionAction(isDark),
+                  ),
+                ),
               ),
             ),
         ],
@@ -213,50 +201,55 @@ class HomePageState extends State<HomePage> {
       ),
       height: 60,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: _navIcons.asMap().entries.map((entry) {
           final int idx = entry.key;
           final item = entry.value;
           final bool isSelected = _currentTab == idx;
 
-          return GestureDetector(
-            onTap: () => setState(() => _currentTab = idx),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  item['icon'],
-                  color: isSelected
-                      ? AppColors.navActive(isDark)
-                      : AppColors.navInactive(isDark),
-                  size: 24,
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _currentTab = idx),
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                height: 60,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      item['icon'],
+                      color: isSelected
+                          ? AppColors.navActive(isDark)
+                          : AppColors.navInactive(isDark),
+                      size: 24,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item['label'],
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isSelected
+                            ? AppColors.navActive(isDark)
+                            : AppColors.navInactive(isDark),
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? AppColors.navActive(isDark)
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item['label'],
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isSelected
-                        ? AppColors.navActive(isDark)
-                        : AppColors.navInactive(isDark),
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected
-                        ? AppColors.navActive(isDark)
-                        : Colors.transparent,
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         }).toList(),
@@ -264,10 +257,10 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  // ── Fetch ────────────────────────────────────────────────────────────────────
   Future<void> _fetchRecentExpenses() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+
     final apiService = ApiServiceRequest();
     final response = await apiService.request(
       endpoint: 'expenses?pageNumber=0&pageSize=5',
@@ -284,6 +277,109 @@ class HomePageState extends State<HomePage> {
         recentItems = fetched;
         _isLoading = false;
       });
+    } else {
+      setState(() => _isLoading = false);
     }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// _HomeBody — body zakładki "Główna"
+// ════════════════════════════════════════════════════════════════════════════
+class _HomeBody extends StatelessWidget {
+  final HomePageState state;
+
+  const _HomeBody({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SummaryCard(),
+        const SizedBox(height: 16),
+        state._sectionHeader('Szybkie akcje'),
+        const SizedBox(height: 10),
+        QuickActionsRow(
+          isDark: state.isDark,
+          onExpenseAdded: state._fetchRecentExpenses,
+        ),
+        const SizedBox(height: 16),
+        state._sectionHeader('Przypięte', action: 'Edytuj'),
+        const SizedBox(height: 10),
+        PinnedScroll(isDark: state.isDark, pinnedItems: state.pinnedItems),
+        const SizedBox(height: 16),
+        state._sectionHeader(
+          'Ostatnie',
+          action: 'Zobacz wszystkie',
+          // "Zobacz wszystkie" przełącza na zakładkę Wydatki (idx 1)
+          onActionTap: () => state.setState(() => state._currentTab = 1),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: state._isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : state.recentItems.isEmpty
+              ? EmptyRecentCard(isDark: state.isDark)
+              : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 20,
+                  ),
+                  itemCount: state.recentItems.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) => RecentExpenseCard(
+                    item: state.recentItems[index],
+                    isDark: state.isDark,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// _PlaceholderTab — tymczasowy widok dla niezaimplementowanych zakładek
+// ════════════════════════════════════════════════════════════════════════════
+class _PlaceholderTab extends StatelessWidget {
+  final String label;
+
+  const _PlaceholderTab({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.construction_rounded,
+            size: 48,
+            color: AppColors.cardSubtitle(isDark).withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.cardTitle(isDark),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Wkrótce dostępne',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.cardSubtitle(isDark),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

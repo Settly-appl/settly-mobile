@@ -27,7 +27,7 @@ class QuickActionsRow extends StatelessWidget {
               iconBg: AppColors.actionAddIconBg(isDark),
               isDark: isDark,
               onTap: () async {
-                final result = await showModalBottomSheet<RecentExpense>(
+                await showModalBottomSheet<RecentExpense>(
                   context: context,
                   isScrollControlled: true,
                   builder: (context) =>
