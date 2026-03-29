@@ -9,11 +9,9 @@ class AuthService {
   static const _clientId = 'settly';
   static const _redirectUrl = 'settly://callback';
   static const keycloakBase =
-      'https://jurnee-semiexclusive-kaylyn.ngrok-free.dev/auth/realms/settly';
-  static const _authEndpoint =
-      '$keycloakBase/protocol/openid-connect/auth';
-  static const _tokenEndpoint =
-      '$keycloakBase/protocol/openid-connect/token';
+      'https://revivable-flaccidly-carey.ngrok-free.dev/auth/realms/settly';
+  static const _authEndpoint = '$keycloakBase/protocol/openid-connect/auth';
+  static const _tokenEndpoint = '$keycloakBase/protocol/openid-connect/token';
   static const _scopes = 'openid profile email';
 
   static const _accessTokenKey = 'access_token';
@@ -63,7 +61,10 @@ class AuthService {
         );
         return (true, null);
       }
-      return (false, 'Token exchange failed: ${response.statusCode} ${response.body}');
+      return (
+        false,
+        'Token exchange failed: ${response.statusCode} ${response.body}',
+      );
     } catch (e) {
       return (false, e.toString());
     }
@@ -82,10 +83,7 @@ class AuthService {
         await http.post(
           Uri.parse('$keycloakBase/protocol/openid-connect/logout'),
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: {
-            'client_id': _clientId,
-            'refresh_token': refreshToken,
-          },
+          body: {'client_id': _clientId, 'refresh_token': refreshToken},
         );
       } catch (_) {}
     }

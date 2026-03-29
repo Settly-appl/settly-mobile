@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-
-import '../api/single_expense/single_expense_api.dart';
+import '../models/recent_expense.dart';
 import '../models/sheet_option.dart';
+import '../models/single_expense.dart';
+import '../services/api_service/api_service_request.dart';
 import 'expense_form_dialog.dart';
 
 class QuickAddMenu extends StatelessWidget {
   final bool isDark;
-  const QuickAddMenu({super.key, required this.isDark});
+  final Future<void> Function() onSaved;
+
+  const QuickAddMenu({super.key, required this.isDark, required this.onSaved});
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +68,21 @@ class QuickAddMenu extends StatelessWidget {
                     print("Mamy dane! Wysyłam do backendu...");
 
                     // 4. STRZAŁ DO BACKENDU
-                    final apiService = SingleExpenseApi();
-                    bool success = await apiService.sendExpense(result);
+                    final apiService = ApiServiceRequest();
+                    final response = await apiService.request(
+                      endpoint: 'expenses',
+                      method: HttpMethod.post,
+                      body: result.toJson(),
+                    );
+
+                    bool success =
+                        response != null &&
+                        (response.statusCode == 200 ||
+                            response.statusCode == 201);
 
                     if (success) {
                       print("Wydatek zapisany w bazie!");
+                      onSaved();
                     } else {
                       print("Błąd wysyłki!");
                     }

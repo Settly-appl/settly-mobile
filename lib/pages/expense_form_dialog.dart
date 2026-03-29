@@ -26,15 +26,16 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
   bool _isSplitTypeExpanded = false;
 
   bool _isFriendsExpanded = false;
+  bool _isScanned = false;
   final List<String> _selectedFriends = [];
 
   final List<Map<String, dynamic>> _categories = [
-    {'name': 'Zakupy', 'icon': Icons.shopping_bag, 'color': Colors.orange},
-    {'name': 'Jedzenie', 'icon': Icons.restaurant, 'color': Colors.red},
+    {'name': 'shopping', 'icon': Icons.shopping_bag, 'color': Colors.orange},
+    {'name': 'food', 'icon': Icons.restaurant, 'color': Colors.red},
     {'name': 'Transport', 'icon': Icons.directions_car, 'color': Colors.blue},
-    {'name': 'Rozrywka', 'icon': Icons.movie, 'color': Colors.purple},
-    {'name': 'Zdrowie', 'icon': Icons.medical_services, 'color': Colors.green},
-    {'name': 'Inne', 'icon': Icons.more_horiz, 'color': Colors.grey},
+    {'name': 'entertainment', 'icon': Icons.movie, 'color': Colors.purple},
+    {'name': 'health', 'icon': Icons.medical_services, 'color': Colors.green},
+    {'name': 'others', 'icon': Icons.more_horiz, 'color': Colors.grey},
   ];
 
   final List<Map<String, dynamic>> _projects = [
@@ -722,6 +723,7 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
           date: _selectedDate,
           //category: _selectedCategory,
           note: _noteController.text.isNotEmpty ? _noteController.text : null,
+          isScanned: _isScanned,
           //projectId: _selectedProject,
           //splitType: _selectedSplitType,
           //participants: _selectedFriends,

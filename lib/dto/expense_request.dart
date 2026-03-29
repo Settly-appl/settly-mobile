@@ -2,6 +2,7 @@ class ExpenseRequest {
   final double totalAmount;
   final String shop;
   final DateTime date;
+  final bool isScanned;
   //final String category;
   final String? note;
   //final String? projectId;
@@ -13,6 +14,7 @@ class ExpenseRequest {
     required this.totalAmount,
     required this.shop,
     required this.date,
+    required this.isScanned,
     //required this.category,
     this.note,
     //required this.projectId,
@@ -27,6 +29,7 @@ class ExpenseRequest {
       'totalAmount': totalAmount,
       'shop': shop,
       'date': date.toIso8601String(),
+      'scanned': isScanned,
       //'category': category,
       'note': note,
       //'project_id': projectId,

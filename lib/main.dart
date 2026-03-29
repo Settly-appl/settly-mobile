@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/pages/home_page.dart';
-import 'package:settly_mobile/pages/login_page.dart';
+import 'package:settly_mobile/pages/main_pages/home_page.dart';
+import 'package:settly_mobile/pages/main_pages/login_page.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
@@ -96,7 +96,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (info != null) {
       final firstName = info['given_name'] as String? ?? '';
       final lastName = info['family_name'] as String? ?? '';
-      final name = info['name'] as String? ?? info['preferred_username'] as String? ?? '';
+      final name =
+          info['name'] as String? ??
+          info['preferred_username'] as String? ??
+          '';
 
       _userName = firstName.isNotEmpty ? firstName : name;
       _userInitials = _buildInitials(firstName, lastName, name);
@@ -135,9 +138,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isChecking) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (!_isLoggedIn) {
