@@ -315,4 +315,28 @@ class AppColors {
       isDark ? _navActiveDark : _navActiveLight;
   static Color navInactive(bool isDark) =>
       isDark ? _navInactiveDark : _navInactiveLight;
+
+  // Bottom sheet
+  static Color sheetHandle(bool isDark) =>
+      isDark ? Color(0xFF243D5A) : Color(0xFFD0D8E4);
+  static Color sheetCancel(bool isDark) =>
+      isDark ? Color(0xFF132233) : Color(0xFFEAEAEA);
+  static Color sheetOptionExpenseBorder(bool isDark) =>
+      isDark ? Color(0xFF1A4A35) : Color(0xFFC3E8DC);
+  static Color sheetOptionProjectBorder(bool isDark) =>
+      isDark ? Color(0xFF1A3060) : Color(0xFFC5D1F5);
+
+  // Formularze
+  static Color formPlaceholder(bool isDark) =>
+      isDark ? Color(0xFF2D4A65) : Color(0xFFC8D5E8);
+  static Color amountFieldBorder(bool isDark) =>
+      isDark ? Color(0xFF1A4A35) : Color(0xFFB3E8D6);
+  static const amountCurrencyDark = Color(0xFF00A87A);
+  static const amountCurrencyLight = Color(0xFF007A5A);
+  static Color amountCurrency(bool isDark) =>
+      isDark ? amountCurrencyDark : amountCurrencyLight;
+
+  // Tagi nieaktywne
+  static Color tagInactiveBg(bool isDark) =>
+      isDark ? Color(0xFF132233) : Color(0xFFF0F4F8);
 }

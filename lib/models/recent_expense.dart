@@ -13,6 +13,7 @@ class RecentExpense {
   final bool scanned;
   final DateTime date;
   final DateTime createdAt;
+  final String? projectId;
 
   const RecentExpense({
     required this.name,
@@ -27,5 +28,6 @@ class RecentExpense {
     required this.scanned,
     required this.date,
     required this.createdAt,
+    this.projectId,
   });
 }
