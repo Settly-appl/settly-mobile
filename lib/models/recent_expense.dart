@@ -5,6 +5,7 @@ class RecentExpense {
   final String subtitle;
   final String totalAmount;
   final String type;
+  final String currency;
   final Color iconBg;
   final Color iconColor;
   final Color badgeBg;
@@ -20,6 +21,7 @@ class RecentExpense {
     required this.subtitle,
     required this.totalAmount,
     required this.type,
+    required this.currency,
     required this.iconBg,
     required this.iconColor,
     required this.badgeBg,

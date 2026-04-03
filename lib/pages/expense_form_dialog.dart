@@ -25,6 +25,9 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
   String _selectedSplitType = "Podział równy";
   bool _isSplitTypeExpanded = false;
 
+  String _selectedCurrency = "PLN";
+  bool _isCurrencyExpanded = false;
+
   bool _isFriendsExpanded = false;
   bool _isScanned = false;
   final List<String> _selectedFriends = [];
@@ -635,62 +638,212 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
   }
 
   Widget _buildAmountSection(Color accentGreen) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.green.withOpacity(0.1), Colors.transparent],
-        ),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            "KWOTA",
-            style: TextStyle(color: Colors.blueGrey, fontSize: 10),
-          ),
-          const SizedBox(height: 4),
-          IntrinsicWidth(
-            child: TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: accentGreen,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-              ),
-              decoration: InputDecoration(
-                hintText: "0,00",
-                hintStyle: TextStyle(color: accentGreen.withOpacity(0.2)),
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    "zł",
-                    style: TextStyle(
-                      color: accentGreen,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-              ),
+    final Color cardColor = widget.isDark
+        ? const Color(0xFF1A2D45)
+        : Colors.white;
+
+    final List<Map<String, dynamic>> _currencies = [
+      {
+        'code': 'PLN',
+        'symbol': 'zł',
+        'name': 'Złoty polski',
+        'color': const Color(0xFF00E6B4),
+      },
+      {'code': 'EUR', 'symbol': '€', 'name': 'Euro', 'color': Colors.blue},
+      {
+        'code': 'USD',
+        'symbol': '\$',
+        'name': 'Dolar amerykański',
+        'color': Colors.orange,
+      },
+      {
+        'code': 'GBP',
+        'symbol': '£',
+        'name': 'Funt brytyjski',
+        'color': Colors.purple,
+      },
+    ];
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.green.withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.green.withOpacity(0.1), Colors.transparent],
             ),
           ),
-        ],
-      ),
+          child: Column(
+            children: [
+              const Text(
+                "KWOTA",
+                style: TextStyle(color: Colors.blueGrey, fontSize: 10),
+              ),
+              const SizedBox(height: 4),
+              IntrinsicWidth(
+                child: TextField(
+                  controller: _amountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: accentGreen,
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "0.00",
+                    hintStyle: TextStyle(color: accentGreen.withOpacity(0.2)),
+                    prefixIcon: GestureDetector(
+                      onTap: () => setState(
+                        () => _isCurrencyExpanded = !_isCurrencyExpanded,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _selectedCurrency == 'PLN'
+                                  ? 'zł'
+                                  : _selectedCurrency,
+                              style: TextStyle(
+                                color: accentGreen,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Icon(
+                              _isCurrencyExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: accentGreen,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // DROPDOWN WALUTY
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          height: _isCurrencyExpanded ? (_currencies.length * 60.0) + 8 : 0,
+          margin: EdgeInsets.only(top: _isCurrencyExpanded ? 8 : 0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.cardBorder(widget.isDark)),
+            ),
+            child: ListView.separated(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: _currencies.length,
+              separatorBuilder: (_, __) => Divider(
+                color: AppColors.cardBorder(widget.isDark),
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              itemBuilder: (context, index) {
+                final currency = _currencies[index];
+                final bool isSelected = _selectedCurrency == currency['code'];
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    _selectedCurrency = currency['code'];
+                    _isCurrencyExpanded = false;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? (currency['color'] as Color).withOpacity(0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: (currency['color'] as Color).withOpacity(
+                              0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              currency['symbol'],
+                              style: TextStyle(
+                                color: currency['color'] as Color,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currency['name'],
+                                style: TextStyle(
+                                  color: AppColors.cardTitle(widget.isDark),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                currency['code'],
+                                style: TextStyle(
+                                  color: AppColors.cardSubtitle(widget.isDark),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.amountCurrency(widget.isDark),
+                            size: 18,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -721,7 +874,8 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
               0.0,
           shop: _placeController.text.trim(),
           date: _selectedDate,
-          //category: _selectedCategory,
+          category: _selectedCategory,
+          currency: _selectedCurrency,
           note: _noteController.text.isNotEmpty ? _noteController.text : null,
           isScanned: _isScanned,
           //projectId: _selectedProject,

@@ -47,7 +47,8 @@ extension ExpenseCategoryLabel on AllExpensesPage {
 // ExpensesPage
 // ════════════════════════════════════════════════════════════════════════════
 class ExpensesPage extends StatefulWidget {
-  const ExpensesPage({super.key});
+  final ValueNotifier<int> tabNotifier;
+  const ExpensesPage({super.key, required this.tabNotifier});
 
   @override
   State<ExpensesPage> createState() => _ExpensesPageState();
@@ -84,6 +85,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   void initState() {
     super.initState();
     _fetchExpenses();
+    widget.tabNotifier.addListener(_onTabChanged);
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
@@ -92,28 +94,32 @@ class _ExpensesPageState extends State<ExpensesPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    widget.tabNotifier.removeListener(_onTabChanged);
     super.dispose();
   }
 
-  // ── Pobranie danych z API ──────────────────────────────────────────────────
+  void _onTabChanged() {
+    if (widget.tabNotifier.value == 1) {
+      _fetchExpenses();
+    }
+  }
+
   // ── Pobranie danych z API ──────────────────────────────────────────────────
   Future<void> _fetchExpenses() async {
     setState(() => _isLoading = true);
 
-    // TODO: gdy backend obsłuży filtrowanie po kategorii odkomentuj i usuń bazowy endpoint
-    // final category = _selectedCategory.apiValue;
-    // final categoryParam = category != null ? '&category=$category' : '';
+    final category = _selectedCategory.apiValue;
+    final categoryParam = category != null ? '&category=$category' : '';
 
     final response = await ApiServiceRequest().request(
       endpoint:
-          'expenses?pageNumber=0&pageSize=20&sortBy=createdAt&sortDirection=desc',
-      // endpoint: 'expenses?pageNumber=0&pageSize=20&sortBy=createdAt&sortDirection=desc$categoryParam',
+          'expenses?pageNumber=0&pageSize=20&sortBy=createdAt&sortDirection=desc$categoryParam',
       method: HttpMethod.get,
     );
 
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final fetched = SingleExpense.listFromJson(data['result'], isDark);
+      final fetched = SingleExpense.listFromJson(data['content'], isDark);
       setState(() => _expenses = fetched);
     }
 
@@ -335,9 +341,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
             child: GestureDetector(
               onTap: () {
                 if (_selectedCategory == cat) return;
-                // TODO: odkomentuj gdy backend obsłuży filtrowanie po kategorii
-                // setState(() => _selectedCategory = cat);
-                // _fetchExpenses();
+                setState(() => _selectedCategory = cat);
+                _fetchExpenses();
                 if (cat == AllExpensesPage.all) {
                   setState(() => _selectedCategory = cat);
                   _fetchExpenses();

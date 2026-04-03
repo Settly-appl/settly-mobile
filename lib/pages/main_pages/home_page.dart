@@ -1,13 +1,12 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/main.dart';
-import 'package:settly_mobile/models/pinned_card.dart';
+import 'package:settly_mobile/models/pinned_item.dart';
 import 'package:settly_mobile/models/recent_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-
 import '../../models/single_expense.dart';
+import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
 import '../all_expenses_page.dart';
 import 'home_page_widgets/pinned_scroll.dart';
@@ -34,6 +33,7 @@ class HomePage extends StatefulWidget {
 class HomePageState extends State<HomePage> {
   int _currentTab = 0;
   bool _isLoading = false;
+  final ValueNotifier<int> _tabNotifier = ValueNotifier(0);
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -46,12 +46,22 @@ class HomePageState extends State<HomePage> {
   ];
 
   List<RecentExpense> recentItems = [];
-  List<PinnedCard> pinnedItems = [];
+
+  // ── ZMIANA: PinnedItem zamiast PinnedCard ──────────────────────────────────
+  List<PinnedItem> pinnedItems = [];
+  final _pinnedRepo = PinnedRepository();
 
   @override
   void initState() {
     super.initState();
     _fetchRecentExpenses();
+    _fetchPinnedItems(); // nowe
+  }
+
+  @override
+  void dispose() {
+    _tabNotifier.dispose();
+    super.dispose();
   }
 
   void switchTab(int index) => setState(() => _currentTab = index);
@@ -59,7 +69,7 @@ class HomePageState extends State<HomePage> {
   // ── Strony dla zakładek ──────────────────────────────────────────────────────
   List<Widget> get _pages => [
     _HomeBody(state: this),
-    const ExpensesPage(),
+    ExpensesPage(tabNotifier: _tabNotifier),
     const _PlaceholderTab(label: 'Grupy'),
     const _PlaceholderTab(label: 'Analiza'),
     const _PlaceholderTab(label: 'Profil'),
@@ -69,7 +79,6 @@ class HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      // AppBar tylko dla zakładki Główna (idx 0)
       appBar: _currentTab == 0 ? _buildAppBar() : null,
       body: IndexedStack(index: _currentTab, children: _pages),
       bottomNavigationBar: _buildBottomNav(),
@@ -210,7 +219,10 @@ class HomePageState extends State<HomePage> {
 
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _currentTab = idx),
+              onTap: () {
+                _tabNotifier.value = idx;
+                setState(() => _currentTab = idx);
+              },
               behavior: HitTestBehavior.opaque,
               child: SizedBox(
                 height: 60,
@@ -259,22 +271,21 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // ── Fetch ────────────────────────────────────────────────────────────────────
+  // ── Fetch wydatków ───────────────────────────────────────────────────────────
   Future<void> _fetchRecentExpenses() async {
     setState(() => _isLoading = true);
 
     final apiService = ApiServiceRequest();
     final response = await apiService.request(
-      endpoint: 'expenses?pageNumber=0&pageSize=5',
+      endpoint: 'expenses?page=0&size=5&sort=createdAt,desc&category=',
       method: HttpMethod.get,
     );
 
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final List<RecentExpense> fetched = data['result'] != null
-          ? SingleExpense.listFromJson(data['result'], isDark)
+      final List<RecentExpense> fetched = data['content'] != null
+          ? SingleExpense.listFromJson(data['content'], isDark)
           : [];
-
       setState(() {
         recentItems = fetched;
         _isLoading = false;
@@ -283,10 +294,16 @@ class HomePageState extends State<HomePage> {
       setState(() => _isLoading = false);
     }
   }
+
+  // ── NOWE: Fetch przypiętych z lokalnego repo ───────────────────────────────
+  Future<void> _fetchPinnedItems() async {
+    final items = await _pinnedRepo.getAll();
+    if (mounted) setState(() => pinnedItems = items);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// _HomeBody — body zakładki "Główna"
+// _HomeBody
 // ════════════════════════════════════════════════════════════════════════════
 class _HomeBody extends StatelessWidget {
   final HomePageState state;
@@ -307,14 +324,22 @@ class _HomeBody extends StatelessWidget {
           onExpenseAdded: state._fetchRecentExpenses,
         ),
         const SizedBox(height: 16),
+
+        // ── Nagłówek "Przypięte" z akcją "Edytuj" ─────────────────────────
         state._sectionHeader('Przypięte', action: 'Edytuj'),
         const SizedBox(height: 10),
-        PinnedScroll(isDark: state.isDark, pinnedItems: state.pinnedItems),
+
+        // ── ZMIANA: nowy PinnedScroll z onRefresh ──────────────────────────
+        PinnedScroll(
+          isDark: state.isDark,
+          pinnedItems: state.pinnedItems,
+          onRefresh: state._fetchPinnedItems,
+        ),
+
         const SizedBox(height: 16),
         state._sectionHeader(
           'Ostatnie',
           action: 'Zobacz wszystkie',
-          // "Zobacz wszystkie" przełącza na zakładkę Wydatki (idx 1)
           onActionTap: () => state.switchTab(1),
         ),
         const SizedBox(height: 10),
@@ -344,7 +369,7 @@ class _HomeBody extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// _PlaceholderTab — tymczasowy widok dla niezaimplementowanych zakładek
+// _PlaceholderTab
 // ════════════════════════════════════════════════════════════════════════════
 class _PlaceholderTab extends StatelessWidget {
   final String label;
