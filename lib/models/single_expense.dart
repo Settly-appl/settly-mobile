@@ -6,7 +6,8 @@ class SingleExpense {
   final String name;
   final String? note;
   final String totalAmount;
-  final String? type;
+  final String? category;
+  final String? currency;
   final bool scanned;
   final DateTime date;
   final DateTime createdAt;
@@ -16,20 +17,22 @@ class SingleExpense {
     required this.name,
     required this.note,
     required this.totalAmount,
-    required this.type,
+    required this.category,
+    required this.currency,
     required this.scanned,
     required this.date,
     required this.createdAt,
     this.projectId,
   });
   RecentExpense toRecentExpense(bool isDark) {
-    final style = ExpenseStyle.getStyle(type ?? 'default', isDark);
+    final style = ExpenseStyle.getStyle(category ?? 'default', isDark);
 
     return RecentExpense(
       name: name,
       subtitle: note ?? '',
       totalAmount: totalAmount,
-      type: type ?? 'default',
+      type: category ?? 'default',
+      currency: currency ?? 'PLN',
       iconBg: style.iconBg,
       iconColor: style.iconColor,
       badgeBg: style.badgeBg,
@@ -47,7 +50,8 @@ class SingleExpense {
       name: json['shop'],
       note: json['note'] ?? '',
       totalAmount: json['totalAmount']?.toString() ?? '0.00',
-      type: json['type']?.toString() ?? 'Wydatek',
+      category: json['category']?.toString() ?? 'Wydatek',
+      currency: json['currency']?.toString() ?? 'PLN',
       scanned: json['isScanned'] ?? false,
       date: DateTime.parse(json['date']),
       createdAt: DateTime.parse(json['createdAt']),

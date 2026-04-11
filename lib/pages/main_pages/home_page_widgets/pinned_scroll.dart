@@ -1,68 +1,152 @@
+// lib/pages/home_page/home_page_widgets/pinned_scroll.dart
+//
+// Poziomy scroll przypiętych kafelków + kafelek "Przytnij wydatek lub projekt".
+// Obsługuje wydatki i projekty (PinnedItem) zamiast starego PinnedCard.
+
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/pinned_card.dart';
+import 'package:settly_mobile/models/pinned_item.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'pin_picker_sheet.dart';
 
 class PinnedScroll extends StatelessWidget {
   final bool isDark;
-  final List<PinnedCard> pinnedItems;
+  final List<PinnedItem> pinnedItems;
+
+  /// Callback do odświeżenia listy przypiętych w HomePageState.
+  final Future<void> Function() onRefresh;
 
   const PinnedScroll({
     super.key,
     required this.isDark,
     required this.pinnedItems,
+    required this.onRefresh,
   });
+
+  void _openPinPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => PinPickerSheet(isDark: isDark, onPinned: onRefresh),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 130,
+      height: 110,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
+          // ── Kafelek "Przytnij" ──────────────────────────────────────────────
+          _AddPinTile(isDark: isDark, onTap: () => _openPinPicker(context)),
+          const SizedBox(width: 10),
+
+          // ── Przypięte elementy ─────────────────────────────────────────────
           ...pinnedItems.map(
             (item) => Padding(
               padding: const EdgeInsets.only(right: 10),
-              child: GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Funkcja otwierania przypiętych będzie dostępna wkrótce!',
-                      ),
-                    ),
-                  );
-                },
-                child: _PinnedCard(item: item, isDark: isDark),
-              ),
+              child: _PinnedTile(item: item, isDark: isDark),
             ),
           ),
-          _PinnedEmptyCard(isDark: isDark),
         ],
       ),
     );
   }
 }
 
-class _PinnedCard extends StatelessWidget {
-  final PinnedCard item;
+// ════════════════════════════════════════════════════════════════════════════
+// Kafelek z "+" — otwiera PinPickerSheet
+// ════════════════════════════════════════════════════════════════════════════
+class _AddPinTile extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _AddPinTile({required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 90,
+        height: 110,
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.cardBorder(isDark),
+            width: 1.5,
+            // Linia przerywana jest natywnie dostępna tylko przez CustomPainter;
+            // tu używamy zwykłej ramki — prosta i czytelna.
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.actionScanIcon(isDark).withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.push_pin_outlined,
+                size: 18,
+                color: AppColors.actionScanIcon(isDark),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Przytnij',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.actionScanIcon(isDark),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'wydatek / projekt',
+              style: TextStyle(
+                fontSize: 9,
+                color: AppColors.cardSubtitle(isDark),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Kafelek przypiętego elementu
+// ════════════════════════════════════════════════════════════════════════════
+class _PinnedTile extends StatelessWidget {
+  final PinnedItem item;
   final bool isDark;
 
-  const _PinnedCard({required this.item, required this.isDark});
+  const _PinnedTile({required this.item, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 140,
+      width: 110,
+      height: 110,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.cardBg(isDark),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.cardBorder(isDark)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Ikona + badge typu
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -73,107 +157,54 @@ class _PinnedCard extends StatelessWidget {
                   color: item.iconBg,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(item.icon, size: 14, color: item.iconColor),
+                child: Icon(item.icon, size: 15, color: item.iconColor),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
-                  color: item.badgeBg,
-                  borderRadius: BorderRadius.circular(6),
+                  color: item.type == PinnedItemType.project
+                      ? Colors.blueAccent.withOpacity(0.15)
+                      : item.iconBg,
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
-                  item.type,
+                  item.type == PinnedItemType.project ? 'Proj.' : 'Wyd.',
                   style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: item.badgeFg,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color: item.iconColor,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const Spacer(),
+
+          // Nazwa
           Text(
-            item.name,
+            item.title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: AppColors.cardTitle(isDark),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
+
+          // Kwota
           Text(
-            item.subtitle,
+            '${item.amount} ${item.currency}',
             style: TextStyle(
-              fontSize: 10,
-              color: AppColors.cardSubtitle(isDark),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.cardAmount(isDark),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
-          Text(
-            item.totalAmount,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: item.amountColor,
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _PinnedEmptyCard extends StatelessWidget {
-  final bool isDark;
-
-  const _PinnedEmptyCard({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.pinnedEmptyBg(isDark),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppColors.pinnedEmptyBorder(isDark),
-            style: BorderStyle.solid,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.pinnedEmptyCircleBg(isDark),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.add,
-                size: 14,
-                color: AppColors.pinnedEmptyIcon(isDark),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Przypnij projekt lub wydatek',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 10,
-                color: AppColors.pinnedEmptyText(isDark),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

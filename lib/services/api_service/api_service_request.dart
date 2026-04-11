@@ -24,6 +24,9 @@ class ApiServiceRequest {
       'Authorization': 'Bearer $token',
       'ngrok-skip-browser-warning': 'true',
     };
+    // if (body != null) {
+    //   print("Body: ${jsonEncode(body)}");
+    // }
 
     try {
       http.Response response;

@@ -85,6 +85,7 @@ class QuickAddMenu extends StatelessWidget {
                       onSaved();
                     } else {
                       print("Błąd wysyłki!");
+                      print(response?.body);
                     }
                   }
                 },
