@@ -9,6 +9,8 @@ import '../../models/single_expense.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
 import '../all_expenses_page.dart';
+import 'friends_page.dart';
+import 'profile_page.dart';
 import 'home_page_widgets/pinned_scroll.dart';
 import 'home_page_widgets/quick_actions_row.dart';
 import 'home_page_widgets/recent_expenses_card.dart';
@@ -41,8 +43,8 @@ class HomePageState extends State<HomePage> {
     {'icon': Icons.grid_view_rounded, 'label': 'Główna'},
     {'icon': Icons.attach_money_rounded, 'label': 'Wydatki'},
     {'icon': Icons.group_outlined, 'label': 'Grupy'},
+    {'icon': Icons.people_outline, 'label': 'Znajomi'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Analiza'},
-    {'icon': Icons.person_outline_rounded, 'label': 'Profil'},
   ];
 
   List<RecentExpense> recentItems = [];
@@ -71,9 +73,21 @@ class HomePageState extends State<HomePage> {
     _HomeBody(state: this),
     ExpensesPage(tabNotifier: _tabNotifier),
     const _PlaceholderTab(label: 'Grupy'),
+    const FriendsPage(),
     const _PlaceholderTab(label: 'Analiza'),
-    const _PlaceholderTab(label: 'Profil'),
   ];
+
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProfilePage(
+          userName: widget.userName,
+          userInitials: widget.userInitials,
+          onLogout: widget.onLogout,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,39 +109,46 @@ class HomePageState extends State<HomePage> {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Dzień dobry,',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.normal,
-              color: AppColors.greeting(isDark),
+      title: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _openProfile,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Dzień dobry,',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.normal,
+                color: AppColors.greeting(isDark),
+              ),
             ),
-          ),
-          Text(
-            widget.userName,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppColors.username(isDark),
+            Text(
+              widget.userName,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.username(isDark),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       leading: Padding(
         padding: const EdgeInsets.only(left: 15.0),
         child: Center(
-          child: CircleAvatar(
-            backgroundColor: AppColors.avatarBg(isDark),
-            radius: 23,
-            child: Text(
-              widget.userInitials,
-              style: TextStyle(
-                color: AppColors.avatarFg(isDark),
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
+          child: GestureDetector(
+            onTap: _openProfile,
+            child: CircleAvatar(
+              backgroundColor: AppColors.avatarBg(isDark),
+              radius: 23,
+              child: Text(
+                widget.userInitials,
+                style: TextStyle(
+                  color: AppColors.avatarFg(isDark),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ),
@@ -151,12 +172,6 @@ class HomePageState extends State<HomePage> {
             color: AppColors.bellIcon(isDark),
             onPressed: () {},
           ),
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.logout_rounded),
-          tooltip: 'Wyloguj się',
-          onPressed: widget.onLogout,
         ),
         const SizedBox(width: 8),
       ],

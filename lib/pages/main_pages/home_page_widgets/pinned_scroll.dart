@@ -1,6 +1,6 @@
 // lib/pages/home_page/home_page_widgets/pinned_scroll.dart
 //
-// Poziomy scroll przypiętych kafelków + kafelek "Przytnij wydatek lub projekt".
+// Poziomy scroll przypiętych kafelków + kafelek "Przypnij wydatek lub projekt".
 // Obsługuje wydatki i projekty (PinnedItem) zamiast starego PinnedCard.
 
 import 'package:flutter/material.dart';
@@ -39,7 +39,7 @@ class PinnedScroll extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          // ── Kafelek "Przytnij" ──────────────────────────────────────────────
+          // ── Kafelek "Przypnij" ──────────────────────────────────────────────
           _AddPinTile(isDark: isDark, onTap: () => _openPinPicker(context)),
           const SizedBox(width: 10),
 
@@ -89,7 +89,7 @@ class _AddPinTile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppColors.actionScanIcon(isDark).withOpacity(0.12),
+                color: AppColors.actionScanIcon(isDark).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -100,7 +100,7 @@ class _AddPinTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Przytnij',
+              'Przypnij',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -163,7 +163,7 @@ class _PinnedTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: item.type == PinnedItemType.project
-                      ? Colors.blueAccent.withOpacity(0.15)
+                      ? Colors.blueAccent.withValues(alpha: 0.15)
                       : item.iconBg,
                   borderRadius: BorderRadius.circular(5),
                 ),
