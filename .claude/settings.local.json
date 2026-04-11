@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/mdut/Settly/settly-api/src/main/java/pl/settly/settly_api/friendships/service/**)",
+      "Read(//home/mdut/Settly/settly-api/src/main/java/**)",
+      "Read(//home/mdut/Settly/settly-api/src/test/**)",
+      "Read(//home/mdut/Settly/settly-api/**)",
+      "Bash(./mvnw -q -pl . test -Dtest='Friendship*Test')",
+      "Bash(find:*)"
+    ]
+  }
+}
