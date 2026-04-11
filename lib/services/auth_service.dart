@@ -3,15 +3,21 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:settly_mobile/const/api_url.dart';
 
 class AuthService {
+  AuthService._internal();
+  static final AuthService _instance = AuthService._internal();
+  factory AuthService() => _instance;
+
   static const _clientId = 'settly';
   static const _redirectUrl = 'settly://callback';
-  static const keycloakBase =
-      'https://revivable-flaccidly-carey.ngrok-free.dev/auth/realms/settly';
-  static const _authEndpoint = '$keycloakBase/protocol/openid-connect/auth';
-  static const _tokenEndpoint = '$keycloakBase/protocol/openid-connect/token';
+  static const _authEndpoint =
+      '${ProjectApiConst.keycloakBase}/protocol/openid-connect/auth';
+  static const _tokenEndpoint =
+      '${ProjectApiConst.keycloakBase}/protocol/openid-connect/token';
+  static const _logoutEndpoint =
+      '${ProjectApiConst.keycloakBase}/protocol/openid-connect/logout';
   static const _scopes = 'openid profile email';
 
   static const _accessTokenKey = 'access_token';
@@ -21,6 +27,7 @@ class AuthService {
   final _storage = const FlutterSecureStorage();
 
   String _codeVerifier = '';
+  Future<bool>? _refreshInFlight;
 
   String buildAuthUrl() {
     _codeVerifier = _generateCodeVerifier();
@@ -73,7 +80,22 @@ class AuthService {
   Future<bool> isLoggedIn() async {
     final refreshToken = await _storage.read(key: _refreshTokenKey);
     if (refreshToken == null) return false;
-    return await _refreshTokens(refreshToken);
+    return refreshAccessToken();
+  }
+
+  /// Refresh the access token using the stored refresh token.
+  /// Concurrent callers share a single in-flight refresh so we don't
+  /// hammer Keycloak when several API calls 401 at the same time.
+  Future<bool> refreshAccessToken() {
+    return _refreshInFlight ??= _doRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _doRefresh() async {
+    final refreshToken = await _storage.read(key: _refreshTokenKey);
+    if (refreshToken == null) return false;
+    return _refreshTokens(refreshToken);
   }
 
   Future<void> logout() async {
@@ -81,14 +103,13 @@ class AuthService {
     if (refreshToken != null) {
       try {
         await http.post(
-          Uri.parse('$keycloakBase/protocol/openid-connect/logout'),
+          Uri.parse(_logoutEndpoint),
           headers: {'Content-Type': 'application/x-www-form-urlencoded'},
           body: {'client_id': _clientId, 'refresh_token': refreshToken},
         );
       } catch (_) {}
     }
     await _storage.deleteAll();
-    await WebViewCookieManager().clearCookies();
   }
 
   Future<String?> getAccessToken() async {

@@ -39,9 +39,9 @@ dependencies:
   intl: ^0.20.2
   http: ^1.2.0
   flutter_secure_storage: ^9.2.2
-  webview_flutter: ^4.10.0
   crypto: ^3.0.6
   shared_preferences: ^2.2.0
+  flutter_web_auth_2: ^5.0.1
 
 dev_dependencies:
   flutter_test:
