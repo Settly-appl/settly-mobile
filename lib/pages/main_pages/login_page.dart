@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:settly_mobile/services/auth_service.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -13,63 +14,63 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _authService = AuthService();
-  bool _showWebView = false;
-  bool _isExchanging = false;
+  bool _isBusy = false;
   String? _errorMessage;
-  late final WebViewController _webViewController;
 
-  void _startLogin() {
-    final authUrl = _authService.buildAuthUrl();
-
-    _webViewController = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (request) {
-            if (request.url.startsWith('settly://callback')) {
-              _handleCallback(request.url);
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(authUrl));
-
+  Future<void> _startLogin() async {
     setState(() {
-      _showWebView = true;
+      _isBusy = true;
       _errorMessage = null;
     });
-  }
 
-  Future<void> _handleCallback(String url) async {
-    final uri = Uri.parse(url);
-    final code = uri.queryParameters['code'];
+    try {
+      final authUrl = _authService.buildAuthUrl();
 
-    if (code == null) {
+      // Opens a Chrome Custom Tab (Android) / ASWebAuthenticationSession (iOS).
+      // Google requires a real browser — embedded WebViews are rejected.
+      final resultUrl = await FlutterWebAuth2.authenticate(
+        url: authUrl,
+        callbackUrlScheme: 'settly',
+      );
+
+      final uri = Uri.parse(resultUrl);
+      final code = uri.queryParameters['code'];
+
+      if (code == null) {
+        if (!mounted) return;
+        setState(() {
+          _isBusy = false;
+          _errorMessage = uri.queryParameters['error_description'] ??
+              'Brak kodu autoryzacji w odpowiedzi.';
+        });
+        return;
+      }
+
+      final (success, error) = await _authService.exchangeCode(code);
+
+      if (!mounted) return;
+
+      if (success) {
+        widget.onLoginSuccess();
+      } else {
+        setState(() {
+          _isBusy = false;
+          _errorMessage = error;
+        });
+      }
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      // User closed the Custom Tab / ASWebAuthenticationSession — not an error.
+      final isCancel = e.code == 'CANCELED' || e.code == 'CANCELLED';
       setState(() {
-        _showWebView = false;
-        _errorMessage = uri.queryParameters['error_description'] ??
-            'Brak kodu autoryzacji w odpowiedzi.';
+        _isBusy = false;
+        _errorMessage = isCancel ? null : (e.message ?? e.code);
       });
-      return;
-    }
-
-    setState(() {
-      _isExchanging = true;
-    });
-
-    final (success, error) = await _authService.exchangeCode(code);
-
-    if (!mounted) return;
-
-    if (success) {
-      widget.onLoginSuccess();
-    } else {
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _showWebView = false;
-        _isExchanging = false;
-        _errorMessage = error;
+        _isBusy = false;
+        _errorMessage = e.toString();
       });
     }
   }
@@ -77,21 +78,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (_showWebView) {
-      return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => setState(() => _showWebView = false),
-          ),
-          title: const Text('Logowanie'),
-        ),
-        body: _isExchanging
-            ? const Center(child: CircularProgressIndicator())
-            : WebViewWidget(controller: _webViewController),
-      );
-    }
 
     return Scaffold(
       body: SafeArea(
@@ -130,17 +116,23 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 16),
               ],
               FilledButton(
-                onPressed: _startLogin,
+                onPressed: _isBusy ? null : _startLogin,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Zaloguj się',
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: _isBusy
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Zaloguj się',
+                        style: TextStyle(fontSize: 16),
+                      ),
               ),
               const SizedBox(height: 48),
             ],

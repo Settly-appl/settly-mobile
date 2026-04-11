@@ -17,58 +17,49 @@ class ApiServiceRequest {
       url = url.replace(queryParameters: queryParams);
     }
 
-    final token = await AuthService().getAccessToken();
-
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-      'ngrok-skip-browser-warning': 'true',
-    };
-    // if (body != null) {
-    //   print("Body: ${jsonEncode(body)}");
-    // }
+    final encodedBody = body != null ? jsonEncode(body) : null;
 
     try {
-      http.Response response;
+      var response = await _send(url, method, encodedBody);
 
-      switch (method) {
-        case HttpMethod.get:
-          response = await http.get(url, headers: headers);
-          break;
-        case HttpMethod.post:
-          response = await http.post(
-            url,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          );
-          break;
-        case HttpMethod.put:
-          response = await http.put(
-            url,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          );
-          break;
-        case HttpMethod.patch:
-          response = await http.patch(
-            url,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          );
-          break;
-        case HttpMethod.delete:
-          response = await http.delete(
-            url,
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          );
-          break;
+      // Access token expired — refresh once and retry.
+      if (response.statusCode == 401) {
+        final refreshed = await AuthService().refreshAccessToken();
+        if (refreshed) {
+          response = await _send(url, method, encodedBody);
+        }
       }
 
       return response;
     } catch (e) {
       print("Błąd połączenia: $e");
       return null;
+    }
+  }
+
+  Future<http.Response> _send(
+    Uri url,
+    HttpMethod method,
+    String? encodedBody,
+  ) async {
+    final token = await AuthService().getAccessToken();
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'ngrok-skip-browser-warning': 'true',
+    };
+
+    switch (method) {
+      case HttpMethod.get:
+        return http.get(url, headers: headers);
+      case HttpMethod.post:
+        return http.post(url, headers: headers, body: encodedBody);
+      case HttpMethod.put:
+        return http.put(url, headers: headers, body: encodedBody);
+      case HttpMethod.patch:
+        return http.patch(url, headers: headers, body: encodedBody);
+      case HttpMethod.delete:
+        return http.delete(url, headers: headers, body: encodedBody);
     }
   }
 }
