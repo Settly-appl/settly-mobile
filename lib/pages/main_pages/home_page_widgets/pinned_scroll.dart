@@ -30,24 +30,30 @@ class PinnedScroll extends StatelessWidget {
 
   Future<void> _handlePinnedClick(BuildContext context, PinnedItem item) async {
     if (item.type == PinnedItemType.expense) {
+      bool isLoaderOpen = false;
       // Pokazujemy loader
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
-
+      isLoaderOpen = true;
       try {
         final response = await ApiServiceRequest().request(
           endpoint: 'expenses/${item.id}',
           method: HttpMethod.get,
         );
 
-        if (context.mounted) Navigator.pop(context); // Zamykamy loader
-
         if (response != null && response.statusCode == 200) {
+          // Najpierw parsujemy dane - jeśli tu wystąpi błąd, przejdzie do catch/finally
           final expense = SingleExpense.fromJson(jsonDecode(response.body));
+
           if (context.mounted) {
+            // Zamykamy dialog przed przejściem dalej
+            Navigator.pop(context);
+            isLoaderOpen = false;
+
+            // Przechodzimy do szczegółów
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -57,11 +63,12 @@ class PinnedScroll extends StatelessWidget {
           }
         }
       } catch (e) {
-        if (context.mounted) {
+        // Tutaj obsłuż błąd, np. pokaż SnackBar
+        print("Błąd: $e");
+      } finally {
+        // Kluczowy blok: zamknij dialog tylko, jeśli nadal jest otwarty
+        if (isLoaderOpen && context.mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Błąd podczas pobierania szczegółów')),
-          );
         }
       }
     } else {

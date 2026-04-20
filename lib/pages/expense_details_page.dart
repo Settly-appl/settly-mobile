@@ -89,7 +89,7 @@ class ExpenseDetailsPage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
@@ -98,12 +98,22 @@ class ExpenseDetailsPage extends StatelessWidget {
               color: AppColors.cardSubtitle(isDark),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.cardTitle(isDark),
+          const SizedBox(width: 16), // Odstęp między etykietą a wartością
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end, // Wyrównanie wartości do prawej
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.cardTitle(isDark),
+              ),
+              // Opcja A: Przycinanie tekstu (ellipsis)
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+
+              // Opcja B: Jeśli wolisz, żeby długa notatka była widoczna w całości,
+              // usuń maxLines i overflow – tekst zawinie się do nowej linii.
             ),
           ),
         ],
