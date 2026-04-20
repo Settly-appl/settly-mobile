@@ -1,66 +1,53 @@
-import 'package:settly_mobile/models/recent_expense.dart';
-
 import 'expens_style.dart';
 
 class SingleExpense {
+  final String? id;
   final String name;
-  final String? note;
+  final String note;
   final String totalAmount;
-  final String? category;
-  final String? currency;
+  final String category;
+  final String currency;
   final bool scanned;
   final DateTime date;
   final DateTime createdAt;
   final String? projectId;
 
   const SingleExpense({
+    this.id,
     required this.name,
-    required this.note,
+    this.note = '',
     required this.totalAmount,
-    required this.category,
-    required this.currency,
+    this.category = 'Wydatek',
+    this.currency = 'PLN',
     required this.scanned,
     required this.date,
     required this.createdAt,
     this.projectId,
   });
-  RecentExpense toRecentExpense(bool isDark) {
-    final style = ExpenseStyle.getStyle(category ?? 'default', isDark);
 
-    return RecentExpense(
-      name: name,
-      subtitle: note ?? '',
-      totalAmount: totalAmount,
-      type: category ?? 'default',
-      currency: currency ?? 'PLN',
-      iconBg: style.iconBg,
-      iconColor: style.iconColor,
-      badgeBg: style.badgeBg,
-      badgeFg: style.badgeFg,
-      icon: style.icon,
-      scanned: scanned,
-      date: date,
-      createdAt: createdAt,
-      projectId: projectId ?? null,
-    );
-  }
+  // ── GETTER STYLI ───────────────────────────────────────────────────────────
+  ExpenseStyle style(bool isDark) => ExpenseStyle.getStyle(category, isDark);
 
   factory SingleExpense.fromJson(Map<String, dynamic> json) {
     return SingleExpense(
-      name: json['shop'],
+      id: json['id']?.toString(),
+      name: json['shop'] ?? 'Wydatek',
       note: json['note'] ?? '',
       totalAmount: json['totalAmount']?.toString() ?? '0.00',
       category: json['category']?.toString() ?? 'Wydatek',
       currency: json['currency']?.toString() ?? 'PLN',
       scanned: json['isScanned'] ?? false,
-      date: DateTime.parse(json['date']),
-      createdAt: DateTime.parse(json['createdAt']),
-      projectId: json['projectId'] ?? null,
+      date: json['date'] != null
+          ? DateTime.parse(json['date'])
+          : DateTime.now(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+      projectId: json['projectId']?.toString(),
     );
   }
-  static List<RecentExpense> listFromJson(List<dynamic> json, bool isDark) {
-    return json
-        .map((e) => SingleExpense.fromJson(e).toRecentExpense(isDark))
-        .toList();
+
+  static List<SingleExpense> listFromJson(List<dynamic> json) {
+    return json.map((e) => SingleExpense.fromJson(e)).toList();
   }
 }

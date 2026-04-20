@@ -1,46 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/recent_expense.dart';
+import 'package:settly_mobile/models/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 
 class RecentExpenseCard extends StatelessWidget {
-  final RecentExpense item;
+  final SingleExpense item;
   final bool isDark;
+  final VoidCallback? onTap;
 
   const RecentExpenseCard({
     super.key,
     required this.item,
     required this.isDark,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg(isDark),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder(isDark)),
-      ),
-      child: Row(
-        children: [
-          _iconBox(),
-          const SizedBox(width: 10),
-          Expanded(child: _nameAndSubtitle()),
-          _amountAndBadge(),
-        ],
+    final style = item.style(isDark);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder(isDark)),
+        ),
+        child: Row(
+          children: [
+            _iconBox(style),
+            const SizedBox(width: 10),
+            Expanded(child: _nameAndSubtitle()),
+            _amountAndBadge(style),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _iconBox() {
+  Widget _iconBox(dynamic style) {
     return Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: item.iconBg,
+        color: style.iconBg,
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(item.icon, size: 16, color: item.iconColor),
+      child: Icon(style.icon, size: 16, color: style.iconColor),
     );
   }
 
@@ -57,14 +64,14 @@ class RecentExpenseCard extends StatelessWidget {
           ),
         ),
         Text(
-          item.subtitle,
+          item.note,
           style: TextStyle(fontSize: 11, color: AppColors.cardSubtitle(isDark)),
         ),
       ],
     );
   }
 
-  Widget _amountAndBadge() {
+  Widget _amountAndBadge(dynamic style) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -80,15 +87,15 @@ class RecentExpenseCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: item.badgeBg,
+            color: style.badgeBg,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            item.type,
+            item.category,
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,
-              color: item.badgeFg,
+              color: style.badgeFg,
             ),
           ),
         ),

@@ -1,8 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/pinned_item.dart';
-import 'package:settly_mobile/models/recent_expense.dart';
 import 'package:settly_mobile/models/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
@@ -30,7 +28,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
   final _repo = PinnedRepository();
 
   // ── Stan zakładki Wydatki ──────────────────────────────────────────────────
-  List<RecentExpense> _expenses = [];
+  List<SingleExpense> _expenses = [];
   bool _loadingExpenses = true;
 
   // ── Śledzenie już przypiętych id ──────────────────────────────────────────
@@ -51,9 +49,9 @@ class _PinPickerSheetState extends State<PinPickerSheet>
   }
 
   Future<void> _loadPinnedIds() async {
-    final pinned = await _repo.getAll();
+    final pinned = await _repo.getPinnedIds();
     if (!mounted) return;
-    setState(() => _pinnedIds = pinned.map((e) => e.id).toSet());
+    setState(() => _pinnedIds = pinned.toSet());
   }
 
   Future<void> _fetchExpenses() async {
@@ -64,29 +62,15 @@ class _PinPickerSheetState extends State<PinPickerSheet>
     );
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final fetched = SingleExpense.listFromJson(
-        data['content'],
-        widget.isDark,
-      );
+      final fetched = SingleExpense.listFromJson(data['content']);
       if (mounted) setState(() => _expenses = fetched);
     }
     if (mounted) setState(() => _loadingExpenses = false);
   }
 
   // ── Przypinanie wydatku ────────────────────────────────────────────────────
-  Future<void> _pinExpense(RecentExpense expense, String expenseId) async {
-    final item = PinnedItem.fromExpense(
-      id: expenseId,
-      name: expense.name,
-      subtitle: expense.subtitle,
-      amount: expense.totalAmount,
-      currency: expense.currency,
-      icon: expense.icon,
-      iconBg: expense.iconBg,
-      iconColor: expense.iconColor,
-    );
-
-    final success = await _repo.pin(item);
+  Future<void> _pinExpense(String expenseId, String name) async {
+    final success = await _repo.pin(expenseId);
 
     if (!mounted) return;
 
@@ -94,7 +78,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
       setState(() => _pinnedIds.add(expenseId));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Przypięto: ${expense.name}'),
+          content: Text('Przypięto: $name'),
           backgroundColor: AppColors.actionScanIcon(widget.isDark),
           duration: const Duration(seconds: 2),
         ),
@@ -224,10 +208,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                _buildExpensesTab(),
-                _buildProjectsTab(), // "otwarta furtka"
-              ],
+              children: [_buildExpensesTab(), _buildProjectsTab()],
             ),
           ),
         ],
@@ -269,31 +250,23 @@ class _PinPickerSheetState extends State<PinPickerSheet>
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final expense = _expenses[index];
-        // Uwaga: RecentExpense nie ma id z backendu — tu używamy name+date jako klucz
-        // Docelowo przekazuj id z JSON. Jeśli dodasz `id` do RecentExpense/SingleExpense,
-        // podmień poniższe na expense.id.
-        final tempId =
-            '${expense.name}_${expense.createdAt.millisecondsSinceEpoch}';
-        final isPinned = _pinnedIds.contains(tempId);
+        final expenseId = expense.id ?? '';
+        if (expenseId.isEmpty) return const SizedBox.shrink();
+
+        final isPinned = _pinnedIds.contains(expenseId);
 
         return _ExpensePickerRow(
           expense: expense,
           isDark: widget.isDark,
           isPinned: isPinned,
-          onTap: () =>
-              isPinned ? _unpinById(tempId) : _pinExpense(expense, tempId),
+          onTap: () => isPinned
+              ? _unpinById(expenseId)
+              : _pinExpense(expenseId, expense.name),
         );
       },
     );
   }
 
-  // ── Zakładka: Projekty (otwarta furtka) ───────────────────────────────────
-  //
-  // Gdy zostanie zaimplementowana funkcjonalność projektów:
-  // 1. Podmień placeholder na listę projektów z API
-  // 2. Wywołaj _pinProject(project) analogicznie do _pinExpense
-  // 3. W PinnedItem.fromProject uzupełnij faktyczne dane projektu
-  //
   Widget _buildProjectsTab() {
     return Center(
       child: Column(
@@ -310,7 +283,9 @@ class _PinPickerSheetState extends State<PinPickerSheet>
             child: Icon(
               Icons.group_outlined,
               size: 36,
-              color: AppColors.cardSubtitle(widget.isDark).withOpacity(0.5),
+              color: AppColors.cardSubtitle(
+                widget.isDark,
+              ).withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 16),
@@ -322,29 +297,14 @@ class _PinPickerSheetState extends State<PinPickerSheet>
               color: AppColors.cardTitle(widget.isDark),
             ),
           ),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'Gdy funkcjonalność projektów zostanie dodana, będziesz mógł tu przypiąć swoje projekty grupowe.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.cardSubtitle(widget.isDark),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Wiersz wydatku z przyciskiem "przypnij / odepnij"
-// ════════════════════════════════════════════════════════════════════════════
 class _ExpensePickerRow extends StatelessWidget {
-  final RecentExpense expense;
+  final SingleExpense expense;
   final bool isDark;
   final bool isPinned;
   final VoidCallback onTap;
@@ -358,6 +318,8 @@ class _ExpensePickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = expense.style(isDark);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
@@ -365,26 +327,23 @@ class _ExpensePickerRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isPinned
-              ? AppColors.actionScanIcon(isDark).withOpacity(0.5)
+              ? AppColors.actionScanIcon(isDark).withValues(alpha: 0.5)
               : AppColors.cardBorder(isDark),
           width: isPinned ? 1.5 : 1,
         ),
       ),
       child: Row(
         children: [
-          // Ikona kategorii
           Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: expense.iconBg,
+              color: style.iconBg,
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(expense.icon, size: 17, color: expense.iconColor),
+            child: Icon(style.icon, size: 17, color: style.iconColor),
           ),
           const SizedBox(width: 10),
-
-          // Nazwa + notatka
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,9 +356,9 @@ class _ExpensePickerRow extends StatelessWidget {
                     color: AppColors.cardTitle(isDark),
                   ),
                 ),
-                if (expense.subtitle.isNotEmpty)
+                if (expense.note.isNotEmpty)
                   Text(
-                    expense.subtitle,
+                    expense.note,
                     style: TextStyle(
                       fontSize: 11,
                       color: AppColors.cardSubtitle(isDark),
@@ -410,8 +369,6 @@ class _ExpensePickerRow extends StatelessWidget {
               ],
             ),
           ),
-
-          // Kwota
           Text(
             '${expense.totalAmount} ${expense.currency}',
             style: TextStyle(
@@ -421,8 +378,6 @@ class _ExpensePickerRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-
-          // Przycisk pin/unpin
           GestureDetector(
             onTap: onTap,
             child: AnimatedContainer(

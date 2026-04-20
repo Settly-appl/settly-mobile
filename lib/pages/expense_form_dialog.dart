@@ -32,10 +32,11 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
   bool _isScanned = false;
   final List<String> _selectedFriends = [];
 
+  //TODO znormalicować nazwy kategori żęby tutaj i w all expenses były takie same
   final List<Map<String, dynamic>> _categories = [
     {'name': 'shopping', 'icon': Icons.shopping_bag, 'color': Colors.orange},
     {'name': 'food', 'icon': Icons.restaurant, 'color': Colors.red},
-    {'name': 'Transport', 'icon': Icons.directions_car, 'color': Colors.blue},
+    {'name': 'transport', 'icon': Icons.directions_car, 'color': Colors.blue},
     {'name': 'entertainment', 'icon': Icons.movie, 'color': Colors.purple},
     {'name': 'health', 'icon': Icons.medical_services, 'color': Colors.green},
     {'name': 'others', 'icon': Icons.more_horiz, 'color': Colors.grey},
