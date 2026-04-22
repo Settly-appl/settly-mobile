@@ -1,18 +1,15 @@
-// lib/pages/home_page/home_page_widgets/pinned_scroll.dart
-//
-// Poziomy scroll przypiętych kafelków + kafelek "Przypnij wydatek lub projekt".
-// Obsługuje wydatki i projekty (PinnedItem) zamiast starego PinnedCard.
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/models/pinned_item.dart';
+import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'pin_picker_sheet.dart';
 
 class PinnedScroll extends StatelessWidget {
   final bool isDark;
   final List<PinnedItem> pinnedItems;
-
-  /// Callback do odświeżenia listy przypiętych w HomePageState.
   final Future<void> Function() onRefresh;
 
   const PinnedScroll({
@@ -31,6 +28,57 @@ class PinnedScroll extends StatelessWidget {
     );
   }
 
+  Future<void> _handlePinnedClick(BuildContext context, PinnedItem item) async {
+    if (item.type == PinnedItemType.expense) {
+      bool isLoaderOpen = false;
+      // Pokazujemy loader
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      isLoaderOpen = true;
+      try {
+        final response = await ApiServiceRequest().request(
+          endpoint: 'expenses/${item.id}',
+          method: HttpMethod.get,
+        );
+
+        if (response != null && response.statusCode == 200) {
+          // Najpierw parsujemy dane - jeśli tu wystąpi błąd, przejdzie do catch/finally
+          final expense = SingleExpense.fromJson(jsonDecode(response.body));
+
+          if (context.mounted) {
+            // Zamykamy dialog przed przejściem dalej
+            Navigator.pop(context);
+            isLoaderOpen = false;
+
+            // Przechodzimy do szczegółów
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ExpenseDetailsPage(expense: expense),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        // Tutaj obsłuż błąd, np. pokaż SnackBar
+        print("Błąd: $e");
+      } finally {
+        // Kluczowy blok: zamknij dialog tylko, jeśli nadal jest otwarty
+        if (isLoaderOpen && context.mounted) {
+          Navigator.pop(context);
+        }
+      }
+    } else {
+      // TODO: Obsługa kliknięcia w projekt (ProjectDetailsPage)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Szczegóły projektu wkrótce!')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -39,15 +87,16 @@ class PinnedScroll extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          // ── Kafelek "Przypnij" ──────────────────────────────────────────────
           _AddPinTile(isDark: isDark, onTap: () => _openPinPicker(context)),
           const SizedBox(width: 10),
-
-          // ── Przypięte elementy ─────────────────────────────────────────────
           ...pinnedItems.map(
             (item) => Padding(
               padding: const EdgeInsets.only(right: 10),
-              child: _PinnedTile(item: item, isDark: isDark),
+              child: _PinnedTile(
+                item: item,
+                isDark: isDark,
+                onTap: () => _handlePinnedClick(context, item),
+              ),
             ),
           ),
         ],
@@ -56,9 +105,6 @@ class PinnedScroll extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Kafelek z "+" — otwiera PinPickerSheet
-// ════════════════════════════════════════════════════════════════════════════
 class _AddPinTile extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
@@ -75,12 +121,7 @@ class _AddPinTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.cardBg(isDark),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.cardBorder(isDark),
-            width: 1.5,
-            // Linia przerywana jest natywnie dostępna tylko przez CustomPainter;
-            // tu używamy zwykłej ramki — prosta i czytelna.
-          ),
+          border: Border.all(color: AppColors.cardBorder(isDark), width: 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -123,88 +164,91 @@ class _AddPinTile extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Kafelek przypiętego elementu
-// ════════════════════════════════════════════════════════════════════════════
 class _PinnedTile extends StatelessWidget {
   final PinnedItem item;
   final bool isDark;
+  final VoidCallback onTap;
 
-  const _PinnedTile({required this.item, required this.isDark});
+  const _PinnedTile({
+    required this.item,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 110,
-      height: 110,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg(isDark),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder(isDark)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Ikona + badge typu
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: item.iconBg,
-                  borderRadius: BorderRadius.circular(9),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 110,
+        height: 110,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder(isDark)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: item.iconBg,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(item.icon, size: 15, color: item.iconColor),
                 ),
-                child: Icon(item.icon, size: 15, color: item.iconColor),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: item.type == PinnedItemType.project
-                      ? Colors.blueAccent.withValues(alpha: 0.15)
-                      : item.iconBg,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  item.type == PinnedItemType.project ? 'Proj.' : 'Wyd.',
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    color: item.iconColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: item.type == PinnedItemType.project
+                        ? Colors.blueAccent.withValues(alpha: 0.15)
+                        : item.iconBg,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(
+                    item.type == PinnedItemType.project ? 'Proj.' : 'Wyd.',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: item.iconColor,
+                    ),
                   ),
                 ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              item.title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.cardTitle(isDark),
               ),
-            ],
-          ),
-          const Spacer(),
-
-          // Nazwa
-          Text(
-            item.title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.cardTitle(isDark),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-
-          // Kwota
-          Text(
-            '${item.amount} ${item.currency}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.cardAmount(isDark),
+            const SizedBox(height: 2),
+            Text(
+              '${item.amount} ${item.currency}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.cardAmount(isDark),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

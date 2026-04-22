@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/models/single_expense.dart';
 
 enum PinnedItemType { expense, project }
 
 class PinnedItem {
-  final String id; // unikalny identyfikator (np. UUID z backendu)
+  final String id;
   final PinnedItemType type;
   final String title;
   final String subtitle;
-  final String amount; // dla expense: kwota, dla project: suma lub "-"
+  final String amount;
   final String currency;
   final IconData icon;
   final Color iconBg;
   final Color iconColor;
   final DateTime pinnedAt;
 
-  // Opcjonalne dane specyficzne dla projektu (null gdy expense)
+  // Opcjonalne dane specyficzne dla projektu
   final String? projectId;
   final int? membersCount;
 
@@ -33,72 +34,25 @@ class PinnedItem {
     this.membersCount,
   });
 
-  // ── Serializacja (SharedPreferences) ─────────────────────────────────────
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'type': type.name,
-    'title': title,
-    'subtitle': subtitle,
-    'amount': amount,
-    'currency': currency,
-    'iconCodePoint': icon.codePoint,
-    'iconFontFamily': icon.fontFamily,
-    'iconBgValue': iconBg.value,
-    'iconColorValue': iconColor.value,
-    'pinnedAt': pinnedAt.toIso8601String(),
-    if (projectId != null) 'projectId': projectId,
-    if (membersCount != null) 'membersCount': membersCount,
-  };
-
-  factory PinnedItem.fromJson(Map<String, dynamic> json) {
-    return PinnedItem(
-      id: json['id'] as String,
-      type: PinnedItemType.values.byName(json['type'] as String),
-      title: json['title'] as String,
-      subtitle: json['subtitle'] as String,
-      amount: json['amount'] as String,
-      currency: json['currency'] as String,
-      icon: IconData(
-        json['iconCodePoint'] as int,
-        fontFamily: json['iconFontFamily'] as String? ?? 'MaterialIcons',
-      ),
-      iconBg: Color(json['iconBgValue'] as int),
-      iconColor: Color(json['iconColorValue'] as int),
-      pinnedAt: DateTime.parse(json['pinnedAt'] as String),
-      projectId: json['projectId'] as String?,
-      membersCount: json['membersCount'] as int?,
-    );
-  }
-
   // ── Fabryki ────────────────────────────────────────────────────────────────
 
-  /// Tworzy PinnedItem z RecentExpense.
-  static PinnedItem fromExpense({
-    required String id,
-    required String name,
-    required String subtitle,
-    required String amount,
-    required String currency,
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-  }) {
+  /// Główna fabryka tworząca PinnedItem z SingleExpense
+  factory PinnedItem.fromExpense(SingleExpense expense, bool isDark) {
+    final style = expense.style(isDark);
     return PinnedItem(
-      id: id,
+      id: expense.id ?? '',
       type: PinnedItemType.expense,
-      title: name,
-      subtitle: subtitle,
-      amount: amount,
-      currency: currency,
-      icon: icon,
-      iconBg: iconBg,
-      iconColor: iconColor,
+      title: expense.name,
+      subtitle: expense.note,
+      amount: expense.totalAmount,
+      currency: expense.currency,
+      icon: style.icon,
+      iconBg: style.iconBg,
+      iconColor: style.iconColor,
       pinnedAt: DateTime.now(),
     );
   }
 
-  /// Tworzy PinnedItem z projektu — wypełnij gdy będzie funkcjonalność projektów.
-  /// Na razie używany przez "otwartą furtkę" w PinPickerSheet.
   static PinnedItem fromProject({
     required String projectId,
     required String name,
@@ -115,7 +69,7 @@ class PinnedItem {
       amount: totalAmount,
       currency: currency,
       icon: Icons.group_rounded,
-      iconBg: Colors.blue.withOpacity(0.2),
+      iconBg: Colors.blue.withValues(alpha: 0.2),
       iconColor: Colors.blueAccent,
       pinnedAt: DateTime.now(),
       projectId: projectId,

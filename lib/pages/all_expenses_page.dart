@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/models/recent_expense.dart';
 import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 
@@ -58,7 +59,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
   // ── Stan ───────────────────────────────────────────────────────────────────
-  List<RecentExpense> _expenses = [];
+  List<SingleExpense> _expenses = [];
   bool _isLoading = true;
   AllExpensesPage _selectedCategory = AllExpensesPage.all;
   final TextEditingController _searchController = TextEditingController();
@@ -119,7 +120,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final fetched = SingleExpense.listFromJson(data['content'], isDark);
+      final fetched = SingleExpense.listFromJson(data['content']);
       setState(() => _expenses = fetched);
     }
 
@@ -127,20 +128,20 @@ class _ExpensesPageState extends State<ExpensesPage> {
   }
 
   // ── Filtrowanie lokalne po wyszukiwarce ───────────────────────────────────
-  List<RecentExpense> get _filteredExpenses {
+  List<SingleExpense> get _filteredExpenses {
     if (_searchQuery.isEmpty) return _expenses;
     return _expenses
         .where(
           (e) =>
               e.name.toLowerCase().contains(_searchQuery) ||
-              e.subtitle.toLowerCase().contains(_searchQuery),
+              e.note.toLowerCase().contains(_searchQuery),
         )
         .toList();
   }
 
   // ── Grupowanie po dacie (klucz = "dd MMM") ────────────────────────────────
-  Map<String, List<RecentExpense>> get _grouped {
-    final Map<String, List<RecentExpense>> map = {};
+  Map<String, List<SingleExpense>> get _grouped {
+    final Map<String, List<SingleExpense>> map = {};
     for (final e in _filteredExpenses) {
       final key = _formatDateKey(e.date);
       map.putIfAbsent(key, () => []).add(e);
@@ -575,7 +576,7 @@ class _SummaryTile extends StatelessWidget {
 
 class _ExpenseDateGroup extends StatelessWidget {
   final String label;
-  final List<RecentExpense> items;
+  final List<SingleExpense> items;
   final bool isDark;
 
   const _ExpenseDateGroup({
@@ -627,85 +628,99 @@ class _ExpenseDateGroup extends StatelessWidget {
 }
 
 class _ExpenseRow extends StatelessWidget {
-  final RecentExpense item;
+  final SingleExpense item;
   final bool isDark;
 
   const _ExpenseRow({required this.item, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg(isDark),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder(isDark)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: item.iconBg,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(item.icon, size: 17, color: item.iconColor),
+    final style = item.style(isDark);
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExpenseDetailsPage(expense: item),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.cardTitle(isDark),
-                  ),
-                ),
-                if (item.subtitle.isNotEmpty)
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder(isDark)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: style.iconBg,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(style.icon, size: 17, color: style.iconColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    item.subtitle,
+                    item.name,
                     style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.cardSubtitle(isDark),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.cardTitle(isDark),
                     ),
                   ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                item.totalAmount,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.cardAmount(isDark),
-                ),
+                  if (item.note.isNotEmpty)
+                    Text(
+                      item.note,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.cardSubtitle(isDark),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: item.badgeBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  item.type,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  item.totalAmount,
                   style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    color: item.badgeFg,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.cardAmount(isDark),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: style.badgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    item.category,
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: style.badgeFg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
