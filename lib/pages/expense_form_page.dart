@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:settly_mobile/const/api_url.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
-import 'package:settly_mobile/models/friend.dart';
+import 'package:settly_mobile/models/expenses/item_draft.dart';
+import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/auth_service.dart';
@@ -14,20 +19,6 @@ class ExpenseFormPage extends StatefulWidget {
 
   @override
   State<ExpenseFormPage> createState() => _ExpenseFormPageState();
-}
-
-class _ItemDraft {
-  final String id;
-  String name;
-  double price;
-  final Set<String> assigneeIds;
-
-  _ItemDraft({
-    required this.id,
-    this.name = '',
-    this.price = 0.0,
-    Set<String>? assigneeIds,
-  }) : assigneeIds = assigneeIds ?? <String>{};
 }
 
 class _CategoryOption {
@@ -56,7 +47,10 @@ const List<Map<String, String>> _kCurrencies = [
 
 class _ExpenseFormPageState extends State<ExpenseFormPage>
     with WidgetsBindingObserver {
+  static const String _receiptScanEndpoint = 'ai';
+
   final _api = ApiServiceRequest();
+  final _imagePicker = ImagePicker();
   double _lastBottomInset = 0;
 
   final TextEditingController _amountController = TextEditingController();
@@ -79,10 +73,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   // Keyed by friendId (payer is NOT here — payer's share is computed).
   final Map<String, TextEditingController> _customAmountControllers = {};
 
-  final List<_ItemDraft> _items = [];
+  final List<ItemDraft> _items = [];
   int _itemAutoId = 0;
 
   bool _saving = false;
+  bool _scanningReceipt = false;
 
   @override
   void initState() {
@@ -263,7 +258,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   void _addItem() {
     setState(() {
       _items.add(
-        _ItemDraft(
+        ItemDraft(
           id: 'item_${_itemAutoId++}',
           assigneeIds: {
             if (_currentUserId != null) _currentUserId!,
@@ -480,6 +475,117 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
+  Future<void> _scanReceiptWithCamera() async {
+    if (_scanningReceipt) return;
+    try {
+      final photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (photo == null) return;
+      await _uploadReceiptAndPrefillItems(photo);
+    } catch (_) {
+      _snack('Nie udało się otworzyć aparatu.');
+    }
+  }
+
+  Future<void> _uploadReceiptAndPrefillItems(XFile photo) async {
+    setState(() => _scanningReceipt = true);
+    try {
+      var response = await _sendReceiptScan(photo);
+
+      if (response?.statusCode == 401) {
+        final refreshed = await AuthService().refreshAccessToken();
+        if (refreshed) {
+          response = await _sendReceiptScan(photo);
+        }
+      }
+
+      if (!mounted) return;
+      if (response == null ||
+          (response.statusCode != 200 && response.statusCode != 201)) {
+        _snack(_apiErrorMessage(response, 'Nie udało się zeskanować paragonu'));
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      final extracted = _extractReceiptItems(decoded);
+      if (extracted.isEmpty) {
+        _snack('Nie rozpoznano pozycji na paragonie.');
+        return;
+      }
+
+      final participants = <String>{
+        if (_currentUserId != null) _currentUserId!,
+        ..._selectedFriendIds,
+      };
+
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(
+            extracted.map(
+              (e) => ItemDraft(
+                id: 'item_${_itemAutoId++}',
+                name: e.name,
+                price: e.price,
+                assigneeIds: Set<String>.from(participants),
+              ),
+            ),
+          );
+        _syncAmountFromItems();
+      });
+
+      _snack('Dodano ${extracted.length} pozycji z paragonu.');
+    } catch (_) {
+      _snack('Wystąpił błąd podczas analizy paragonu.');
+    } finally {
+      if (mounted) setState(() => _scanningReceipt = false);
+    }
+  }
+
+  Future<http.Response?> _sendReceiptScan(XFile photo) async {
+    final token = await AuthService().getAccessToken();
+    final uri = Uri.parse('${ProjectApiConst.baseUrl}/$_receiptScanEndpoint');
+
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..headers['ngrok-skip-browser-warning'] = 'true'
+      ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
+
+    try {
+      final streamed = await req.send();
+      return http.Response.fromStream(streamed);
+    } on SocketException {
+      return null;
+    }
+  }
+
+  List<_ReceiptItemParsed> _extractReceiptItems(dynamic body) {
+    dynamic source = body;
+    if (body is Map<String, dynamic>) {
+      source =
+          body['items'] ??
+          body['products'] ??
+          body['positions'] ??
+          body['data'];
+    }
+    if (source is! List) return const [];
+
+    final result = <_ReceiptItemParsed>[];
+    for (final raw in source.whereType<Map<String, dynamic>>()) {
+      final name = (raw['name'] ?? raw['itemName'] ?? raw['productName'])
+          ?.toString()
+          .trim();
+      final rawPrice = (raw['price'] ?? raw['amount'] ?? raw['totalPrice'])
+          ?.toString();
+      final price = double.tryParse((rawPrice ?? '').replaceAll(',', '.'));
+      if (name == null || name.isEmpty || price == null || price <= 0) continue;
+      result.add(_ReceiptItemParsed(name: name, price: price));
+    }
+    return result;
+  }
+
   String _apiErrorMessage(dynamic resp, String fallback) {
     if (resp == null) return 'Brak połączenia. Spróbuj ponownie.';
     try {
@@ -509,52 +615,52 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-      backgroundColor: AppColors.scaffold(widget.isDark),
-      appBar: AppBar(
         backgroundColor: AppColors.scaffold(widget.isDark),
-        elevation: 0,
-        iconTheme: IconThemeData(color: AppColors.username(widget.isDark)),
-        title: Text(
-          'Nowy wydatek',
-          style: TextStyle(
-            color: AppColors.username(widget.isDark),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAmountCard(),
-                const SizedBox(height: 20),
-
-                _sectionHeader('SZCZEGÓŁY'),
-                const SizedBox(height: 8),
-                _detailsCard(),
-
-                const SizedBox(height: 20),
-                _sectionHeader('PODZIAŁ'),
-                const SizedBox(height: 8),
-                _friendsPickerCard(),
-
-                if (_selectedFriendIds.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _splitModeSelector(),
-                  const SizedBox(height: 12),
-                  if (_splitType == SplitType.equal) _equalEditor(),
-                  if (_splitType == SplitType.custom) _customEditor(),
-                  if (_splitType == SplitType.byItems) _itemsEditor(),
-                ],
-              ],
+        appBar: AppBar(
+          backgroundColor: AppColors.scaffold(widget.isDark),
+          elevation: 0,
+          iconTheme: IconThemeData(color: AppColors.username(widget.isDark)),
+          title: Text(
+            'Nowy wydatek',
+            style: TextStyle(
+              color: AppColors.username(widget.isDark),
+              fontWeight: FontWeight.bold,
             ),
           ),
-          _buildSaveBar(),
-        ],
-      ),
+        ),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildAmountCard(),
+                  const SizedBox(height: 20),
+
+                  _sectionHeader('SZCZEGÓŁY'),
+                  const SizedBox(height: 8),
+                  _detailsCard(),
+
+                  const SizedBox(height: 20),
+                  _sectionHeader('PODZIAŁ'),
+                  const SizedBox(height: 8),
+                  _friendsPickerCard(),
+
+                  if (_selectedFriendIds.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _splitModeSelector(),
+                    const SizedBox(height: 12),
+                    if (_splitType == SplitType.equal) _equalEditor(),
+                    if (_splitType == SplitType.custom) _customEditor(),
+                    if (_splitType == SplitType.byItems) _itemsEditor(),
+                  ],
+                ],
+              ),
+            ),
+            _buildSaveBar(),
+          ],
+        ),
       ),
     );
   }
@@ -630,9 +736,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   ),
                   decoration: InputDecoration(
                     hintText: '0.00',
-                    hintStyle: TextStyle(
-                      color: amountColor.withOpacity(0.4),
-                    ),
+                    hintStyle: TextStyle(color: amountColor.withOpacity(0.4)),
                     border: InputBorder.none,
                     isDense: true,
                   ),
@@ -688,13 +792,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
                 title: Text(
                   c['name']!,
-                  style: TextStyle(
-                    color: AppColors.cardTitle(widget.isDark),
-                  ),
+                  style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
                 ),
                 subtitle: Text(
                   c['code']!,
-                  style: TextStyle(color: AppColors.cardSubtitle(widget.isDark)),
+                  style: TextStyle(
+                    color: AppColors.cardSubtitle(widget.isDark),
+                  ),
                 ),
                 trailing: _selectedCurrency == c['code']
                     ? Icon(
@@ -842,8 +946,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                       ? AppColors.cardSubtitle(widget.isDark)
                       : AppColors.cardTitle(widget.isDark),
                   fontSize: 15,
-                  fontStyle:
-                      placeholder ? FontStyle.italic : FontStyle.normal,
+                  fontStyle: placeholder ? FontStyle.italic : FontStyle.normal,
                 ),
               ),
             ),
@@ -1044,9 +1147,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       return;
     }
     if (_availableFriends.isEmpty) {
-      _snack(
-        'Nie masz jeszcze znajomych. Dodaj ich w zakładce Znajomi.',
-      );
+      _snack('Nie masz jeszcze znajomych. Dodaj ich w zakładce Znajomi.');
       return;
     }
 
@@ -1182,7 +1283,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         const SizedBox(width: 8),
         _modeChip('Kwoty', Icons.edit_note, SplitType.custom),
         const SizedBox(width: 8),
-        _modeChip('Per produkt', Icons.shopping_basket_outlined, SplitType.byItems),
+        _modeChip(
+          'Per produkt',
+          Icons.shopping_basket_outlined,
+          SplitType.byItems,
+        ),
       ],
     );
   }
@@ -1218,7 +1323,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: active ? accent : AppColors.cardSubtitle(widget.isDark),
+                  color: active
+                      ? accent
+                      : AppColors.cardSubtitle(widget.isDark),
                 ),
               ),
             ],
@@ -1345,8 +1452,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
               ),
               TextButton(
-                onPressed: () =>
-                    setState(_syncCustomControllersToEqualFriends),
+                onPressed: () => setState(_syncCustomControllersToEqualFriends),
                 style: TextButton.styleFrom(
                   foregroundColor: accent,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1392,7 +1498,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             width: 110,
             child: TextField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
@@ -1440,6 +1548,31 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          FilledButton.icon(
+            onPressed: _scanningReceipt ? null : _scanReceiptWithCamera,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.amountCurrency(widget.isDark),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            icon: _scanningReceipt
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.camera_alt_outlined, size: 18),
+            label: Text(
+              _scanningReceipt ? 'Skanuję paragon...' : 'Skanuj paragon',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 10),
           if (_items.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1476,7 +1609,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  Widget _itemCard(_ItemDraft item) {
+  Widget _itemCard(ItemDraft item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
@@ -1526,8 +1659,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   ],
                   textAlign: TextAlign.right,
                   onChanged: (v) => setState(() {
-                    item.price =
-                        double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                    item.price = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                     if (_splitType == SplitType.byItems) {
                       _syncAmountFromItems();
                     }
@@ -1580,7 +1712,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  Widget _itemAssigneeChip(_ItemDraft item, String userId) {
+  Widget _itemAssigneeChip(ItemDraft item, String userId) {
     final isMe = userId == _currentUserId;
     final name = isMe ? _currentUserDisplayName : _nameFor(userId);
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
@@ -1628,9 +1760,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: active
-                    ? accent
-                    : AppColors.cardSubtitle(widget.isDark),
+                color: active ? accent : AppColors.cardSubtitle(widget.isDark),
               ),
             ),
           ],
@@ -1779,11 +1909,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     return _availableFriends
         .firstWhere(
           (f) => f.userId == userId,
-          orElse: () => Friend(
-            friendshipId: '',
-            userId: userId,
-            displayName: '?',
-          ),
+          orElse: () =>
+              Friend(friendshipId: '', userId: userId, displayName: '?'),
         )
         .displayName;
   }
@@ -1792,4 +1919,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     return '${d.day.toString().padLeft(2, '0')}.'
         '${d.month.toString().padLeft(2, '0')}.${d.year}';
   }
+}
+
+class _ReceiptItemParsed {
+  final String name;
+  final double price;
+
+  const _ReceiptItemParsed({required this.name, required this.price});
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/recent_expense.dart';
+import 'package:settly_mobile/models/expenses/recent_expense.dart';
 import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 

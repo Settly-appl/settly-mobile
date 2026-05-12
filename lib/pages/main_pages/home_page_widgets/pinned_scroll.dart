@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/pinned_item.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';

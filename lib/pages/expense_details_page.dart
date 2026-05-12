@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/enums/expense_splits_type.dart';
-import 'package:settly_mobile/models/expense_member_item.dart';
-import 'package:settly_mobile/models/expens_style.dart';
+import 'package:settly_mobile/models/expenses/expense_member_item.dart';
+import 'package:settly_mobile/models/expenses/expens_style.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-import '../models/expense_member.dart';
+import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
 
 class ExpenseDetailsPage extends StatefulWidget {
@@ -373,6 +373,15 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   }
 
   Widget _buildMemberTile(ExpenseMember m, bool isDark, bool isByItem) {
+    final displayAmount = isByItem && m.items.isNotEmpty
+        ? m.items.fold<double>(
+            0.0,
+            (sum, item) =>
+                sum +
+                (double.tryParse(item.amount.replaceAll(',', '.')) ?? 0.0),
+          )
+        : double.tryParse(m.amount.replaceAll(',', '.')) ?? 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -385,7 +394,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           ),
           title: Text(m.displayName),
           trailing: Text(
-            '${m.amount} ${widget.expense.currency}',
+            '${displayAmount.toStringAsFixed(2)} ${widget.expense.currency}',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
