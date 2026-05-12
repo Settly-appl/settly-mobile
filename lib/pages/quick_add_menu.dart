@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-import '../models/recent_expense.dart';
 import '../models/sheet_option.dart';
-import '../models/single_expense.dart';
-import '../services/api_service/api_service_request.dart';
-import 'expense_form_dialog.dart';
+import 'expense_form_page.dart';
 
 class QuickAddMenu extends StatelessWidget {
   final bool isDark;
@@ -55,38 +51,23 @@ class QuickAddMenu extends StatelessWidget {
                 titleColor: AppColors.amountCurrency(isDark),
                 subtitleColor: AppColors.cardSubtitle(isDark),
                 onTap: () async {
-                  Navigator.pop(context);
+                  final rootMessenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
 
-                  // 2. Otwieramy wysepkę i CZEKAMY na wynik (ExpenseDto)
-                  final result = await showDialog<ExpenseRequest>(
-                    context: context,
-                    builder: (context) => ExpenseFormDialog(isDark: isDark),
+                  final saved = await navigator.push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ExpenseFormPage(isDark: isDark),
+                    ),
                   );
 
-                  // 3. Sprawdzamy, czy użytkownik faktycznie zapisał, czy tylko zamknął krzyżykiem
-                  if (result != null) {
-                    print("Mamy dane! Wysyłam do backendu...");
-
-                    // 4. STRZAŁ DO BACKENDU
-                    final apiService = ApiServiceRequest();
-                    final response = await apiService.request(
-                      endpoint: 'expenses',
-                      method: HttpMethod.post,
-                      body: result.toJson(),
-                    );
-
-                    bool success =
-                        response != null &&
-                        (response.statusCode == 200 ||
-                            response.statusCode == 201);
-
-                    if (success) {
-                      print("Wydatek zapisany w bazie!");
-                      onSaved();
-                    } else {
-                      print("Błąd wysyłki!");
-                      print(response?.body);
-                    }
+                  if (saved == true) {
+                    rootMessenger
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(content: Text('Dodano wydatek.')),
+                      );
+                    await onSaved();
                   }
                 },
               ),

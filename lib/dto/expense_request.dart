@@ -1,43 +1,122 @@
-class ExpenseRequest {
-  final double totalAmount;
-  final String shop;
-  final DateTime date;
-  final bool isScanned;
-  final String category;
-  final String currency;
-  final String? note;
-  //final String? projectId;
-  //final String splitType;
-  //final List<String> participants;
+enum SplitType {
+  equal,
+  custom,
+  byItems;
 
-  ExpenseRequest({
-    required this.totalAmount,
+  String get apiValue {
+    switch (this) {
+      case SplitType.equal:
+        return 'EQUAL';
+      case SplitType.custom:
+        return 'CUSTOM';
+      case SplitType.byItems:
+        return 'BY_ITEM';
+    }
+  }
+}
+
+String _formatLocalDate(DateTime d) {
+  final y = d.year.toString().padLeft(4, '0');
+  final m = d.month.toString().padLeft(2, '0');
+  final day = d.day.toString().padLeft(2, '0');
+  return '$y-$m-$day';
+}
+
+double _round2(double v) => double.parse(v.toStringAsFixed(2));
+
+class CreateExpenseRequest {
+  final String shop;
+  final String? note;
+  final String currency;
+  final String category;
+  final double totalAmount;
+  final DateTime date;
+  final String? projectId;
+
+  const CreateExpenseRequest({
     required this.shop,
-    required this.date,
-    required this.isScanned,
-    required this.category,
     required this.currency,
+    required this.category,
+    required this.totalAmount,
+    required this.date,
     this.note,
-    //required this.projectId,
-    //required this.splitType,
-    //required this.participants,
-    //this.currency = 'PLN',
+    this.projectId,
   });
 
-  // Mapper: Przekształca dane z klasy na Mapę (JSON) dla backendu
-  Map<String, dynamic> toJson() {
-    return {
-      'totalAmount': totalAmount,
-      'shop': shop,
-      'date': date.toIso8601String(),
-      'scanned': isScanned,
-      'category': category,
-      'currency': currency,
-      'note': note,
-      //'project_id': projectId,
-      //'split_type': splitType,
-      //'participants': participants,
-      'created_at': DateTime.now().toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'shop': shop,
+    'note': note,
+    'currency': currency,
+    'category': category,
+    'totalAmount': _round2(totalAmount),
+    'date': _formatLocalDate(date),
+    'projectId': projectId,
+  };
+}
+
+class CreateExpenseItemRequest {
+  final String name;
+  final double price;
+  final double? quantity;
+  final String? category;
+
+  const CreateExpenseItemRequest({
+    required this.name,
+    required this.price,
+    this.quantity,
+    this.category,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'price': _round2(price),
+    if (quantity != null) 'quantity': quantity,
+    if (category != null) 'category': category,
+  };
+}
+
+class SplitParticipantRequest {
+  final String friendId;
+  final double amount;
+
+  const SplitParticipantRequest({required this.friendId, required this.amount});
+
+  Map<String, dynamic> toJson() => {
+    'friendId': friendId,
+    'amount': _round2(amount),
+  };
+}
+
+class ItemSplitAssignment {
+  final String expenseItemId;
+  final List<String> userIds;
+
+  const ItemSplitAssignment({
+    required this.expenseItemId,
+    required this.userIds,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'expenseItemId': expenseItemId,
+    'userIds': userIds,
+  };
+}
+
+class CreateExpenseSplitRequest {
+  final SplitType splitType;
+  final List<SplitParticipantRequest> participants;
+  final List<ItemSplitAssignment>? itemAssignments;
+
+  const CreateExpenseSplitRequest({
+    required this.splitType,
+    required this.participants,
+    this.itemAssignments,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'expenseSplitType': splitType.apiValue,
+    'participants': participants.map((p) => p.toJson()).toList(),
+    if (itemAssignments != null)
+      'itemAssignments': itemAssignments!.map((a) => a.toJson()).toList(),
+  };
 }

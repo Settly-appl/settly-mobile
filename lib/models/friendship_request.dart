@@ -14,6 +14,7 @@ class FriendshipRequest {
   });
 
   factory FriendshipRequest.fromJson(Map<String, dynamic> json) {
+    print(json);
     final user = json['user'] as Map<String, dynamic>;
     return FriendshipRequest(
       friendshipId: json['friendshipId'] as String,
