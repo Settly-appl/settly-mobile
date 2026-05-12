@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:settly_mobile/models/single_expense.dart';
 import 'package:settly_mobile/models/enums/expense_splits_type.dart';
 import 'package:settly_mobile/models/expense_member_item.dart';
+import 'package:settly_mobile/models/expens_style.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import '../models/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
@@ -28,6 +29,16 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     _loadDetails();
   }
 
+  @override
+  void didUpdateWidget(ExpenseDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.expense.id != widget.expense.id) {
+      _loading = true;
+      _members = [];
+      _loadDetails();
+    }
+  }
+
   Future<void> _loadDetails() async {
     final expenseId = widget.expense.id;
     if (expenseId == null) {
@@ -37,10 +48,16 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
 
     try {
       final splitMembers = await _fetchSplitMembers(expenseId);
-      if (splitMembers.isEmpty) return;
+      if (splitMembers.isEmpty) {
+        _finishLoading();
+        return;
+      }
 
       final membersWithNames = await _enrichMembersWithNames(splitMembers);
-      if (membersWithNames.isEmpty) return;
+      if (membersWithNames.isEmpty) {
+        _finishLoading();
+        return;
+      }
 
       _splitType = ExpenseSplitsType.fromString(
         membersWithNames.first.splitType,
@@ -49,6 +66,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
 
       if (_splitType != ExpenseSplitsType.BY_ITEM) {
         _members = membersWithNames;
+        _finishLoading();
         return;
       }
 
@@ -300,7 +318,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     );
   }
 
-  Widget _buildHeader(style, bool isDark) => Column(
+  Widget _buildHeader(ExpenseStyle style, bool isDark) => Column(
     children: [
       Container(
         padding: const EdgeInsets.all(20),
