@@ -15,7 +15,17 @@ import 'package:settly_mobile/services/auth_service.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final bool isDark;
-  const ExpenseFormPage({super.key, required this.isDark});
+  final String? initialCategory;
+  final String? initialCurrency;
+  final double? initialAmount;
+
+  const ExpenseFormPage({
+    super.key,
+    required this.isDark,
+    this.initialCategory,
+    this.initialCurrency,
+    this.initialAmount,
+  });
 
   @override
   State<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -84,6 +94,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _amountController.addListener(_onAmountChanged);
+
+    // Initialize with provided values if any
+    if (widget.initialAmount != null) {
+      _amountController.text = widget.initialAmount!.toStringAsFixed(2);
+    }
+    if (widget.initialCurrency != null) {
+      _selectedCurrency = widget.initialCurrency!;
+    }
+    if (widget.initialCategory != null) {
+      _selectedCategory = _kCategories.firstWhere(
+        (cat) => cat.id == widget.initialCategory,
+        orElse: () => _kCategories.first,
+      );
+    }
+
     _loadCurrentUser();
     _loadFriends();
   }

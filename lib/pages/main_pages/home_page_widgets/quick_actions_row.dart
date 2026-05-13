@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/models/expenses/recent_expense.dart';
 import 'package:settly_mobile/pages/quick_add_menu.dart';
+import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 
 class QuickActionsRow extends StatelessWidget {
@@ -47,7 +48,14 @@ class QuickActionsRow extends StatelessWidget {
               iconColor: AppColors.actionScanIcon(isDark),
               iconBg: AppColors.actionScanIconBg(isDark),
               isDark: isDark,
-              onTap: () {},
+              onTap: () async {
+                await showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) =>
+                      QuickScanMenu(isDark: isDark, onSaved: onExpenseAdded),
+                );
+              },
             ),
           ),
           const SizedBox(width: 8),
