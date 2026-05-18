@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:settly_mobile/const/api_url.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/services/receipt_scan_service.dart';
 import '../models/quick_add_dialog/sheet_option.dart';
 import 'expense_form_page.dart';
@@ -248,16 +252,31 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
 
       if (imageFile == null) return;
 
-      final result = await _scanService.scanReceipt(imageFile);
-      if (result == null) {
+      // Single call to /ai: payload should include items and can include summary fields.
+      final itemsResponse = await _sendReceiptForItems(imageFile);
+      if (itemsResponse == null ||
+          (itemsResponse.statusCode != 200 &&
+              itemsResponse.statusCode != 201)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Nie udało się zskanować paragonu. Spróbuj ponownie.',
-              ),
-            ),
-          );
+          _snack('Nie udało się zskanować paragonu. Spróbuj ponownie.');
+        }
+        return;
+      }
+
+      late final Map<String, dynamic> parsed;
+      try {
+        parsed = _parseGroupScanPayload(jsonDecode(itemsResponse.body));
+      } catch (_) {
+        if (mounted) {
+          _snack('Błąd podczas odczytu danych z paragonu.');
+        }
+        return;
+      }
+
+      final itemsData = parsed['items'] as List<Map<String, dynamic>>;
+      if (itemsData.isEmpty) {
+        if (mounted) {
+          _snack('Nie rozpoznano pozycji na paragonie.');
         }
         return;
       }
@@ -272,12 +291,10 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
         MaterialPageRoute(
           builder: (_) => ExpenseFormPage(
             isDark: widget.isDark,
-            initialCategory: result.category,
-            initialCurrency: result.currency,
-            initialAmount: result.totalAmount,
+            initialCategory: parsed['category'] as String,
             initialSelectedFriendIds: selectedFriendIds.toList(),
             initialSplitType: SplitType.byItems,
-            initialReceiptImagePath: imageFile.path,
+            initialReceiptItems: itemsData,
           ),
         ),
       );
@@ -497,6 +514,43 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
         ),
       ),
     );
+  }
+
+  Future<http.Response?> _sendReceiptForItems(File photo) async {
+    final token = await AuthService().getAccessToken();
+    final uri = Uri.parse('${ProjectApiConst.baseUrl}/ai');
+
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..headers['ngrok-skip-browser-warning'] = 'true'
+      ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
+
+    try {
+      final streamed = await req.send();
+      return http.Response.fromStream(streamed);
+    } on SocketException {
+      return null;
+    }
+  }
+
+  Map<String, dynamic> _parseGroupScanPayload(dynamic decoded) {
+    List<Map<String, dynamic>> items = const [];
+    String category = 'others';
+
+    if (decoded is Map<String, dynamic>) {
+      // Extract category
+      category = decoded['category']?.toString() ?? category;
+
+      // Extract items
+      final itemsSource = decoded['items'];
+      if (itemsSource is List) {
+        items = List<Map<String, dynamic>>.from(
+          itemsSource.whereType<Map<String, dynamic>>(),
+        );
+      }
+    }
+
+    return {'items': items, 'category': category};
   }
 
   Future<void> _loadFriends() async {

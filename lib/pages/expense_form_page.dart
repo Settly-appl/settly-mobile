@@ -21,6 +21,7 @@ class ExpenseFormPage extends StatefulWidget {
   final List<String> initialSelectedFriendIds;
   final SplitType? initialSplitType;
   final String? initialReceiptImagePath;
+  final List<Map<String, dynamic>>? initialReceiptItems;
 
   const ExpenseFormPage({
     super.key,
@@ -31,6 +32,7 @@ class ExpenseFormPage extends StatefulWidget {
     this.initialSelectedFriendIds = const [],
     this.initialSplitType,
     this.initialReceiptImagePath,
+    this.initialReceiptItems,
   });
 
   @override
@@ -662,8 +664,24 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
   void _maybeStartInitialReceiptScan() {
     if (_initialReceiptScanStarted) return;
-    if (widget.initialReceiptImagePath == null) return;
     if (_currentUserId == null) return;
+
+    // If items are already extracted, use them directly (from quick_scan)
+    if (widget.initialReceiptItems != null &&
+        widget.initialReceiptItems!.isNotEmpty) {
+      if (_selectedFriendIds.isEmpty) return; // Only for group expenses
+      if (_splitType != SplitType.byItems) return;
+
+      _initialReceiptScanStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _prefillItemsFromExtracted(widget.initialReceiptItems!);
+      });
+      return;
+    }
+
+    // Otherwise, if receipt image path is provided, scan it
+    if (widget.initialReceiptImagePath == null) return;
 
     if (_selectedFriendIds.isEmpty) {
       _initialReceiptScanStarted = true;
@@ -735,6 +753,41 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       _snack('Wystąpił błąd podczas analizy paragonu.');
     } finally {
       if (mounted) setState(() => _scanningReceipt = false);
+    }
+  }
+
+  void _prefillItemsFromExtracted(List<Map<String, dynamic>> rawItems) {
+    try {
+      final extracted = _extractReceiptItems(rawItems);
+      if (extracted.isEmpty) {
+        _snack('Nie rozpoznano pozycji na paragonie.');
+        return;
+      }
+
+      final participants = <String>{
+        if (_currentUserId != null) _currentUserId!,
+        ..._selectedFriendIds,
+      };
+
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(
+            extracted.map(
+              (e) => ItemDraft(
+                id: 'item_${_itemAutoId++}',
+                name: e.name,
+                price: e.price,
+                assigneeIds: Set<String>.from(participants),
+              ),
+            ),
+          );
+        _syncAmountFromItems();
+      });
+
+      _snack('Dodano ${extracted.length} pozycji z paragonu.');
+    } catch (_) {
+      _snack('Wystąpił błąd podczas przetwarzania pozycji.');
     }
   }
 
@@ -1369,7 +1422,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               ),
             ],
           ),
-          if (selected.isEmpty) ...[
+          if (_selectedFriendIds.isEmpty) ...[
             const SizedBox(height: 6),
             Text(
               'Dodaj znajomych, aby podzielić koszty.',
@@ -1426,57 +1479,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                       ),
               ),
             ),
-          ] else ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: _scanningReceipt ? () {} : _scanSingleExpenseWithCamera,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  border: Border.all(
-                    color: AppColors.amountCurrency(widget.isDark),
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: _scanningReceipt
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(
-                              AppColors.amountCurrency(widget.isDark),
-                            ),
-                          ),
-                        ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 18,
-                            color: AppColors.amountCurrency(widget.isDark),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Wypełnij skanem paragonu',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: AppColors.amountCurrency(widget.isDark),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
           ],
-          if (selected.isNotEmpty) ...[
+          if (_selectedFriendIds.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
               spacing: 6,
