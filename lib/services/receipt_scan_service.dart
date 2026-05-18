@@ -45,6 +45,21 @@ class ReceiptScanService {
     }
   }
 
+  Future<File?> pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (image == null) return null;
+      return File(image.path);
+    } catch (e) {
+      print('Error picking image from gallery: $e');
+      return null;
+    }
+  }
+
   Future<ScanReceiptResult?> scanReceipt(File imageFile) async {
     try {
       final token = await AuthService().getAccessToken();

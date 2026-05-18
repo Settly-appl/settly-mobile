@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Potrzebujemy dostepu do aparatu, aby zeskanowac paragon.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Potrzebujemy dostepu do galerii, aby wybrać zdjęcie paragonu.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Potrzebujemy dostepu do galerii, aby wybrać zdjęcie paragonu.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
