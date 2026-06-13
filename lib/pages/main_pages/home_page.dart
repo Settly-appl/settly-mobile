@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/main.dart';
+import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/pinned_item.dart';
 import 'package:settly_mobile/models/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
+import '../../services/notification_service.dart';
+import '../../services/notifications_store.dart';
 import '../all_expenses_page.dart';
 import '../expense_details_page.dart';
 import 'friends_page.dart';
@@ -38,6 +42,7 @@ class HomePageState extends State<HomePage> {
   bool _isPinnedLoading = false;
   bool _hasInitialPinnedLoaded = false;
   final ValueNotifier<int> _tabNotifier = ValueNotifier(0);
+  StreamSubscription<AppNotification>? _notifSub;
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -58,6 +63,17 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _fetchRecentExpenses();
+
+    // Refresh recent expenses when added to a shared expense.
+    _notifSub = NotificationsStore().stream.listen((n) {
+      if (mounted && n.type == 'EXPENSE_SPLIT') _fetchRecentExpenses();
+    });
+
+    // Handle a notification tapped while the app was terminated, now that the
+    // home screen (and navigator) is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().consumePendingNavigation();
+    });
   }
 
   @override
@@ -71,6 +87,7 @@ class HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _tabNotifier.dispose();
     super.dispose();
   }
@@ -172,16 +189,36 @@ class HomePageState extends State<HomePage> {
           },
         ),
         const SizedBox(width: 8),
-        CircleAvatar(
-          backgroundColor: AppColors.bellBg(isDark),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            color: AppColors.bellIcon(isDark),
-            onPressed: () {},
-          ),
+        ListenableBuilder(
+          listenable: NotificationsStore(),
+          builder: (context, _) {
+            final unread = NotificationsStore().unreadCount;
+            return CircleAvatar(
+              backgroundColor: AppColors.bellBg(isDark),
+              child: IconButton(
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.notifications_none_rounded),
+                ),
+                color: AppColors.bellIcon(isDark),
+                onPressed: _openNotifications,
+              ),
+            );
+          },
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  void _openNotifications() {
+    NotificationsStore().markAllRead();
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.scaffold(isDark),
+      builder: (_) => _NotificationsSheet(onOpenFriends: () => switchTab(3)),
     );
   }
 
@@ -445,6 +482,99 @@ class _PlaceholderTab extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NotificationsSheet extends StatelessWidget {
+  final VoidCallback onOpenFriends;
+
+  const _NotificationsSheet({required this.onOpenFriends});
+
+  IconData _iconFor(String? type) {
+    switch (type) {
+      case 'FRIEND_REQUEST':
+      case 'FRIEND_REQUEST_ACCEPTED':
+        return Icons.people_outline;
+      case 'EXPENSE_SPLIT':
+        return Icons.attach_money_rounded;
+      default:
+        return Icons.notifications_none_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = NotificationsStore();
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) {
+            final items = store.items;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Powiadomienia',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (items.isNotEmpty)
+                        TextButton(
+                          onPressed: store.clear,
+                          child: const Text('Wyczyść'),
+                        ),
+                    ],
+                  ),
+                ),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('Brak powiadomień')),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final n = items[i];
+                        return ListTile(
+                          leading: Icon(_iconFor(n.type)),
+                          title: Text(n.title),
+                          subtitle: n.body.isEmpty ? null : Text(n.body),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            if (n.type == 'FRIEND_REQUEST' ||
+                                n.type == 'FRIEND_REQUEST_ACCEPTED') {
+                              onOpenFriends();
+                            } else if (n.type == 'EXPENSE_SPLIT') {
+                              NotificationService().navigateForNotification(n);
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

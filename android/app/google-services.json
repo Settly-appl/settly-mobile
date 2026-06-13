@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "240217906279",
+    "project_id": "settly-491611",
+    "storage_bucket": "settly-491611.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:240217906279:android:edcdb9f3301a7308b648c2",
+        "android_client_info": {
+          "package_name": "pl.settly.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "240217906279-8hbb4fg57k5o107qq5k97jf3gbnao3b4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAnvwNnso9w7V7uNmUdghLJ5esduzaepE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "240217906279-8hbb4fg57k5o107qq5k97jf3gbnao3b4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

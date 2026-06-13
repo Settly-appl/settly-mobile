@@ -122,6 +122,21 @@ class AuthService {
     return _decodeJwtPayload(idToken);
   }
 
+  /// True if the access token carries the `admin` client role for this app.
+  Future<bool> isAdmin() async {
+    final accessToken = await _storage.read(key: _accessTokenKey);
+    if (accessToken == null) return false;
+    try {
+      final payload = _decodeJwtPayload(accessToken);
+      final resourceAccess = payload['resource_access'] as Map<String, dynamic>?;
+      final client = resourceAccess?[_clientId] as Map<String, dynamic>?;
+      final roles = (client?['roles'] as List?)?.cast<String>() ?? const [];
+      return roles.contains('admin');
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> _refreshTokens(String refreshToken) async {
     try {
       final response = await http.post(

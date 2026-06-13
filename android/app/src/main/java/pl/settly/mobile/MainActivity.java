@@ -1,4 +1,4 @@
-package com.example.settly_mobile;
+package pl.settly.mobile;
 
 import io.flutter.embedding.android.FlutterActivity;
 

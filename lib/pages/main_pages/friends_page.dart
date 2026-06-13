@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/friend.dart';
 import 'package:settly_mobile/models/friendship_request.dart';
 import 'package:settly_mobile/models/user_search_result.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/services/notifications_store.dart';
 
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key});
@@ -19,6 +22,7 @@ class _FriendsPageState extends State<FriendsPage>
   late final TabController _tabController;
   final _api = ApiServiceRequest();
   final _friendsSearchController = TextEditingController();
+  StreamSubscription<AppNotification>? _notifSub;
 
   bool _loadingFriends = false;
   bool _loadingRequests = false;
@@ -35,10 +39,20 @@ class _FriendsPageState extends State<FriendsPage>
     _tabController = TabController(length: 2, vsync: this);
     _loadFriends();
     _loadRequests();
+
+    // Refresh live when a friendship notification arrives while this page is up.
+    _notifSub = NotificationsStore().stream.listen((n) {
+      if (!mounted) return;
+      if (n.type == 'FRIEND_REQUEST' || n.type == 'FRIEND_REQUEST_ACCEPTED') {
+        _loadRequests();
+        _loadFriends();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _tabController.dispose();
     _friendsSearchController.dispose();
     super.dispose();
