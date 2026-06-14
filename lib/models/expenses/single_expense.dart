@@ -5,6 +5,7 @@ class SingleExpense {
   final String name;
   final String note;
   final String totalAmount;
+  String userShare; // Mutable - zaktualizować po pobraniu z API
   final String category;
   final String currency;
   final bool scanned;
@@ -12,11 +13,12 @@ class SingleExpense {
   final DateTime createdAt;
   final String? projectId;
 
-  const SingleExpense({
+  SingleExpense({
     this.id,
     required this.name,
     this.note = '',
     required this.totalAmount,
+    this.userShare = '',
     this.category = 'Wydatek',
     this.currency = 'PLN',
     required this.scanned,

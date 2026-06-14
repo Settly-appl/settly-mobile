@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/friend.dart';
+import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';

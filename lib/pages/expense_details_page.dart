@@ -1,15 +1,16 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/expense_split_info.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
+import 'package:settly_mobile/models/enums/expense_splits_type.dart';
+import 'package:settly_mobile/models/expenses/expense_member_item.dart';
+import 'package:settly_mobile/models/expenses/expens_style.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-import 'package:settly_mobile/services/api_service/api_service_request.dart';
-import 'package:settly_mobile/services/auth_service.dart';
+import '../models/expenses/expense_member.dart';
+import '../services/api_service/api_service_request.dart';
+import '../services/api_service/projects_service.dart';
 
 class ExpenseDetailsPage extends StatefulWidget {
   final SingleExpense expense;
-
   const ExpenseDetailsPage({super.key, required this.expense});
 
   @override
@@ -17,99 +18,291 @@ class ExpenseDetailsPage extends StatefulWidget {
 }
 
 class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
-  final _api = ApiServiceRequest();
-
-  bool _loadingSplit = true;
-  double? _shareAmount;
-  String? _shareCurrency;
-  List<ExpenseSplitInfo> _splits = [];
-  List<_OwedItem> _myItems = [];
-  String? _currentUserId;
-
-  bool get isDark => Theme.of(context).brightness == Brightness.dark;
+  bool _loading = true;
+  String _splitLabel = '';
+  ExpenseSplitsType _splitType = ExpenseSplitsType.EQUAL;
+  List<ExpenseMember> _members = [];
+  String? _projectName;
+  final ApiServiceRequest _api = ApiServiceRequest();
+  final ProjectsService _projectsService = ProjectsService();
 
   @override
   void initState() {
     super.initState();
-    _loadSplitDetails();
+    _loadDetails();
   }
 
-  Future<void> _loadSplitDetails() async {
-    final id = widget.expense.id;
-    if (id == null) {
-      setState(() => _loadingSplit = false);
+  @override
+  void didUpdateWidget(ExpenseDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.expense.id != widget.expense.id) {
+      _loading = true;
+      _members = [];
+      _loadDetails();
+    }
+  }
+
+  Future<void> _loadDetails() async {
+    final expenseId = widget.expense.id;
+    if (expenseId == null) {
+      _finishLoading();
       return;
     }
 
-    final userInfo = await AuthService().getUserInfo();
-    _currentUserId = userInfo?['sub'] as String?;
+    await _loadProjectName();
 
-    final results = await Future.wait([
-      _api.request(endpoint: 'expenses/$id/userShare', method: HttpMethod.get),
-      _api.request(endpoint: 'expenses/$id/splits', method: HttpMethod.get),
-    ]);
-    if (!mounted) return;
+    try {
+      final splitMembers = await _fetchSplitMembers(expenseId);
+      if (splitMembers.isEmpty) {
+        _finishLoading();
+        return;
+      }
 
-    final shareRes = results[0];
-    if (shareRes != null && shareRes.statusCode == 200) {
-      final data = jsonDecode(shareRes.body) as Map<String, dynamic>;
-      _shareAmount = (data['amount'] as num?)?.toDouble();
-      _shareCurrency = data['currency'] as String?;
-    }
+      final membersWithNames = await _enrichMembersWithNames(splitMembers);
+      if (membersWithNames.isEmpty) {
+        _finishLoading();
+        return;
+      }
 
-    final splitsRes = results[1];
-    if (splitsRes != null && splitsRes.statusCode == 200) {
-      _splits = ExpenseSplitInfo.listFromJson(
-        jsonDecode(splitsRes.body) as List<dynamic>,
+      _splitType = ExpenseSplitsType.fromString(
+        membersWithNames.first.splitType,
       );
-    }
+      _splitLabel = _splitType.label;
 
-    // For item splits, work out which items this user is responsible for.
-    final isByItem = _splits.any((s) => s.splitType == 'BY_ITEM');
-    if (isByItem && _currentUserId != null) {
-      _myItems = await _loadMyItems(id);
-    }
+      if (_splitType != ExpenseSplitsType.BY_ITEM) {
+        _members = membersWithNames;
+        _finishLoading();
+        return;
+      }
 
-    if (mounted) setState(() => _loadingSplit = false);
+      final productsByUser = await _loadByItemProducts(expenseId);
+      _members = membersWithNames
+          .map(
+            (member) => member.copyWith(
+              items: productsByUser[member.userId] ?? const [],
+            ),
+          )
+          .toList();
+    } catch (_) {}
+    _finishLoading();
   }
 
-  Future<List<_OwedItem>> _loadMyItems(String expenseId) async {
-    final itemsRes = await _api.request(
-      endpoint: 'expenses/$expenseId/items',
+  Future<void> _loadProjectName() async {
+    final projectId = widget.expense.projectId;
+    if (projectId == null) return;
+    try {
+      final project = await _projectsService.getProject(projectId);
+      _projectName = project.name;
+    } catch (_) {
+      // Non-fatal: just don't show the project row.
+    }
+  }
+
+  Future<List<ExpenseMember>> _fetchSplitMembers(String expenseId) async {
+    final res = await _api.request(
+      endpoint: 'expenses/$expenseId/splits',
       method: HttpMethod.get,
     );
-    if (itemsRes == null || itemsRes.statusCode != 200) return [];
+    if (res?.statusCode != 200) return const [];
+    return ExpenseMember.listFromJson(jsonDecode(res!.body));
+  }
 
-    final items = jsonDecode(itemsRes.body) as List<dynamic>;
-    final owed = <_OwedItem>[];
+  Future<List<ExpenseMember>> _enrichMembersWithNames(
+    List<ExpenseMember> members,
+  ) {
+    return Future.wait(
+      members.map((m) async {
+        final displayName = await _fetchUserDisplayName(m.userId);
+        return m.copyWith(displayName: displayName);
+      }),
+    );
+  }
 
-    for (final raw in items) {
-      final item = raw as Map<String, dynamic>;
-      final itemId = item['id']?.toString();
-      if (itemId == null) continue;
+  Future<String> _fetchUserDisplayName(String userId) async {
+    final res = await _api.request(
+      endpoint: 'users/$userId',
+      method: HttpMethod.get,
+    );
+    if (res?.statusCode != 200) return 'Nieznany';
+    return jsonDecode(res!.body)['displayName']?.toString() ?? 'Nieznany';
+  }
 
-      final usersRes = await _api.request(
-        endpoint: 'expenses/items/$itemId/users',
+  void _finishLoading() {
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<Map<String, List<ExpenseMemberItem>>> _loadByItemProducts(
+    String expenseId,
+  ) async {
+    try {
+      final itemsRes = await _api.request(
+        endpoint: 'expenses/$expenseId/items',
         method: HttpMethod.get,
       );
-      if (usersRes == null || usersRes.statusCode != 200) continue;
+      if (itemsRes?.statusCode != 200) return const {};
 
-      final users = jsonDecode(usersRes.body) as List<dynamic>;
-      final assignedToMe = users.any(
-        (u) => (u as Map<String, dynamic>)['id']?.toString() == _currentUserId,
-      );
-      if (!assignedToMe || users.isEmpty) continue;
+      final items = _extractList(jsonDecode(itemsRes!.body));
+      final productsByUser = <String, List<ExpenseMemberItem>>{};
 
-      final price = (item['price'] as num?)?.toDouble() ?? 0;
-      final quantity = (item['quantity'] as num?)?.toDouble() ?? 1;
-      final share = (price * quantity) / users.length;
-      owed.add(_OwedItem(name: item['name']?.toString() ?? 'Pozycja', share: share));
+      final rowsByItemId = _groupItemRowsByItemId(items);
+      for (final entry in rowsByItemId.entries) {
+        await _appendByItemShares(
+          itemId: entry.key,
+          rows: entry.value,
+          productsByUser: productsByUser,
+        );
+      }
+
+      return productsByUser;
+    } catch (_) {
+      return const {};
     }
-    return owed;
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupItemRowsByItemId(
+    List<dynamic> items,
+  ) {
+    final groupedByItemId = <String, List<Map<String, dynamic>>>{};
+    for (final raw in items.whereType<Map<String, dynamic>>()) {
+      final itemId = _readItemId(raw);
+      if (itemId == null) continue;
+      groupedByItemId
+          .putIfAbsent(itemId, () => <Map<String, dynamic>>[])
+          .add(raw);
+    }
+    return groupedByItemId;
+  }
+
+  Future<void> _appendByItemShares({
+    required String itemId,
+    required List<Map<String, dynamic>> rows,
+    required Map<String, List<ExpenseMemberItem>> productsByUser,
+  }) async {
+    if (rows.isEmpty) return;
+
+    final usersRes = await _api.request(
+      endpoint: 'expenses/items/$itemId/users',
+      method: HttpMethod.get,
+    );
+    if (usersRes?.statusCode != 200) return;
+
+    final users = _extractList(jsonDecode(usersRes!.body));
+    if (users.isEmpty) return;
+
+    final assignedUserIds = _extractAssignedUserIds(users);
+    if (assignedUserIds.isEmpty) return;
+
+    final amountByUserId = _buildAmountByUserId(rows);
+    final totalAmount = _readItemAmount(rows.first);
+    final totalAmountValue = _tryParseAmount(totalAmount);
+    final hasCompleteUserAmounts = _hasCompleteUserAmounts(
+      assignedUserIds,
+      amountByUserId,
+    );
+    final equalShareAmount =
+        (!hasCompleteUserAmounts && totalAmountValue != null)
+        ? _formatAmount(totalAmountValue / assignedUserIds.length)
+        : null;
+
+    final itemName = _readItemName(rows.first, fallbackItemId: itemId);
+    for (final userId in assignedUserIds) {
+      final userAmount = hasCompleteUserAmounts
+          ? amountByUserId[userId]!
+          : (equalShareAmount ?? amountByUserId[userId] ?? totalAmount);
+
+      productsByUser
+          .putIfAbsent(userId, () => <ExpenseMemberItem>[])
+          .add(ExpenseMemberItem(name: itemName, amount: userAmount));
+    }
+  }
+
+  Set<String> _extractAssignedUserIds(List<dynamic> users) {
+    final ids = <String>{};
+    for (final user in users.whereType<Map<String, dynamic>>()) {
+      final id = _readUserId(user);
+      if (id != null) ids.add(id);
+    }
+    return ids;
+  }
+
+  Map<String, String> _buildAmountByUserId(List<Map<String, dynamic>> rows) {
+    final result = <String, String>{};
+    for (final row in rows) {
+      final userId = _readUserId(row);
+      if (userId == null) continue;
+      result[userId] = _readItemAmount(row);
+    }
+    return result;
+  }
+
+  bool _hasCompleteUserAmounts(
+    Set<String> assignedUserIds,
+    Map<String, String> amountByUserId,
+  ) {
+    return assignedUserIds.every(
+      (id) => _tryParseAmount(amountByUserId[id]) != null,
+    );
+  }
+
+  List<dynamic> _extractList(dynamic body) {
+    if (body is List) return body;
+    if (body is! Map<String, dynamic>) return const [];
+
+    const keys = ['data', 'content', 'items', 'results'];
+    for (final key in keys) {
+      final candidate = body[key];
+      if (candidate is List) return candidate;
+    }
+    return const [];
+  }
+
+  String? _readItemId(Map<String, dynamic> item) {
+    final id = item['id'] ?? item['itemId'] ?? item['expenseItemId'];
+    final value = id?.toString();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  String _readItemName(Map<String, dynamic> item, {String? fallbackItemId}) {
+    final name = item['name'] ?? item['itemName'] ?? item['productName'];
+    final value = name?.toString();
+    if (value == null || value.isEmpty) {
+      final shortId = (fallbackItemId != null && fallbackItemId.length >= 6)
+          ? fallbackItemId.substring(0, 6)
+          : fallbackItemId;
+      return shortId == null ? 'Pozycja' : 'Pozycja $shortId';
+    }
+    return value;
+  }
+
+  String _readItemAmount(Map<String, dynamic> item) {
+    final amount = item['amount'] ?? item['price'] ?? item['totalPrice'];
+    final value = amount?.toString();
+    if (value == null || value.isEmpty) return '0.00';
+    return value;
+  }
+
+  String? _readUserId(Map<String, dynamic> user) {
+    final id = user['userId'] ?? user['id'] ?? user['friendId'];
+    final value = id?.toString();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  double? _tryParseAmount(String? value) {
+    if (value == null) return null;
+    final normalized = value.replaceAll(',', '.').trim();
+    if (normalized.isEmpty) return null;
+    return double.tryParse(normalized);
+  }
+
+  String _formatAmount(double value) {
+    return value.toStringAsFixed(2);
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final style = widget.expense.style(isDark);
 
     return Scaffold(
@@ -117,198 +310,152 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          'Szczegóły wydatku',
-          style: TextStyle(color: AppColors.username(isDark)),
-        ),
-        iconTheme: IconThemeData(color: AppColors.username(isDark)),
+        title: const Text("Szczegóły"),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: style.iconBg,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(style.icon, size: 40, color: style.iconColor),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Center(
-              child: Text(
-                '${widget.expense.totalAmount} ${widget.expense.currency}',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.cardAmount(isDark),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                widget.expense.name,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.cardTitle(isDark),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (_loadingSplit)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_shareAmount != null)
-              _buildShareBanner(),
-            const SizedBox(height: 8),
-            _buildDetailRow(context, 'Kategoria', widget.expense.category),
-            _buildDetailRow(
-              context,
+            _buildHeader(style, isDark),
+            const SizedBox(height: 32),
+            _infoRow('Kategoria', widget.expense.category, isDark),
+            _infoRow(
               'Data',
               widget.expense.date.toString().split(' ')[0],
+              isDark,
             ),
             if (widget.expense.note.isNotEmpty)
-              _buildDetailRow(context, 'Notatka', widget.expense.note),
-            if (widget.expense.projectId != null)
-              //TODO poprawne wyswietlanie projektu
-              _buildDetailRow(context, 'Projekt', widget.expense.projectId!),
-            if (_myItems.isNotEmpty) _buildItemsSection(),
-            if (_splits.isNotEmpty) _buildSplitsSection(),
+              _infoRow('Notatka', widget.expense.note, isDark),
+            if (_projectName != null) _infoRow('Projekt', _projectName!, isDark),
+            const Divider(height: 40),
+            _buildSplitSection(isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildShareBanner() {
-    final cur = _shareCurrency ?? widget.expense.currency;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bellBg(isDark),
-        borderRadius: BorderRadius.circular(16),
+  Widget _buildHeader(ExpenseStyle style, bool isDark) => Column(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: style.iconBg, shape: BoxShape.circle),
+        child: Icon(style.icon, size: 40, color: style.iconColor),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Twoja część',
-            style: TextStyle(fontSize: 13, color: AppColors.cardSubtitle(isDark)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_shareAmount!.toStringAsFixed(2)} $cur',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.cardAmount(isDark),
-            ),
-          ),
-        ],
+      const SizedBox(height: 16),
+      Text(
+        '${widget.expense.totalAmount} ${widget.expense.currency}',
+        style: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: AppColors.cardAmount(isDark),
+        ),
       ),
-    );
-  }
+      Text(
+        widget.expense.name,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+      ),
+    ],
+  );
 
-  Widget _buildSplitsSection() {
-    final cur = _shareCurrency ?? widget.expense.currency;
+  Widget _buildSplitSection(bool isDark) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    final isByItem = _splitType == ExpenseSplitsType.BY_ITEM;
+    final hasAnyProducts = _members.any((m) => m.items.isNotEmpty);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
         Text(
-          'Podział',
+          'PODZIAŁ: $_splitLabel',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: AppColors.cardTitle(isDark),
+            color: AppColors.cardSubtitle(isDark),
           ),
         ),
-        const SizedBox(height: 8),
-        ..._splits.map((s) {
-          final isMe = s.userId == _currentUserId;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    isMe ? 'Ty' : s.label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isMe ? FontWeight.bold : FontWeight.w500,
-                      color: AppColors.cardTitle(isDark),
-                    ),
-                  ),
-                ),
-                _settledChip(s.settled),
-                const SizedBox(width: 12),
-                Text(
-                  '${s.amount.toStringAsFixed(2)} $cur',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.cardAmount(isDark),
-                  ),
-                ),
-              ],
+        const SizedBox(height: 12),
+        ..._members.map((m) => _buildMemberTile(m, isDark, isByItem)),
+        if (isByItem && !hasAnyProducts)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Brak danych o produktach dla tego podzialu.',
+              style: TextStyle(color: AppColors.cardSubtitle(isDark)),
             ),
-          );
-        }),
+          ),
       ],
     );
   }
 
-  Widget _buildItemsSection() {
-    final cur = _shareCurrency ?? widget.expense.currency;
+  Widget _buildMemberTile(ExpenseMember m, bool isDark, bool isByItem) {
+    final displayAmount = isByItem && m.items.isNotEmpty
+        ? m.items.fold<double>(
+            0.0,
+            (sum, item) =>
+                sum +
+                (double.tryParse(item.amount.replaceAll(',', '.')) ?? 0.0),
+          )
+        : double.tryParse(m.amount.replaceAll(',', '.')) ?? 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
-        Text(
-          'Twoje pozycje',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.cardTitle(isDark),
-          ),
-        ),
-        const SizedBox(height: 8),
-        ..._myItems.map(
-          (item) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.cardTitle(isDark),
-                    ),
-                  ),
-                ),
-                Text(
-                  '${item.share.toStringAsFixed(2)} $cur',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.cardAmount(isDark),
-                  ),
-                ),
-              ],
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(
+            child: Text(
+              m.displayName.isEmpty ? '?' : m.displayName[0].toUpperCase(),
             ),
           ),
+          title: Text(m.displayName),
+          trailing: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${displayAmount.toStringAsFixed(2)} ${widget.expense.currency}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              _settledChip(m.settled),
+            ],
+          ),
         ),
+        if (isByItem && m.items.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 56, bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: m.items
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.name,
+                              style: TextStyle(
+                                color: AppColors.cardSubtitle(isDark),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${item.amount} ${widget.expense.currency}',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -323,44 +470,23 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       ),
       child: Text(
         settled ? 'Rozliczone' : 'Do zapłaty',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 14, color: AppColors.cardSubtitle(isDark)),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.cardTitle(isDark),
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OwedItem {
-  final String name;
-  final double share;
-
-  const _OwedItem({required this.name, required this.share});
+  Widget _infoRow(String label, String value, bool isDark) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: AppColors.cardSubtitle(isDark))),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+      ],
+    ),
+  );
 }

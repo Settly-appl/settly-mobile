@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
+import '../../../models/expenses/single_expense.dart';
 
-class RecentExpenseCard extends StatelessWidget {
+class RecentExpenseCard extends StatefulWidget {
   final SingleExpense item;
   final bool isDark;
   final VoidCallback? onTap;
@@ -15,17 +16,52 @@ class RecentExpenseCard extends StatelessWidget {
   });
 
   @override
+  State<RecentExpenseCard> createState() => _RecentExpenseCardState();
+}
+
+class _RecentExpenseCardState extends State<RecentExpenseCard> {
+  final _expenseRepository = ExpenseRepository();
+  bool _loadingUserShare = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserShare();
+  }
+
+  Future<void> _loadUserShare() async {
+    // Jeśli userShare jest już załadowany, nie pobieraj ponownie
+    if (widget.item.userShare.isNotEmpty) return;
+
+    setState(() => _loadingUserShare = true);
+
+    final userShare = await _expenseRepository.fetchUserShareForExpense(
+      expenseId: widget.item.id ?? '',
+      currency: widget.item.currency,
+    );
+
+    if (userShare != null && mounted) {
+      setState(() {
+        widget.item.userShare = userShare;
+        _loadingUserShare = false;
+      });
+    } else if (mounted) {
+      setState(() => _loadingUserShare = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final style = item.style(isDark);
+    final style = widget.item.style(widget.isDark);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: AppColors.cardBg(isDark),
+          color: AppColors.cardBg(widget.isDark),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder(isDark)),
+          border: Border.all(color: AppColors.cardBorder(widget.isDark)),
         ),
         child: Row(
           children: [
@@ -56,31 +92,39 @@ class RecentExpenseCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          item.name,
+          widget.item.name,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.cardTitle(isDark),
+            color: AppColors.cardTitle(widget.isDark),
           ),
         ),
         Text(
-          item.note,
-          style: TextStyle(fontSize: 11, color: AppColors.cardSubtitle(isDark)),
+          widget.item.note,
+          style: TextStyle(
+            fontSize: 11,
+            color: AppColors.cardSubtitle(widget.isDark),
+          ),
         ),
       ],
     );
   }
 
   Widget _amountAndBadge(dynamic style) {
+    // Wyświetl userShare jeśli jest dostępny, w przeciwnym razie totalAmount
+    final displayAmount = widget.item.userShare.isNotEmpty
+        ? widget.item.userShare
+        : widget.item.totalAmount;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
-          item.totalAmount,
+          _loadingUserShare ? '...' : displayAmount,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.cardAmount(isDark),
+            color: AppColors.cardAmount(widget.isDark),
           ),
         ),
         const SizedBox(height: 3),
@@ -91,7 +135,7 @@ class RecentExpenseCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            item.category,
+            widget.item.category,
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,

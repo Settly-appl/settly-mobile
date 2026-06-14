@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
 import 'package:settly_mobile/models/app_notification.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';

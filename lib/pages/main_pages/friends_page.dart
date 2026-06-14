@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/models/app_notification.dart';
-import 'package:settly_mobile/models/friend.dart';
-import 'package:settly_mobile/models/friendship_request.dart';
-import 'package:settly_mobile/models/user_search_result.dart';
+import 'package:settly_mobile/models/frends/friend.dart';
+import 'package:settly_mobile/models/frends/friendship_request.dart';
+import 'package:settly_mobile/models/frends/user_search_result.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
@@ -117,7 +117,10 @@ class _FriendsPageState extends State<FriendsPage>
     }
   }
 
-  Future<void> _deleteFriendship(String friendshipId, {String? successMsg}) async {
+  Future<void> _deleteFriendship(
+    String friendshipId, {
+    String? successMsg,
+  }) async {
     final response = await _api.request(
       endpoint: 'friendships/$friendshipId',
       method: HttpMethod.delete,
@@ -384,7 +387,9 @@ class _FriendsPageState extends State<FriendsPage>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Usunąć znajomego?'),
-        content: Text('${friend.displayName} zostanie usunięty z listy znajomych.'),
+        content: Text(
+          '${friend.displayName} zostanie usunięty z listy znajomych.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -521,12 +526,18 @@ class _IncomingRequestRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.check_circle, color: AppColors.amountCurrency(isDark)),
+            icon: Icon(
+              Icons.check_circle,
+              color: AppColors.amountCurrency(isDark),
+            ),
             tooltip: 'Akceptuj',
             onPressed: onAccept,
           ),
           IconButton(
-            icon: const Icon(Icons.cancel_outlined, color: AppColors.amountNegative),
+            icon: const Icon(
+              Icons.cancel_outlined,
+              color: AppColors.amountNegative,
+            ),
             tooltip: 'Odrzuć',
             onPressed: onDecline,
           ),
@@ -583,10 +594,7 @@ class _OutgoingRequestRow extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onCancel,
-            child: const Text('Anuluj'),
-          ),
+          TextButton(onPressed: onCancel, child: const Text('Anuluj')),
         ],
       ),
     );
@@ -620,9 +628,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = displayName.isNotEmpty
-        ? displayName[0].toUpperCase()
-        : '?';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
     return CircleAvatar(
       radius: 20,
       backgroundColor: AppColors.avatarBg(isDark),
@@ -735,7 +741,9 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       setState(() => _result = UserSearchResult.fromJson(data));
     } else if (response.statusCode == 404) {
-      setState(() => _error = 'Nie znaleziono użytkownika z tym adresem email.');
+      setState(
+        () => _error = 'Nie znaleziono użytkownika z tym adresem email.',
+      );
     } else {
       setState(() => _error = 'Błąd wyszukiwania (${response.statusCode}).');
     }
