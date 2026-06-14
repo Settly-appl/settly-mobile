@@ -13,6 +13,7 @@ import '../../services/notification_service.dart';
 import '../../services/notifications_store.dart';
 import '../all_expenses_page.dart';
 import '../expense_details_page.dart';
+import '../projects_page.dart';
 import 'friends_page.dart';
 import 'profile_page.dart';
 import 'home_page_widgets/pinned_scroll.dart';
@@ -43,6 +44,9 @@ class HomePageState extends State<HomePage> {
   bool _hasInitialPinnedLoaded = false;
   final ValueNotifier<int> _tabNotifier = ValueNotifier(0);
   StreamSubscription<AppNotification>? _notifSub;
+
+  // Reassigned on pull-to-refresh to force the SummaryCard to reload its data.
+  Key _summaryKey = UniqueKey();
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -94,10 +98,17 @@ class HomePageState extends State<HomePage> {
 
   void switchTab(int index) => setState(() => _currentTab = index);
 
+  /// Pull-to-refresh for the home tab: reloads recent expenses, pinned items
+  /// and the balances summary card.
+  Future<void> _refreshHome() async {
+    if (mounted) setState(() => _summaryKey = UniqueKey());
+    await Future.wait([_fetchRecentExpenses(), _fetchPinnedItems()]);
+  }
+
   List<Widget> get _pages => [
     _HomeBody(state: this),
     ExpensesPage(tabNotifier: _tabNotifier),
-    const _PlaceholderTab(label: 'Grupy'),
+    const ProjectsPage(),
     const FriendsPage(),
     const _PlaceholderTab(label: 'Analiza'),
   ];
@@ -376,73 +387,78 @@ class _HomeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SummaryCard(),
-        const SizedBox(height: 16),
-        state._sectionHeader('Szybkie akcje'),
-        const SizedBox(height: 10),
-        QuickActionsRow(
-          isDark: state.isDark,
-          onExpenseAdded: state._fetchRecentExpenses,
-        ),
-        const SizedBox(height: 16),
+    return RefreshIndicator(
+      onRefresh: state._refreshHome,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SummaryCard(key: state._summaryKey),
+          const SizedBox(height: 16),
+          state._sectionHeader('Szybkie akcje'),
+          const SizedBox(height: 10),
+          QuickActionsRow(
+            isDark: state.isDark,
+            onExpenseAdded: state._fetchRecentExpenses,
+          ),
+          const SizedBox(height: 16),
 
-        state._sectionHeader('Przypięte', action: 'Edytuj'),
-        const SizedBox(height: 10),
+          state._sectionHeader('Przypięte', action: 'Edytuj'),
+          const SizedBox(height: 10),
 
-        state._isPinnedLoading
-            ? const SizedBox(
-                height: 110,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            : PinnedScroll(
-                isDark: state.isDark,
-                pinnedItems: state.pinnedItems,
-                onRefresh: state._fetchPinnedItems,
-              ),
-
-        const SizedBox(height: 16),
-        state._sectionHeader(
-          'Ostatnie',
-          action: 'Zobacz wszystkie',
-          onActionTap: () => state.switchTab(1),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: state._isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : state.recentItems.isEmpty
-              ? EmptyRecentCard(isDark: state.isDark)
-              : ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 20,
-                  ),
-                  itemCount: state.recentItems.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final expense = state.recentItems[index];
-                    return RecentExpenseCard(
-                      item: expense,
-                      isDark: state.isDark,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ExpenseDetailsPage(expense: expense),
-                          ),
-                        );
-                      },
-                    );
-                  },
+          state._isPinnedLoading
+              ? const SizedBox(
+                  height: 110,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : PinnedScroll(
+                  isDark: state.isDark,
+                  pinnedItems: state.pinnedItems,
+                  onRefresh: state._fetchPinnedItems,
                 ),
-        ),
-      ],
+
+          const SizedBox(height: 16),
+          state._sectionHeader(
+            'Ostatnie',
+            action: 'Zobacz wszystkie',
+            onActionTap: () => state.switchTab(1),
+          ),
+          const SizedBox(height: 10),
+
+          if (state._isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (state.recentItems.isEmpty)
+            EmptyRecentCard(isDark: state.isDark)
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: Column(
+                children: [
+                  for (var index = 0; index < state.recentItems.length; index++)
+                    Padding(
+                      padding: EdgeInsets.only(top: index == 0 ? 0 : 8),
+                      child: RecentExpenseCard(
+                        item: state.recentItems[index],
+                        isDark: state.isDark,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExpenseDetailsPage(
+                                expense: state.recentItems[index],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -4,13 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/friend.dart';
+import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final bool isDark;
-  const ExpenseFormPage({super.key, required this.isDark});
+
+  /// When set, the expense is pre-assigned to this project (e.g. when opening
+  /// the form from a project's detail screen).
+  final String? initialProjectId;
+
+  const ExpenseFormPage({super.key, required this.isDark, this.initialProjectId});
 
   @override
   State<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -47,6 +54,10 @@ const List<_CategoryOption> _kCategories = [
   _CategoryOption('others', 'Inne', Icons.more_horiz, Colors.grey),
 ];
 
+/// Sentinel returned by the project picker when the user explicitly chooses
+/// "no project" (distinct from dismissing the sheet, which returns null).
+const String _kNoProject = '__none__';
+
 const List<Map<String, String>> _kCurrencies = [
   {'code': 'PLN', 'symbol': 'zł', 'name': 'Złoty polski'},
   {'code': 'EUR', 'symbol': '€', 'name': 'Euro'},
@@ -66,6 +77,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   DateTime _selectedDate = DateTime.now();
   _CategoryOption? _selectedCategory;
   String _selectedCurrency = 'PLN';
+
+  final _projectsService = ProjectsService();
+  List<Project> _projects = [];
+  String? _selectedProjectId;
 
   bool _loadingFriends = true;
   List<Friend> _availableFriends = [];
@@ -89,8 +104,19 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _amountController.addListener(_onAmountChanged);
+    _selectedProjectId = widget.initialProjectId;
     _loadCurrentUser();
     _loadFriends();
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    try {
+      final projects = await _projectsService.getMyProjects();
+      if (mounted) setState(() => _projects = projects);
+    } catch (_) {
+      // Non-fatal: the project picker just stays empty.
+    }
   }
 
   @override
@@ -360,6 +386,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         category: _selectedCategory!.id,
         totalAmount: _totalAmount,
         date: _selectedDate,
+        projectId: _selectedProjectId,
       );
       final expResp = await _api.request(
         endpoint: 'expenses',
@@ -537,6 +564,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 _detailsCard(),
 
                 const SizedBox(height: 20),
+                _sectionHeader('PROJEKT'),
+                const SizedBox(height: 8),
+                _projectPickerCard(),
+
+                const SizedBox(height: 20),
                 _sectionHeader('PODZIAŁ'),
                 const SizedBox(height: 8),
                 _friendsPickerCard(),
@@ -557,6 +589,166 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       ),
       ),
     );
+  }
+
+  // ── Project ─────────────────────────────────────────────────────────────────
+  Widget _projectPickerCard() {
+    final selected = _projects.where((p) => p.id == _selectedProjectId);
+    final hasSelection = selected.isNotEmpty;
+    final label = hasSelection
+        ? selected.first.name
+        : 'Brak — wydatek osobisty';
+
+    return GestureDetector(
+      onTap: _pickProject,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(widget.isDark),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder(widget.isDark)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.actionProjectIconBg(widget.isDark),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.groups_2_outlined,
+                size: 20,
+                color: AppColors.actionProjectIcon(widget.isDark),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Projekt',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: hasSelection
+                          ? AppColors.cardTitle(widget.isDark)
+                          : AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.cardSubtitle(widget.isDark),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickProject() async {
+    final picked = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: AppColors.cardBg(widget.isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.sheetHandle(widget.isDark),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(
+                  Icons.person_outline,
+                  color: AppColors.cardSubtitle(widget.isDark),
+                ),
+                title: Text(
+                  'Brak — wydatek osobisty',
+                  style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
+                ),
+                trailing: _selectedProjectId == null
+                    ? Icon(
+                        Icons.check,
+                        color: AppColors.amountCurrency(widget.isDark),
+                      )
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(_kNoProject),
+              ),
+              if (_projects.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Nie masz jeszcze projektów.',
+                    style: TextStyle(
+                      color: AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _projects
+                        .map(
+                          (p) => ListTile(
+                            leading: Icon(
+                              Icons.groups_2_outlined,
+                              color: AppColors.actionProjectIcon(widget.isDark),
+                            ),
+                            title: Text(
+                              p.name,
+                              style: TextStyle(
+                                color: AppColors.cardTitle(widget.isDark),
+                              ),
+                            ),
+                            trailing: _selectedProjectId == p.id
+                                ? Icon(
+                                    Icons.check,
+                                    color: AppColors.amountCurrency(
+                                      widget.isDark,
+                                    ),
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(sheetContext).pop(p.id),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (picked == null) return; // dismissed without choosing
+    setState(() => _selectedProjectId = picked == _kNoProject ? null : picked);
   }
 
   // ── Amount ────────────────────────────────────────────────────────────────
