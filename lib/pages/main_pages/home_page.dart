@@ -1,14 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/main.dart';
-import 'package:settly_mobile/models/pinned_item.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/app_notification.dart';
+import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
+import '../../services/notification_service.dart';
+import '../../services/notifications_store.dart';
 import '../all_expenses_page.dart';
 import '../expense_details_page.dart';
+import '../projects_page.dart';
 import 'friends_page.dart';
 import 'profile_page.dart';
 import 'home_page_widgets/pinned_scroll.dart';
@@ -38,6 +43,10 @@ class HomePageState extends State<HomePage> {
   bool _isPinnedLoading = false;
   bool _hasInitialPinnedLoaded = false;
   final ValueNotifier<int> _tabNotifier = ValueNotifier(0);
+  StreamSubscription<AppNotification>? _notifSub;
+
+  // Reassigned on pull-to-refresh to force the SummaryCard to reload its data.
+  Key _summaryKey = UniqueKey();
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -58,6 +67,17 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _fetchRecentExpenses();
+
+    // Refresh recent expenses when added to a shared expense.
+    _notifSub = NotificationsStore().stream.listen((n) {
+      if (mounted && n.type == 'EXPENSE_SPLIT') _fetchRecentExpenses();
+    });
+
+    // Handle a notification tapped while the app was terminated, now that the
+    // home screen (and navigator) is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().consumePendingNavigation();
+    });
   }
 
   @override
@@ -71,16 +91,24 @@ class HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _tabNotifier.dispose();
     super.dispose();
   }
 
   void switchTab(int index) => setState(() => _currentTab = index);
 
+  /// Pull-to-refresh for the home tab: reloads recent expenses, pinned items
+  /// and the balances summary card.
+  Future<void> _refreshHome() async {
+    if (mounted) setState(() => _summaryKey = UniqueKey());
+    await Future.wait([_fetchRecentExpenses(), _fetchPinnedItems()]);
+  }
+
   List<Widget> get _pages => [
     _HomeBody(state: this),
     ExpensesPage(tabNotifier: _tabNotifier),
-    const _PlaceholderTab(label: 'Grupy'),
+    const ProjectsPage(),
     const FriendsPage(),
     const _PlaceholderTab(label: 'Analiza'),
   ];
@@ -172,16 +200,36 @@ class HomePageState extends State<HomePage> {
           },
         ),
         const SizedBox(width: 8),
-        CircleAvatar(
-          backgroundColor: AppColors.bellBg(isDark),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            color: AppColors.bellIcon(isDark),
-            onPressed: () {},
-          ),
+        ListenableBuilder(
+          listenable: NotificationsStore(),
+          builder: (context, _) {
+            final unread = NotificationsStore().unreadCount;
+            return CircleAvatar(
+              backgroundColor: AppColors.bellBg(isDark),
+              child: IconButton(
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text('$unread'),
+                  child: const Icon(Icons.notifications_none_rounded),
+                ),
+                color: AppColors.bellIcon(isDark),
+                onPressed: _openNotifications,
+              ),
+            );
+          },
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  void _openNotifications() {
+    NotificationsStore().markAllRead();
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.scaffold(isDark),
+      builder: (_) => _NotificationsSheet(onOpenFriends: () => switchTab(3)),
     );
   }
 
@@ -339,73 +387,78 @@ class _HomeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SummaryCard(),
-        const SizedBox(height: 16),
-        state._sectionHeader('Szybkie akcje'),
-        const SizedBox(height: 10),
-        QuickActionsRow(
-          isDark: state.isDark,
-          onExpenseAdded: state._fetchRecentExpenses,
-        ),
-        const SizedBox(height: 16),
+    return RefreshIndicator(
+      onRefresh: state._refreshHome,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SummaryCard(key: state._summaryKey),
+          const SizedBox(height: 16),
+          state._sectionHeader('Szybkie akcje'),
+          const SizedBox(height: 10),
+          QuickActionsRow(
+            isDark: state.isDark,
+            onExpenseAdded: state._fetchRecentExpenses,
+          ),
+          const SizedBox(height: 16),
 
-        state._sectionHeader('Przypięte', action: 'Edytuj'),
-        const SizedBox(height: 10),
+          state._sectionHeader('Przypięte', action: 'Edytuj'),
+          const SizedBox(height: 10),
 
-        state._isPinnedLoading
-            ? const SizedBox(
-                height: 110,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            : PinnedScroll(
-                isDark: state.isDark,
-                pinnedItems: state.pinnedItems,
-                onRefresh: state._fetchPinnedItems,
-              ),
-
-        const SizedBox(height: 16),
-        state._sectionHeader(
-          'Ostatnie',
-          action: 'Zobacz wszystkie',
-          onActionTap: () => state.switchTab(1),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: state._isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : state.recentItems.isEmpty
-              ? EmptyRecentCard(isDark: state.isDark)
-              : ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 20,
-                  ),
-                  itemCount: state.recentItems.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final expense = state.recentItems[index];
-                    return RecentExpenseCard(
-                      item: expense,
-                      isDark: state.isDark,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ExpenseDetailsPage(expense: expense),
-                          ),
-                        );
-                      },
-                    );
-                  },
+          state._isPinnedLoading
+              ? const SizedBox(
+                  height: 110,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : PinnedScroll(
+                  isDark: state.isDark,
+                  pinnedItems: state.pinnedItems,
+                  onRefresh: state._fetchPinnedItems,
                 ),
-        ),
-      ],
+
+          const SizedBox(height: 16),
+          state._sectionHeader(
+            'Ostatnie',
+            action: 'Zobacz wszystkie',
+            onActionTap: () => state.switchTab(1),
+          ),
+          const SizedBox(height: 10),
+
+          if (state._isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (state.recentItems.isEmpty)
+            EmptyRecentCard(isDark: state.isDark)
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: Column(
+                children: [
+                  for (var index = 0; index < state.recentItems.length; index++)
+                    Padding(
+                      padding: EdgeInsets.only(top: index == 0 ? 0 : 8),
+                      child: RecentExpenseCard(
+                        item: state.recentItems[index],
+                        isDark: state.isDark,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExpenseDetailsPage(
+                                expense: state.recentItems[index],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -445,6 +498,99 @@ class _PlaceholderTab extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NotificationsSheet extends StatelessWidget {
+  final VoidCallback onOpenFriends;
+
+  const _NotificationsSheet({required this.onOpenFriends});
+
+  IconData _iconFor(String? type) {
+    switch (type) {
+      case 'FRIEND_REQUEST':
+      case 'FRIEND_REQUEST_ACCEPTED':
+        return Icons.people_outline;
+      case 'EXPENSE_SPLIT':
+        return Icons.attach_money_rounded;
+      default:
+        return Icons.notifications_none_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = NotificationsStore();
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: ListenableBuilder(
+          listenable: store,
+          builder: (context, _) {
+            final items = store.items;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Powiadomienia',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (items.isNotEmpty)
+                        TextButton(
+                          onPressed: store.clear,
+                          child: const Text('Wyczyść'),
+                        ),
+                    ],
+                  ),
+                ),
+                if (items.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('Brak powiadomień')),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final n = items[i];
+                        return ListTile(
+                          leading: Icon(_iconFor(n.type)),
+                          title: Text(n.title),
+                          subtitle: n.body.isEmpty ? null : Text(n.body),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            if (n.type == 'FRIEND_REQUEST' ||
+                                n.type == 'FRIEND_REQUEST_ACCEPTED') {
+                              onOpenFriends();
+                            } else if (n.type == 'EXPENSE_SPLIT') {
+                              NotificationService().navigateForNotification(n);
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

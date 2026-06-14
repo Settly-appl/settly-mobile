@@ -5,6 +5,7 @@ class ExpenseMember {
   final String amount;
   final String splitType;
   final String displayName;
+  final bool settled;
   final List<ExpenseMemberItem> items;
 
   ExpenseMember({
@@ -12,6 +13,7 @@ class ExpenseMember {
     required this.amount,
     required this.splitType,
     required this.displayName,
+    this.settled = false,
     this.items = const [],
   });
 
@@ -21,6 +23,7 @@ class ExpenseMember {
       amount: (json['amount']?.toString()) ?? '0.00',
       splitType: json['splitType']?.toString() ?? '',
       displayName: '',
+      settled: json['settled'] == true,
       items: ExpenseMemberItem.listFromJson(json['items']),
     );
   }
@@ -34,6 +37,7 @@ class ExpenseMember {
   ExpenseMember copyWith({
     String? displayName,
     String? amount,
+    bool? settled,
     List<ExpenseMemberItem>? items,
   }) {
     return ExpenseMember(
@@ -41,6 +45,7 @@ class ExpenseMember {
       splitType: this.splitType,
       amount: amount ?? this.amount,
       displayName: displayName ?? this.displayName,
+      settled: settled ?? this.settled,
       items: items ?? this.items,
     );
   }

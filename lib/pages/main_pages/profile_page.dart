@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/pages/admin_broadcast_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/services/auth_service.dart';
 
 class ProfilePage extends StatelessWidget {
   final String userName;
@@ -63,6 +65,32 @@ class ProfilePage extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              FutureBuilder<bool>(
+                future: AuthService().isAdmin(),
+                builder: (context, snapshot) {
+                  if (snapshot.data != true) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AdminBroadcastPage(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.campaign_outlined),
+                      label: const Text('Wyślij powiadomienie do wszystkich'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
               FilledButton.icon(
                 onPressed: () {
                   Navigator.of(context).pop();

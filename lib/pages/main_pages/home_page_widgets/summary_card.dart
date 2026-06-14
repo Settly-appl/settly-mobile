@@ -1,64 +1,120 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:intl/intl.dart';
 
-class SummaryCard extends StatelessWidget {
+class SummaryCard extends StatefulWidget {
   const SummaryCard({super.key});
 
   @override
+  State<SummaryCard> createState() => _SummaryCardState();
+}
+
+class _SummaryCardState extends State<SummaryCard> {
+  final _service = BalancesService();
+  bool _loading = true;
+  double _owedToYou = 0;
+  double _youOwe = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final balances = await _service.getBalances();
+      if (!mounted) return;
+      setState(() {
+        _owedToYou = balances
+            .where((b) => b.owesYou)
+            .fold(0.0, (s, b) => s + b.absAmount);
+        _youOwe = balances
+            .where((b) => b.youOwe)
+            .fold(0.0, (s, b) => s + b.absAmount);
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _money(double v) => '${v.toStringAsFixed(2)} zł';
+
+  @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final String formattedDate = DateFormat(
       'MMMM yyyy',
       'pl',
     ).format(DateTime.now());
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.summaryGradientLeft,
-            AppColors.summaryGradientRight,
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Podsumowanie — $formattedDate',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.summaryTitle,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryTile(
-                  label: 'Należności',
-                  amount: '210 zł',
-                  subtitle: 'inni Tobie',
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SummaryTile(
-                  label: 'Zobowiązania',
-                  amount: '85 zł',
-                  subtitle: 'Ty innym',
-                ),
-              ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BalancesPage()),
+        );
+        _load();
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.summaryGradientLeft,
+              AppColors.summaryGradientRight,
             ],
           ),
-        ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Podsumowanie — $formattedDate',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.summaryTitle,
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: AppColors.summaryTitle,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryTile(
+                    label: 'Należności',
+                    amount: _loading ? '—' : _money(_owedToYou),
+                    subtitle: 'inni Tobie',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SummaryTile(
+                    label: 'Zobowiązania',
+                    amount: _loading ? '—' : _money(_youOwe),
+                    subtitle: 'Ty innym',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

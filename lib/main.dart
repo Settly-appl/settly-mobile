@@ -1,13 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:settly_mobile/app_navigator.dart';
 import 'package:settly_mobile/pages/main_pages/home_page.dart';
 import 'package:settly_mobile/pages/main_pages/login_page.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/services/notification_service.dart';
+import 'package:settly_mobile/services/notifications_store.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+/// Background/terminated-state handler. The OS renders the notification from
+/// the FCM payload automatically; this just needs to exist and be an entry point.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await NotificationService().init();
   await initializeDateFormatting('pl_PL', null);
   runApp(const MyApp());
 }
@@ -15,14 +28,14 @@ Future<void> main() async {
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  static _MyAppState of(BuildContext context) =>
-      context.findAncestorStateOfType<_MyAppState>()!;
+  static MyAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<MyAppState>()!;
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<MyApp> createState() => MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.system;
 
   void changeTheme(ThemeMode themeMode) {
@@ -34,6 +47,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -82,6 +96,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final loggedIn = await _authService.isLoggedIn();
     if (loggedIn) {
       await _loadUserData();
+      await NotificationService().registerCurrentToken();
     }
     if (mounted) {
       setState(() {
@@ -117,6 +132,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _onLoginSuccess() async {
     await _loadUserData();
+    await NotificationService().registerCurrentToken();
     if (mounted) {
       setState(() {
         _isLoggedIn = true;
@@ -125,6 +141,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _onLogout() async {
+    // Remove this device's token while the access token is still valid.
+    await NotificationService().unregisterCurrentToken();
+    // Drop the previous user's in-app notifications so the next account starts clean.
+    NotificationsStore().clear();
     await _authService.logout();
     if (mounted) {
       setState(() {

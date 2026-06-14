@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/pinned_item.dart';
-import '../models/single_expense.dart';
+import '../models/pinned_items/pinned_item.dart';
+import '../models/expenses/single_expense.dart';
 import '../services/api_service/api_service_request.dart';
 
 class PinnedRepository {

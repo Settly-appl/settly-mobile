@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/enums/expense_splits_type.dart';
-import 'package:settly_mobile/models/expense_member_item.dart';
-import 'package:settly_mobile/models/expens_style.dart';
+import 'package:settly_mobile/models/expenses/expense_member_item.dart';
+import 'package:settly_mobile/models/expenses/expens_style.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-import '../models/expense_member.dart';
+import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
+import '../services/api_service/projects_service.dart';
 
 class ExpenseDetailsPage extends StatefulWidget {
   final SingleExpense expense;
@@ -21,7 +22,9 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   String _splitLabel = '';
   ExpenseSplitsType _splitType = ExpenseSplitsType.EQUAL;
   List<ExpenseMember> _members = [];
+  String? _projectName;
   final ApiServiceRequest _api = ApiServiceRequest();
+  final ProjectsService _projectsService = ProjectsService();
 
   @override
   void initState() {
@@ -45,6 +48,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       _finishLoading();
       return;
     }
+
+    await _loadProjectName();
 
     try {
       final splitMembers = await _fetchSplitMembers(expenseId);
@@ -80,6 +85,17 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           .toList();
     } catch (_) {}
     _finishLoading();
+  }
+
+  Future<void> _loadProjectName() async {
+    final projectId = widget.expense.projectId;
+    if (projectId == null) return;
+    try {
+      final project = await _projectsService.getProject(projectId);
+      _projectName = project.name;
+    } catch (_) {
+      // Non-fatal: just don't show the project row.
+    }
   }
 
   Future<List<ExpenseMember>> _fetchSplitMembers(String expenseId) async {
@@ -310,6 +326,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             ),
             if (widget.expense.note.isNotEmpty)
               _infoRow('Notatka', widget.expense.note, isDark),
+            if (_projectName != null) _infoRow('Projekt', _projectName!, isDark),
             const Divider(height: 40),
             _buildSplitSection(isDark),
           ],
@@ -373,6 +390,15 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   }
 
   Widget _buildMemberTile(ExpenseMember m, bool isDark, bool isByItem) {
+    final displayAmount = isByItem && m.items.isNotEmpty
+        ? m.items.fold<double>(
+            0.0,
+            (sum, item) =>
+                sum +
+                (double.tryParse(item.amount.replaceAll(',', '.')) ?? 0.0),
+          )
+        : double.tryParse(m.amount.replaceAll(',', '.')) ?? 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -384,9 +410,17 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             ),
           ),
           title: Text(m.displayName),
-          trailing: Text(
-            '${m.amount} ${widget.expense.currency}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          trailing: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${displayAmount.toStringAsFixed(2)} ${widget.expense.currency}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              _settledChip(m.settled),
+            ],
           ),
         ),
         if (isByItem && m.items.isNotEmpty) ...[
@@ -423,6 +457,25 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _settledChip(bool settled) {
+    final color = settled ? Colors.green : Colors.orange;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        settled ? 'Rozliczone' : 'Do zapłaty',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 

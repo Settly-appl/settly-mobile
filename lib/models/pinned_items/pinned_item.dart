@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 
 enum PinnedItemType { expense, project }
 

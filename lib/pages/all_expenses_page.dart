@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:settly_mobile/models/recent_expense.dart';
-import 'package:settly_mobile/models/single_expense.dart';
+import 'package:settly_mobile/models/app_notification.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/services/notifications_store.dart';
 
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
 enum AllExpensesPage { all, food, transport, shopping, other }
@@ -64,6 +67,9 @@ class _ExpensesPageState extends State<ExpensesPage> {
   AllExpensesPage _selectedCategory = AllExpensesPage.all;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  StreamSubscription<AppNotification>? _notifSub;
+
+  final _expenseRepository = ExpenseRepository();
 
   // ── Podsumowanie (hardcoded — docelowo z API) ──────────────────────────────
   final String _monthLabel = 'Marzec 2026';
@@ -90,10 +96,16 @@ class _ExpensesPageState extends State<ExpensesPage> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
+
+    // Refresh when added to a shared expense while this page is up.
+    _notifSub = NotificationsStore().stream.listen((n) {
+      if (mounted && n.type == 'EXPENSE_SPLIT') _fetchExpenses();
+    });
   }
 
   @override
   void dispose() {
+    _notifSub?.cancel();
     _searchController.dispose();
     widget.tabNotifier.removeListener(_onTabChanged);
     super.dispose();
@@ -121,6 +133,20 @@ class _ExpensesPageState extends State<ExpensesPage> {
     if (response != null && response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final fetched = SingleExpense.listFromJson(data['content']);
+
+      // Pobierz userShare dla każdego wydatku z endpointu
+      for (var expense in fetched) {
+        if (expense.id != null) {
+          final userShare = await _expenseRepository.fetchUserShareForExpense(
+            expenseId: expense.id!,
+            currency: expense.currency,
+          );
+          if (userShare != null) {
+            expense.userShare = userShare;
+          }
+        }
+      }
+
       setState(() => _expenses = fetched);
     }
 
@@ -691,7 +717,7 @@ class _ExpenseRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  item.totalAmount,
+                  item.userShare.isNotEmpty ? item.userShare : item.totalAmount,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
-import '../models/sheet_option.dart';
+import '../models/quick_add_dialog/sheet_option.dart';
 import 'expense_form_page.dart';
 
 class QuickAddMenu extends StatelessWidget {
