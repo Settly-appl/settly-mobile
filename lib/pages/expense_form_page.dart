@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:settly_mobile/const/api_url.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/expenses/item_draft.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
@@ -17,9 +18,6 @@ import 'package:settly_mobile/services/auth_service.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final bool isDark;
-
-  /// When set, the expense is pre-assigned to this project (e.g. when opening
-  /// the form from a project's detail screen).
   final String? initialProjectId;
   final String? initialCategory;
   final String? initialCurrency;
@@ -48,23 +46,38 @@ class ExpenseFormPage extends StatefulWidget {
 
 class _CategoryOption {
   final String id;
-  final String label;
   final IconData icon;
   final Color color;
-  const _CategoryOption(this.id, this.label, this.icon, this.color);
+
+  const _CategoryOption(this.id, this.icon, this.color);
+
+  String label(AppTexts texts) {
+    switch (id) {
+      case 'shopping':
+        return texts.expensesLabelShopping;
+      case 'food':
+        return texts.expensesLabelFood;
+      case 'transport':
+        return texts.expensesLabelTransport;
+      case 'entertainment':
+        return texts.categoryEntertainmentLabel;
+      case 'health':
+        return texts.categoryHealthLabel;
+      default:
+        return texts.expensesLabelOther;
+    }
+  }
 }
 
 const List<_CategoryOption> _kCategories = [
-  _CategoryOption('shopping', 'Zakupy', Icons.shopping_bag, Colors.orange),
-  _CategoryOption('food', 'Jedzenie', Icons.restaurant, Colors.red),
-  _CategoryOption('transport', 'Transport', Icons.directions_car, Colors.blue),
-  _CategoryOption('entertainment', 'Rozrywka', Icons.movie, Colors.purple),
-  _CategoryOption('health', 'Zdrowie', Icons.medical_services, Colors.green),
-  _CategoryOption('others', 'Inne', Icons.more_horiz, Colors.grey),
+  _CategoryOption('shopping', Icons.shopping_bag, Colors.orange),
+  _CategoryOption('food', Icons.restaurant, Colors.red),
+  _CategoryOption('transport', Icons.directions_car, Colors.blue),
+  _CategoryOption('entertainment', Icons.movie, Colors.purple),
+  _CategoryOption('health', Icons.medical_services, Colors.green),
+  _CategoryOption('others', Icons.more_horiz, Colors.grey),
 ];
 
-/// Sentinel returned by the project picker when the user explicitly chooses
-/// "no project" (distinct from dismissing the sheet, which returns null).
 const String _kNoProject = '__none__';
 
 const List<Map<String, String>> _kCurrencies = [
@@ -104,7 +117,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   SplitType _splitType = SplitType.equal;
   String? _amountBeforeByItems;
 
-  // Keyed by friendId (payer is NOT here — payer's share is computed).
   final Map<String, TextEditingController> _customAmountControllers = {};
 
   final List<ItemDraft> _items = [];
@@ -129,8 +141,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     if (widget.initialSplitType != null) {
       _splitType = widget.initialSplitType!;
     }
-
-    // Initialize with provided values if any
     if (widget.initialAmount != null) {
       _amountController.text = widget.initialAmount!.toStringAsFixed(2);
     }
@@ -160,9 +170,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     try {
       final projects = await _projectsService.getMyProjects();
       if (mounted) setState(() => _projects = projects);
-    } catch (_) {
-      // Non-fatal: the project picker just stays empty.
-    }
+    } catch (_) {}
   }
 
   @override
@@ -192,6 +200,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
+
   Future<void> _loadCurrentUser() async {
     final info = await AuthService().getUserInfo();
     if (!mounted || info == null) return;
@@ -222,10 +231,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Math ──────────────────────────────────────────────────────────────────
+
   double get _totalAmount =>
       double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
 
-  /// Everyone in the split: current user first, then selected friends in list order.
   List<String> get _participantIdsIncludingMe {
     final ids = <String>[];
     if (_currentUserId != null) ids.add(_currentUserId!);
@@ -235,7 +244,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     return ids;
   }
 
-  /// Equal split: everyone gets total/N; remainder (groszy) ends up on payer.
   Map<String, double> _equalAmounts() {
     final ids = _participantIdsIncludingMe;
     if (ids.isEmpty || _totalAmount <= 0) {
@@ -331,31 +339,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       final enteringByItems = t == SplitType.byItems && !wasByItems;
       final leavingByItems = wasByItems && t != SplitType.byItems;
 
-      if (enteringByItems) {
-        _amountBeforeByItems = _amountController.text;
-      }
+      if (enteringByItems) _amountBeforeByItems = _amountController.text;
 
       _splitType = t;
-      if (t == SplitType.custom) {
-        _syncCustomControllersToEqualFriends();
-      }
-      if (t == SplitType.byItems) {
-        _syncAmountFromItems();
-      }
+      if (t == SplitType.custom) _syncCustomControllersToEqualFriends();
+      if (t == SplitType.byItems) _syncAmountFromItems();
       if (leavingByItems && _amountBeforeByItems != null) {
         _amountController.text = _amountBeforeByItems!;
       }
-      if (leavingByItems) {
-        _selectedItemIds.clear();
-      }
+      if (leavingByItems) _selectedItemIds.clear();
     });
   }
 
   void _syncAmountFromItems() {
     final text = _itemsSum.toStringAsFixed(2);
-    if (_amountController.text != text) {
-      _amountController.text = text;
-    }
+    if (_amountController.text != text) _amountController.text = text;
   }
 
   void _addItem() {
@@ -422,21 +420,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
   Future<void> _removeAllItems() async {
     if (_items.isEmpty) return;
+    final texts = AppTexts.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Usuń wszystkie pozycje?'),
-        content: const Text(
-          'Ta akcja usunie wszystkie produkty z listy. Nie da się jej cofnąć.',
-        ),
+        title: Text(texts.clearAllItemsDialogTitle),
+        content: Text(texts.clearAllItemsDialogContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Anuluj'),
+            child: Text(texts.cancelAction),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Usuń wszystko'),
+            child: Text(texts.deleteAllItems),
           ),
         ],
       ),
@@ -452,42 +449,34 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  String? _blockingError() {
-    if (_currentUserId == null) {
-      return 'Nie można pobrać Twojego konta. Zaloguj się ponownie.';
-    }
-    if (_totalAmount <= 0) return 'Wprowadź kwotę większą niż 0.';
-    if (_selectedCategory == null) return 'Wybierz kategorię wydatku.';
 
-    if (_selectedFriendIds.isEmpty) {
-      return null; // personal expense — OK
-    }
+  String? _blockingError() {
+    final texts = AppTexts.of(context);
+    if (_currentUserId == null) return texts.errorNoAccount;
+    if (_totalAmount <= 0) return texts.errorAmountZero;
+    if (_selectedCategory == null) return texts.errorNoCategory;
+
+    if (_selectedFriendIds.isEmpty) return null;
 
     if (_splitType == SplitType.custom) {
       if (_customFriendsTotal >= _totalAmount) {
-        return 'Kwoty znajomych nie mogą pokryć całości — Ty też musisz coś zapłacić.';
+        return texts.errorFriendsExceedTotal;
       }
       if (_customFriendsTotal < 0 ||
           _customAmountControllers.values.any((c) => _parseCtrl(c) < 0)) {
-        return 'Kwoty nie mogą być ujemne.';
+        return texts.errorNegativeAmounts;
       }
     }
 
     if (_splitType == SplitType.byItems) {
-      if (_items.isEmpty) return 'Dodaj przynajmniej jedną pozycję.';
+      if (_items.isEmpty) return texts.errorNoItems;
       for (final item in _items) {
-        if (item.name.trim().isEmpty) {
-          return 'Każda pozycja musi mieć nazwę.';
-        }
-        if (item.price <= 0) {
-          return 'Każda pozycja musi mieć cenę większą niż 0.';
-        }
+        if (item.name.trim().isEmpty) return texts.errorItemNoName;
+        if (item.price <= 0) return texts.errorItemNoPrice;
         if (item.assigneeIds.isEmpty) {
-          return 'Pozycja "${item.name}" musi mieć przynajmniej jedną osobę.';
+          return texts.errorItemNoAssignee.replaceAll('{name}', item.name);
         }
       }
-      // Ensure every selected friend is actually assigned somewhere — otherwise
-      // backend would reject them as unused participants.
       final assigned = <String>{for (final i in _items) ...i.assigneeIds};
       for (final friendId in _selectedFriendIds) {
         if (!assigned.contains(friendId)) {
@@ -501,7 +490,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
               )
               .displayName;
-          return 'Przypisz pozycje dla: $name (lub usuń osobę z podziału).';
+          return texts.errorFriendNotAssigned.replaceAll('{name}', name);
         }
       }
     }
@@ -511,6 +500,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   bool get _canSave => _blockingError() == null && !_saving;
 
   Future<void> _save() async {
+    final texts = AppTexts.of(context);
     final err = _blockingError();
     if (err != null) {
       _snack(err);
@@ -519,7 +509,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
     setState(() => _saving = true);
     try {
-      // ── Step 1: create the expense ───────────────────────────────────────
       final req = CreateExpenseRequest(
         shop: _placeController.text.trim(),
         note: _noteController.text.trim().isEmpty
@@ -538,22 +527,18 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       );
       if (expResp == null ||
           (expResp.statusCode != 200 && expResp.statusCode != 201)) {
-        _snack(_apiErrorMessage(expResp, 'Nie udało się utworzyć wydatku'));
+        _snack(_apiErrorMessage(expResp, texts.errorCreateExpense));
         return;
       }
       final expenseId =
           (jsonDecode(expResp.body) as Map<String, dynamic>)['id'] as String;
 
-      // Personal expense — done after step 1, unless we are saving receipt items.
       if (_selectedFriendIds.isEmpty && _splitType != SplitType.byItems) {
         _finishSuccessfully();
         return;
       }
 
-      // ── Step 2 (BY_ITEM only): create items ──────────────────────────────
-      final itemIds = <String, String>{
-        // draft.id -> server itemId
-      };
+      final itemIds = <String, String>{};
       if (_splitType == SplitType.byItems) {
         for (final draft in _items) {
           final itemResp = await _api.request(
@@ -571,7 +556,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             _snack(
               _apiErrorMessage(
                 itemResp,
-                'Nie udało się zapisać pozycji "${draft.name}"',
+                texts.errorSaveItem.replaceAll('{name}', draft.name),
               ),
             );
             return;
@@ -581,7 +566,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         }
       }
 
-      // ── Step 3: create splits ────────────────────────────────────────────
       final participants = _buildParticipantsPayload();
       final assignments = _splitType == SplitType.byItems
           ? [
@@ -606,7 +590,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       if (splitResp == null ||
           (splitResp.statusCode != 200 && splitResp.statusCode != 201)) {
         await _rollbackExpense(expenseId);
-        _snack(_apiErrorMessage(splitResp, 'Nie udało się zapisać podziału'));
+        _snack(_apiErrorMessage(splitResp, texts.errorSaveSplit));
         return;
       }
 
@@ -617,16 +601,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   List<SplitParticipantRequest> _buildParticipantsPayload() {
-    // Backend forbids the payer being in `participants` and adds them automatically.
     switch (_splitType) {
       case SplitType.equal:
         final eq = _equalAmounts();
         return [
           for (final id in _selectedFriendIds)
-            SplitParticipantRequest(
-              friendId: id,
-              amount: eq[id] ?? 0.01, // backend recomputes; just needs > 0
-            ),
+            SplitParticipantRequest(friendId: id, amount: eq[id] ?? 0.01),
         ];
       case SplitType.custom:
         return [
@@ -637,7 +617,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             ),
         ];
       case SplitType.byItems:
-        // Any positive amount works — backend recomputes from item assignments.
         return [
           for (final id in _selectedFriendIds)
             SplitParticipantRequest(friendId: id, amount: 0.01),
@@ -652,13 +631,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
+  // ── Receipt scan ──────────────────────────────────────────────────────────
+
   Future<void> _scanReceiptWithCamera() async {
     if (_scanningReceipt) return;
-
-    // Show dialog to choose between camera and gallery
     final imageSource = await _showImageSourceDialog();
     if (imageSource == null) return;
-
     try {
       final photo = await _imagePicker.pickImage(
         source: imageSource,
@@ -667,16 +645,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       if (photo == null) return;
       await _uploadReceiptAndPrefillItems(photo);
     } catch (_) {
-      _snack('Nie udało się otworzyć źródła zdjęcia.');
+      if (mounted) _snack(AppTexts.of(context).snackPhotoSourceError);
     }
   }
 
   Future<void> _scanSingleExpenseWithCamera() async {
     if (_scanningReceipt) return;
-
     final imageSource = await _showImageSourceDialog();
     if (imageSource == null) return;
-
     try {
       final photo = await _imagePicker.pickImage(
         source: imageSource,
@@ -685,7 +661,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       if (photo == null) return;
       await _uploadSingleExpenseAndPrefill(photo);
     } catch (_) {
-      _snack('Nie udało się otworzyć źródła zdjęcia.');
+      if (mounted) _snack(AppTexts.of(context).snackPhotoSourceError);
     }
   }
 
@@ -693,12 +669,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     if (_initialReceiptScanStarted) return;
     if (_currentUserId == null) return;
 
-    // If items are already extracted, use them directly (from quick_scan)
     if (widget.initialReceiptItems != null &&
         widget.initialReceiptItems!.isNotEmpty) {
-      if (_selectedFriendIds.isEmpty) return; // Only for group expenses
+      if (_selectedFriendIds.isEmpty) return;
       if (_splitType != SplitType.byItems) return;
-
       _initialReceiptScanStarted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -707,7 +681,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       return;
     }
 
-    // Otherwise, if receipt image path is provided, scan it
     if (widget.initialReceiptImagePath == null) return;
 
     if (_selectedFriendIds.isEmpty) {
@@ -732,33 +705,27 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     setState(() => _scanningReceipt = true);
     try {
       var response = await _sendReceiptScan(photo);
-
       if (response?.statusCode == 401) {
         final refreshed = await AuthService().refreshAccessToken();
-        if (refreshed) {
-          response = await _sendReceiptScan(photo);
-        }
+        if (refreshed) response = await _sendReceiptScan(photo);
       }
-
       if (!mounted) return;
+      final texts = AppTexts.of(context);
       if (response == null ||
           (response.statusCode != 200 && response.statusCode != 201)) {
-        _snack(_apiErrorMessage(response, 'Nie udało się zeskanować paragonu'));
+        _snack(_apiErrorMessage(response, texts.snackReceiptScanFailed));
         return;
       }
-
       final decoded = jsonDecode(response.body);
       final extracted = _extractReceiptItems(decoded);
       if (extracted.isEmpty) {
-        _snack('Nie rozpoznano pozycji na paragonie.');
+        _snack(texts.snackReceiptNoItems);
         return;
       }
-
       final participants = <String>{
         if (_currentUserId != null) _currentUserId!,
         ..._selectedFriendIds,
       };
-
       setState(() {
         _items
           ..clear()
@@ -774,28 +741,28 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           );
         _syncAmountFromItems();
       });
-
-      _snack('Dodano ${extracted.length} pozycji z paragonu.');
+      _snack(
+        texts.snackReceiptItems.replaceAll('{count}', '${extracted.length}'),
+      );
     } catch (_) {
-      _snack('Wystąpił błąd podczas analizy paragonu.');
+      if (mounted) _snack(AppTexts.of(context).snackReceiptError);
     } finally {
       if (mounted) setState(() => _scanningReceipt = false);
     }
   }
 
   void _prefillItemsFromExtracted(List<Map<String, dynamic>> rawItems) {
+    final texts = AppTexts.of(context);
     try {
       final extracted = _extractReceiptItems(rawItems);
       if (extracted.isEmpty) {
-        _snack('Nie rozpoznano pozycji na paragonie.');
+        _snack(texts.snackReceiptNoItems);
         return;
       }
-
       final participants = <String>{
         if (_currentUserId != null) _currentUserId!,
         ..._selectedFriendIds,
       };
-
       setState(() {
         _items
           ..clear()
@@ -811,10 +778,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           );
         _syncAmountFromItems();
       });
-
-      _snack('Dodano ${extracted.length} pozycji z paragonu.');
+      _snack(
+        texts.snackReceiptItems.replaceAll('{count}', '${extracted.length}'),
+      );
     } catch (_) {
-      _snack('Wystąpił błąd podczas przetwarzania pozycji.');
+      _snack(texts.snackProcessingError);
     }
   }
 
@@ -822,26 +790,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     setState(() => _scanningReceipt = true);
     try {
       var response = await _sendSingleExpenseScan(photo);
-
       if (response?.statusCode == 401) {
         final refreshed = await AuthService().refreshAccessToken();
-        if (refreshed) {
-          response = await _sendSingleExpenseScan(photo);
-        }
+        if (refreshed) response = await _sendSingleExpenseScan(photo);
       }
-
       if (!mounted) return;
+      final texts = AppTexts.of(context);
       if (response == null ||
           (response.statusCode != 200 && response.statusCode != 201)) {
-        _snack(_apiErrorMessage(response, 'Nie udało się zeskanować paragonu'));
+        _snack(_apiErrorMessage(response, texts.snackReceiptScanFailed));
         return;
       }
-
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final currency = decoded['currency']?.toString();
       final category = decoded['category']?.toString();
       final totalAmount = (decoded['totalAmount'] as num?)?.toDouble() ?? 0.0;
-
       setState(() {
         if (currency != null && currency.isNotEmpty) {
           _selectedCurrency = currency;
@@ -857,10 +820,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         }
         _amountController.text = totalAmount.toStringAsFixed(2);
       });
-
-      _snack('Uzupełniono wydatkiem ze skanu paragonu.');
+      _snack(texts.snackSingleExpenseFilled);
     } catch (_) {
-      _snack('Wystąpił błąd podczas analizy paragonu.');
+      if (mounted) _snack(AppTexts.of(context).snackReceiptError);
     } finally {
       if (mounted) setState(() => _scanningReceipt = false);
     }
@@ -869,12 +831,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   Future<http.Response?> _sendReceiptScan(XFile photo) async {
     final token = await AuthService().getAccessToken();
     final uri = Uri.parse('${ProjectApiConst.baseUrl}/$_receiptScanEndpoint');
-
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true'
       ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
-
     try {
       final streamed = await req.send();
       return http.Response.fromStream(streamed);
@@ -886,12 +846,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   Future<http.Response?> _sendSingleExpenseScan(XFile photo) async {
     final token = await AuthService().getAccessToken();
     final uri = Uri.parse('${ProjectApiConst.baseUrl}/ai/singleExpense');
-
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true'
       ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
-
     try {
       final streamed = await req.send();
       return http.Response.fromStream(streamed);
@@ -910,7 +868,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           body['data'];
     }
     if (source is! List) return const [];
-
     final result = <_ReceiptItemParsed>[];
     for (final raw in source.whereType<Map<String, dynamic>>()) {
       final name = (raw['name'] ?? raw['itemName'] ?? raw['productName'])
@@ -926,7 +883,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   String _apiErrorMessage(dynamic resp, String fallback) {
-    if (resp == null) return 'Brak połączenia. Spróbuj ponownie.';
+    final texts = AppTexts.of(context);
+    if (resp == null) return texts.errorNoConnection;
     try {
       final body = jsonDecode(resp.body);
       if (body is Map && body['message'] is String) {
@@ -948,8 +906,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).unfocus(),
@@ -960,7 +920,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           elevation: 0,
           iconTheme: IconThemeData(color: AppColors.username(widget.isDark)),
           title: Text(
-            'Nowy wydatek',
+            texts.formNewExpense,
             style: TextStyle(
               color: AppColors.username(widget.isDark),
               fontWeight: FontWeight.bold,
@@ -974,206 +934,43 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildAmountCard(),
+                  _buildAmountCard(texts),
                   const SizedBox(height: 20),
-
-                  _sectionHeader('SZCZEGÓŁY'),
+                  _sectionHeader(texts.formDetailsSection),
                   const SizedBox(height: 8),
-                  _detailsCard(),
-
+                  _detailsCard(texts),
                   const SizedBox(height: 20),
-                  _sectionHeader('PROJEKT'),
+                  _sectionHeader(texts.formProjectSection),
                   const SizedBox(height: 8),
-                  _projectPickerCard(),
-
+                  _projectPickerCard(texts),
                   const SizedBox(height: 20),
-                  _sectionHeader('PODZIAŁ'),
+                  _sectionHeader(texts.formSplitSection),
                   const SizedBox(height: 8),
-                  _friendsPickerCard(),
-
+                  _friendsPickerCard(texts),
                   if (_selectedFriendIds.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    _splitModeSelector(),
+                    _splitModeSelector(texts),
                     const SizedBox(height: 12),
-                    if (_splitType == SplitType.equal) _equalEditor(),
-                    if (_splitType == SplitType.custom) _customEditor(),
+                    if (_splitType == SplitType.equal) _equalEditor(texts),
+                    if (_splitType == SplitType.custom) _customEditor(texts),
                     if (_splitType == SplitType.byItems) ...[
                       const SizedBox(height: 12),
-                      _itemsEditor(),
+                      _itemsEditor(texts),
                     ],
                   ],
                 ],
               ),
             ),
-            _buildSaveBar(),
+            _buildSaveBar(texts),
           ],
         ),
       ),
     );
   }
 
-  // ── Project ─────────────────────────────────────────────────────────────────
-  Widget _projectPickerCard() {
-    final selected = _projects.where((p) => p.id == _selectedProjectId);
-    final hasSelection = selected.isNotEmpty;
-    final label = hasSelection
-        ? selected.first.name
-        : 'Brak — wydatek osobisty';
+  // ── Amount card ───────────────────────────────────────────────────────────
 
-    return GestureDetector(
-      onTap: _pickProject,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg(widget.isDark),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.cardBorder(widget.isDark)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.actionProjectIconBg(widget.isDark),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.groups_2_outlined,
-                size: 20,
-                color: AppColors.actionProjectIcon(widget.isDark),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Projekt',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.cardSubtitle(widget.isDark),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: hasSelection
-                          ? AppColors.cardTitle(widget.isDark)
-                          : AppColors.cardSubtitle(widget.isDark),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: AppColors.cardSubtitle(widget.isDark),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickProject() async {
-    final picked = await showModalBottomSheet<String?>(
-      context: context,
-      backgroundColor: AppColors.cardBg(widget.isDark),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.sheetHandle(widget.isDark),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Icon(
-                  Icons.person_outline,
-                  color: AppColors.cardSubtitle(widget.isDark),
-                ),
-                title: Text(
-                  'Brak — wydatek osobisty',
-                  style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
-                ),
-                trailing: _selectedProjectId == null
-                    ? Icon(
-                        Icons.check,
-                        color: AppColors.amountCurrency(widget.isDark),
-                      )
-                    : null,
-                onTap: () => Navigator.of(sheetContext).pop(_kNoProject),
-              ),
-              if (_projects.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Nie masz jeszcze projektów.',
-                    style: TextStyle(
-                      color: AppColors.cardSubtitle(widget.isDark),
-                    ),
-                  ),
-                )
-              else
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: _projects
-                        .map(
-                          (p) => ListTile(
-                            leading: Icon(
-                              Icons.groups_2_outlined,
-                              color: AppColors.actionProjectIcon(widget.isDark),
-                            ),
-                            title: Text(
-                              p.name,
-                              style: TextStyle(
-                                color: AppColors.cardTitle(widget.isDark),
-                              ),
-                            ),
-                            trailing: _selectedProjectId == p.id
-                                ? Icon(
-                                    Icons.check,
-                                    color: AppColors.amountCurrency(
-                                      widget.isDark,
-                                    ),
-                                  )
-                                : null,
-                            onTap: () => Navigator.of(sheetContext).pop(p.id),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (picked == null) return; // dismissed without choosing
-    setState(() => _selectedProjectId = picked == _kNoProject ? null : picked);
-  }
-
-  // ── Amount ────────────────────────────────────────────────────────────────
-  Widget _buildAmountCard() {
+  Widget _buildAmountCard(AppTexts texts) {
     final accent = AppColors.amountCurrency(widget.isDark);
     final locked = _splitType == SplitType.byItems;
     final amountColor = locked ? accent.withValues(alpha: 0.45) : accent;
@@ -1193,7 +990,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       child: Column(
         children: [
           Text(
-            locked ? 'KWOTA (z pozycji)' : 'KWOTA',
+            locked ? texts.formAmountLocked : texts.formAmountLabel,
             style: TextStyle(
               color: AppColors.cardSubtitle(widget.isDark),
               fontSize: 11,
@@ -1256,7 +1053,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           if (locked) ...[
             const SizedBox(height: 6),
             Text(
-              'Suma aktualizuje się automatycznie z dodanych pozycji.',
+              texts.formAmountLockedHint,
               style: TextStyle(
                 color: AppColors.cardSubtitle(widget.isDark),
                 fontSize: 11,
@@ -1333,7 +1130,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Details card ──────────────────────────────────────────────────────────
-  Widget _detailsCard() {
+
+  Widget _detailsCard(AppTexts texts) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg(widget.isDark),
@@ -1343,31 +1141,31 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       child: Column(
         children: [
           _rowInput(
-            label: 'Sklep / miejsce',
-            hint: 'np. Biedronka',
+            label: texts.formShopLabel,
+            hint: texts.formShopHint,
             controller: _placeController,
           ),
           _rowDivider(),
           _rowTap(
-            label: 'Data',
+            label: texts.formDateLabel,
             value: _formatDate(_selectedDate),
             icon: Icons.calendar_today_outlined,
             onTap: _pickDate,
           ),
           _rowDivider(),
           _rowTap(
-            label: 'Kategoria',
-            value: _selectedCategory?.label ?? 'Wybierz',
+            label: texts.formCategoryLabel,
+            value: _selectedCategory?.label(texts) ?? texts.formCategoryHint,
             valueIcon: _selectedCategory?.icon,
             valueColor: _selectedCategory?.color,
             placeholder: _selectedCategory == null,
             icon: Icons.local_offer_outlined,
-            onTap: _pickCategory,
+            onTap: () => _pickCategory(texts),
           ),
           _rowDivider(),
           _rowInput(
-            label: 'Notatka',
-            hint: 'Opcjonalnie',
+            label: texts.formNoteLabel,
+            hint: texts.formNoteHint,
             controller: _noteController,
           ),
         ],
@@ -1491,7 +1289,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     }
   }
 
-  Future<void> _pickCategory() async {
+  Future<void> _pickCategory(AppTexts texts) async {
     final picked = await showModalBottomSheet<_CategoryOption>(
       context: context,
       backgroundColor: AppColors.cardBg(widget.isDark),
@@ -1541,7 +1339,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                             Icon(c.icon, color: c.color, size: 24),
                             const SizedBox(height: 6),
                             Text(
-                              c.label,
+                              c.label(texts),
                               style: TextStyle(
                                 color: AppColors.cardTitle(widget.isDark),
                                 fontSize: 12,
@@ -1562,8 +1360,167 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     if (picked != null) setState(() => _selectedCategory = picked);
   }
 
+  // ── Project picker ────────────────────────────────────────────────────────
+
+  Widget _projectPickerCard(AppTexts texts) {
+    final selected = _projects.where((p) => p.id == _selectedProjectId);
+    final hasSelection = selected.isNotEmpty;
+    final label = hasSelection ? selected.first.name : texts.noProjectExpense;
+
+    return GestureDetector(
+      onTap: () => _pickProject(texts),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(widget.isDark),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder(widget.isDark)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.actionProjectIconBg(widget.isDark),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.groups_2_outlined,
+                size: 20,
+                color: AppColors.actionProjectIcon(widget.isDark),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    texts.projectLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: hasSelection
+                          ? AppColors.cardTitle(widget.isDark)
+                          : AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: AppColors.cardSubtitle(widget.isDark),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickProject(AppTexts texts) async {
+    final picked = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: AppColors.cardBg(widget.isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.sheetHandle(widget.isDark),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(
+                  Icons.person_outline,
+                  color: AppColors.cardSubtitle(widget.isDark),
+                ),
+                title: Text(
+                  texts.noProjectExpense,
+                  style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
+                ),
+                trailing: _selectedProjectId == null
+                    ? Icon(
+                        Icons.check,
+                        color: AppColors.amountCurrency(widget.isDark),
+                      )
+                    : null,
+                onTap: () => Navigator.of(sheetContext).pop(_kNoProject),
+              ),
+              if (_projects.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    texts.noProjectsYet,
+                    style: TextStyle(
+                      color: AppColors.cardSubtitle(widget.isDark),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: _projects
+                        .map(
+                          (p) => ListTile(
+                            leading: Icon(
+                              Icons.groups_2_outlined,
+                              color: AppColors.actionProjectIcon(widget.isDark),
+                            ),
+                            title: Text(
+                              p.name,
+                              style: TextStyle(
+                                color: AppColors.cardTitle(widget.isDark),
+                              ),
+                            ),
+                            trailing: _selectedProjectId == p.id
+                                ? Icon(
+                                    Icons.check,
+                                    color: AppColors.amountCurrency(
+                                      widget.isDark,
+                                    ),
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(sheetContext).pop(p.id),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null) return;
+    setState(() => _selectedProjectId = picked == _kNoProject ? null : picked);
+  }
+
   // ── Friends picker ────────────────────────────────────────────────────────
-  Widget _friendsPickerCard() {
+
+  Widget _friendsPickerCard(AppTexts texts) {
     final selected = _availableFriends
         .where((f) => _selectedFriendIds.contains(f.userId))
         .toList();
@@ -1589,8 +1546,18 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               Expanded(
                 child: Text(
                   _selectedFriendIds.isEmpty
-                      ? 'Wydatek osobisty'
-                      : 'Dzielisz z ${_selectedFriendIds.length} ${_selectedFriendIds.length == 1 ? 'osobą' : 'osobami'}',
+                      ? texts.personalExpenseLabel
+                      : texts.splitWithPeople
+                            .replaceAll(
+                              '{count}',
+                              '${_selectedFriendIds.length}',
+                            )
+                            .replaceAll(
+                              '{people}',
+                              _selectedFriendIds.length == 1
+                                  ? 'osobą'
+                                  : 'osobami',
+                            ),
                   style: TextStyle(
                     color: AppColors.cardTitle(widget.isDark),
                     fontSize: 15,
@@ -1599,7 +1566,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
               ),
               TextButton.icon(
-                onPressed: _openFriendsPicker,
+                onPressed: () => _openFriendsPicker(texts),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.amountCurrency(widget.isDark),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1607,9 +1574,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text(
-                  'Dodaj',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                label: Text(
+                  texts.addAction,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -1617,7 +1584,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           if (_selectedFriendIds.isEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Dodaj znajomych, aby podzielić koszty.',
+              texts.addFriendsToSplit,
               style: TextStyle(
                 color: AppColors.cardSubtitle(widget.isDark),
                 fontSize: 12,
@@ -1660,7 +1627,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Wypełnij skanem paragonu',
+                            texts.fillFromReceipt,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -1701,13 +1668,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  Future<void> _openFriendsPicker() async {
+  Future<void> _openFriendsPicker(AppTexts texts) async {
     if (_loadingFriends) {
-      _snack('Trwa ładowanie znajomych…');
+      _snack(texts.loadingFriends);
       return;
     }
     if (_availableFriends.isEmpty) {
-      _snack('Nie masz jeszcze znajomych. Dodaj ich w zakładce Znajomi.');
+      _snack(texts.noFriendsYetAddInTab);
       return;
     }
 
@@ -1743,7 +1710,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   child: Row(
                     children: [
                       Text(
-                        'Wybierz osoby',
+                        texts.choosePeople,
                         style: TextStyle(
                           color: AppColors.cardTitle(widget.isDark),
                           fontSize: 16,
@@ -1752,7 +1719,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                       ),
                       const Spacer(),
                       Text(
-                        '${tempSelected.length} zaznaczonych',
+                        texts.selectedCountLabel.replaceAll(
+                          '{count}',
+                          '${tempSelected.length}',
+                        ),
                         style: TextStyle(
                           color: AppColors.cardSubtitle(widget.isDark),
                           fontSize: 12,
@@ -1768,9 +1738,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                     itemCount: _availableFriends.length,
                     itemBuilder: (_, i) {
                       final f = _availableFriends[i];
-                      final selected = tempSelected.contains(f.userId);
+                      final sel = tempSelected.contains(f.userId);
                       return CheckboxListTile(
-                        value: selected,
+                        value: sel,
                         onChanged: (v) => setModal(() {
                           if (v == true) {
                             tempSelected.add(f.userId);
@@ -1806,9 +1776,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'Gotowe',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: Text(
+                        texts.doneAction,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -1847,15 +1817,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Split selector ────────────────────────────────────────────────────────
-  Widget _splitModeSelector() {
+
+  Widget _splitModeSelector(AppTexts texts) {
     return Row(
       children: [
-        _modeChip('Równo', Icons.pie_chart_outline, SplitType.equal),
+        _modeChip(
+          texts.splitModeEqual,
+          Icons.pie_chart_outline,
+          SplitType.equal,
+        ),
         const SizedBox(width: 8),
-        _modeChip('Kwoty', Icons.edit_note, SplitType.custom),
+        _modeChip(texts.splitModeCustom, Icons.edit_note, SplitType.custom),
         const SizedBox(width: 8),
         _modeChip(
-          'Per produkt',
+          texts.splitModeByItem,
           Icons.shopping_basket_outlined,
           SplitType.byItems,
         ),
@@ -1907,7 +1882,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Equal editor ──────────────────────────────────────────────────────────
-  Widget _equalEditor() {
+
+  Widget _equalEditor(AppTexts texts) {
     final eq = _equalAmounts();
     final per = _participantIdsIncludingMe.isNotEmpty && _totalAmount > 0
         ? (_totalAmount / _participantIdsIncludingMe.length)
@@ -1919,8 +1895,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         children: [
           Text(
             _totalAmount > 0
-                ? 'Po ok. ${per.toStringAsFixed(2)} ${_currencySymbol(_selectedCurrency)} na osobę'
-                : 'Wprowadź kwotę powyżej',
+                ? texts.splitEqualPerPerson
+                      .replaceAll('{amount}', per.toStringAsFixed(2))
+                      .replaceAll(
+                        '{currency}',
+                        _currencySymbol(_selectedCurrency),
+                      )
+                : texts.splitEqualHint,
             style: TextStyle(
               color: AppColors.cardSubtitle(widget.isDark),
               fontSize: 12,
@@ -1967,7 +1948,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Custom editor ─────────────────────────────────────────────────────────
-  Widget _customEditor() {
+
+  Widget _customEditor(AppTexts texts) {
     final accent = AppColors.amountCurrency(widget.isDark);
     final myShare = _myCustomShare;
     final overflow = myShare <= 0 && _totalAmount > 0;
@@ -1984,7 +1966,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Ty (reszta)',
+                    texts.splitCustomYouRest,
                     style: TextStyle(
                       color: AppColors.cardTitle(widget.isDark),
                       fontSize: 14,
@@ -2011,9 +1993,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             children: [
               Expanded(
                 child: Text(
-                  overflow
-                      ? 'Suma znajomych ≥ total. Ty musisz mieć > 0 zł.'
-                      : 'Twój udział = total − suma znajomych.',
+                  overflow ? texts.splitCustomOverflow : texts.splitCustomHint,
                   style: TextStyle(
                     color: overflow
                         ? AppColors.amountNegative
@@ -2030,9 +2010,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   minimumSize: const Size(0, 32),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text(
-                  'Rozdziel równo',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                child: Text(
+                  texts.splitCustomDistribute,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -2113,8 +2096,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  // ── Items editor (BY_ITEM) ────────────────────────────────────────────────
-  Widget _itemsEditor() {
+  // ── Items editor ──────────────────────────────────────────────────────────
+
+  Widget _itemsEditor(AppTexts texts) {
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2128,7 +2112,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    '${_items.length} ${_items.length == 1 ? 'pozycja' : 'pozycje'}',
+                    '${_items.length} ${_items.length == 1 ? texts.itemNounSingular : texts.itemNounPlural}',
                     style: TextStyle(
                       color: AppColors.cardSubtitle(widget.isDark),
                       fontSize: 12,
@@ -2153,8 +2137,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                       ),
                       label: Text(
                         _selectedItemIds.length == _items.length
-                            ? 'Odznacz'
-                            : 'Zaznacz wszystkie',
+                            ? texts.deselectAll
+                            : texts.selectAll,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -2168,9 +2152,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text(
-                        'Usuń zaznaczone',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      label: Text(
+                        texts.deleteSelected,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                     TextButton.icon(
@@ -2181,9 +2165,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       icon: const Icon(Icons.delete_forever_outlined, size: 18),
-                      label: const Text(
-                        'Wyczyść',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      label: Text(
+                        texts.clearAction,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                     TextButton.icon(
@@ -2198,9 +2182,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                      label: const Text(
-                        'Gotowe',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      label: Text(
+                        texts.doneAction,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -2226,9 +2210,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                     ),
                   )
                 : const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text(
-              'Zeskanuj paragon',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            label: Text(
+              texts.scanReceiptButton,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(height: 10),
@@ -2240,21 +2224,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               padding: const EdgeInsets.symmetric(horizontal: 8),
             ),
             icon: const Icon(Icons.add, size: 18),
-            label: const Text(
-              'Dodaj pozycję',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            label: Text(
+              texts.addItemButton,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
           if (_items.isNotEmpty) ...[
             const SizedBox(height: 12),
             for (var i = 0; i < _items.length; i++) ...[
-              _buildItemCard(_items[i]),
+              _buildItemCard(_items[i], texts),
               if (i != _items.length - 1) const SizedBox(height: 10),
             ],
           ] else ...[
             const SizedBox(height: 8),
             Text(
-              'Dodaj pozycje ręcznie albo zeskanuj paragon, aby je wypełnić automatycznie.',
+              texts.addItemsHint,
               style: TextStyle(
                 color: AppColors.cardSubtitle(widget.isDark),
                 fontSize: 12,
@@ -2266,7 +2250,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  Widget _buildItemCard(ItemDraft item) {
+  Widget _buildItemCard(ItemDraft item, AppTexts texts) {
     final selected = _selectedItemIds.contains(item.id);
 
     return GestureDetector(
@@ -2296,7 +2280,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               children: [
                 Expanded(
                   child: Text(
-                    item.name.trim().isEmpty ? 'Bez nazwy' : item.name,
+                    item.name.trim().isEmpty ? texts.untitledItem : item.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2431,7 +2415,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Save bar ──────────────────────────────────────────────────────────────
-  Widget _buildSaveBar() {
+
+  Widget _buildSaveBar(AppTexts texts) {
     final err = _blockingError();
     return Positioned(
       left: 0,
@@ -2499,9 +2484,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                           color: Colors.white,
                         ),
                       )
-                    : const Text(
-                        'Zapisz wydatek',
-                        style: TextStyle(
+                    : Text(
+                        texts.saveExpenseButton,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -2516,6 +2501,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
   Widget _sectionHeader(String title) => Padding(
     padding: const EdgeInsets.only(left: 4),
     child: Text(
@@ -2577,6 +2563,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
+    final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: AppColors.cardBg(widget.isDark),
@@ -2599,7 +2586,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               ),
               const SizedBox(height: 16),
               Text(
-                'Wybierz źródło zdjęcia',
+                texts.chooseImageSourceTitle,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -2613,11 +2600,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   color: AppColors.amountCurrency(widget.isDark),
                 ),
                 title: Text(
-                  'Aparat',
+                  texts.cameraLabel,
                   style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
                 ),
                 subtitle: Text(
-                  'Zrób zdjęcie paragonu',
+                  texts.cameraSubtitle,
                   style: TextStyle(
                     color: AppColors.cardSubtitle(widget.isDark),
                   ),
@@ -2631,11 +2618,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   color: AppColors.amountCurrency(widget.isDark),
                 ),
                 title: Text(
-                  'Galeria',
+                  texts.galleryLabel,
                   style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
                 ),
                 subtitle: Text(
-                  'Wybierz zdjęcie z galerii',
+                  texts.gallerySubtitle,
                   style: TextStyle(
                     color: AppColors.cardSubtitle(widget.isDark),
                   ),

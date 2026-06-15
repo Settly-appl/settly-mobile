@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/debt_record.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
@@ -30,6 +31,7 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
   }
 
   Future<void> _load() async {
+    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -46,7 +48,7 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Nie udało się pobrać historii. Spróbuj ponownie.';
+        _error = texts.historyRetryError;
         _loading = false;
       });
     }
@@ -54,13 +56,14 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         title: Text(
-          'Historia rozliczeń',
+          texts.historyTitle,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.username(isDark),
@@ -74,6 +77,7 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
   }
 
   Widget _buildBody() {
+    final texts = AppTexts.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -83,15 +87,15 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
         _error!,
         action: OutlinedButton(
           onPressed: _load,
-          child: const Text('Spróbuj ponownie'),
+          child: Text(texts.historyRetryButton),
         ),
       );
     }
     if (_records.isEmpty) {
       return _centered(
         Icons.receipt_long_outlined,
-        'Brak historii rozliczeń',
-        subtitle: 'Tu pojawią się Twoje zamknięte rozliczenia.',
+        texts.historyNoItems,
+        subtitle: texts.historySubtitle,
       );
     }
 
@@ -167,13 +171,18 @@ class _RecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        youReceived ? AppColors.amountPositive : AppColors.amountNegative;
+    final texts = AppTexts.of(context);
+    final color = youReceived
+        ? AppColors.amountPositive
+        : AppColors.amountNegative;
     final sign = youReceived ? '+' : '-';
-    final title = youReceived ? 'Otrzymano wpłatę' : 'Wysłano wpłatę';
+    final title = youReceived
+        ? texts.historyReceivedPayment
+        : texts.historySentPayment;
     final date = record.settledAt ?? record.createdAt;
-    final dateLabel =
-        date != null ? DateFormat('d MMM yyyy, HH:mm', 'pl').format(date) : '';
+    final dateLabel = date != null
+        ? DateFormat('d MMM yyyy, HH:mm', 'pl').format(date)
+        : '';
 
     return Container(
       decoration: BoxDecoration(
@@ -192,9 +201,7 @@ class _RecordCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              youReceived
-                  ? Icons.south_west_rounded
-                  : Icons.north_east_rounded,
+              youReceived ? Icons.south_west_rounded : Icons.north_east_rounded,
               color: color,
               size: 20,
             ),

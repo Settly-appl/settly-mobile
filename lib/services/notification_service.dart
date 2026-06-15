@@ -96,7 +96,9 @@ class NotificationService {
     final token = await _messaging.getToken();
     if (token != null) {
       // ignore: avoid_print
-      print('FCM device token: $token'); // for local Firebase Console test sends
+      print(
+        'Token urządzenia FCM: $token',
+      ); // do lokalnych testów z Firebase Console
       await _sendToken(token);
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/pages/settlement_history_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
@@ -32,6 +33,7 @@ class _BalancesPageState extends State<BalancesPage> {
   }
 
   Future<void> _load() async {
+    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -46,7 +48,7 @@ class _BalancesPageState extends State<BalancesPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Nie udało się pobrać sald. Spróbuj ponownie.';
+        _error = texts.balancesRetryMessage;
         _loading = false;
       });
     }
@@ -72,6 +74,7 @@ class _BalancesPageState extends State<BalancesPage> {
   }
 
   Future<void> _settle(FriendBalance balance) async {
+    final texts = AppTexts.of(context);
     setState(() => _settling.add(balance.userId));
     try {
       await _service.settleUp(debtorUserId: balance.userId);
@@ -79,7 +82,9 @@ class _BalancesPageState extends State<BalancesPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Rozliczono ${_money(balance.absAmount)} z ${balance.label}',
+            texts.balancePaidOut
+                .replaceAll('{amount}', _money(balance.absAmount))
+                .replaceAll('{name}', balance.label),
           ),
           backgroundColor: AppColors.amountPositive,
         ),
@@ -87,9 +92,9 @@ class _BalancesPageState extends State<BalancesPage> {
       await _load();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nie udało się rozliczyć. Spróbuj ponownie.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.settleFailedError)));
     } finally {
       if (mounted) setState(() => _settling.remove(balance.userId));
     }
@@ -97,13 +102,14 @@ class _BalancesPageState extends State<BalancesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         title: Text(
-          'Rozliczenia',
+          texts.balancesTitle,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.username(isDark),
@@ -112,7 +118,7 @@ class _BalancesPageState extends State<BalancesPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.history_rounded),
-            tooltip: 'Historia rozliczeń',
+            tooltip: texts.balancesHistoryTooltip,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -130,6 +136,7 @@ class _BalancesPageState extends State<BalancesPage> {
   }
 
   Widget _buildBody() {
+    final texts = AppTexts.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -137,7 +144,7 @@ class _BalancesPageState extends State<BalancesPage> {
       return _MessageState(
         icon: Icons.cloud_off_rounded,
         title: _error!,
-        actionLabel: 'Spróbuj ponownie',
+        actionLabel: texts.retryAction,
         onAction: _load,
         isDark: isDark,
       );
@@ -155,8 +162,8 @@ class _BalancesPageState extends State<BalancesPage> {
         if (_balances.isEmpty)
           _MessageState(
             icon: Icons.celebration_outlined,
-            title: 'Wszystko rozliczone!',
-            subtitle: 'Nie masz żadnych nierozliczonych sald ze znajomymi.',
+            title: texts.allSettledTitle,
+            subtitle: texts.allSettledSubtitle,
             isDark: isDark,
           )
         else
@@ -184,6 +191,7 @@ class _SummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -201,17 +209,17 @@ class _SummaryHeader extends StatelessWidget {
         children: [
           Expanded(
             child: _SummaryTile(
-              label: 'Należności',
+              label: texts.balancesOwedToYou,
               amount: owedToYou,
-              subtitle: 'inni Tobie',
+              subtitle: texts.balancesOtherOwes,
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: _SummaryTile(
-              label: 'Zobowiązania',
+              label: texts.balancesYouOwe,
               amount: youOwe,
-              subtitle: 'Ty innym',
+              subtitle: texts.balancesYouOweOthers,
             ),
           ),
         ],
@@ -287,11 +295,12 @@ class _BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountColor =
-        balance.owesYou ? AppColors.amountPositive : AppColors.amountNegative;
+    final texts = AppTexts.of(context);
+    final amountColor = balance.owesYou
+        ? AppColors.amountPositive
+        : AppColors.amountNegative;
     final sign = balance.owesYou ? '+' : '-';
-    final subtitle =
-        balance.owesYou ? 'Jest Ci winien/winna' : 'Jesteś winien/winna';
+    final subtitle = balance.owesYou ? 'They owe you' : 'You owe them';
 
     return Container(
       decoration: BoxDecoration(
@@ -307,8 +316,8 @@ class _BalanceCard extends StatelessWidget {
               CircleAvatar(
                 radius: 22,
                 backgroundColor: AppColors.avatarBg(isDark),
-                backgroundImage: (balance.avatarUrl != null &&
-                        balance.avatarUrl!.isNotEmpty)
+                backgroundImage:
+                    (balance.avatarUrl != null && balance.avatarUrl!.isNotEmpty)
                     ? NetworkImage(balance.avatarUrl!)
                     : null,
                 child: (balance.avatarUrl == null || balance.avatarUrl!.isEmpty)
@@ -371,7 +380,7 @@ class _BalanceCard extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.check_rounded, size: 18),
-                label: Text(settling ? 'Rozliczanie…' : 'Oznacz jako zapłacone'),
+                label: Text(settling ? texts.loading : texts.settlesAsReceived),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.amountPositive,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -386,7 +395,7 @@ class _BalanceCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Poczekaj, aż znajomy potwierdzi otrzymanie wpłaty.',
+                'Wait until your friend confirms receiving the payment.',
                 style: TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
@@ -416,7 +425,7 @@ class _SettleConfirmSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Oznaczyć jako zapłacone?',
+            'Mark as settled?',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -425,9 +434,9 @@ class _SettleConfirmSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Potwierdzasz, że ${balance.label} oddał(a) Ci '
-            '${balance.absAmount.toStringAsFixed(2)} zł. Wszystkie '
-            'nierozliczone udziały tej osoby wobec Ciebie zostaną zamknięte.',
+            'You confirm that ${balance.label} paid you '
+            '${balance.absAmount.toStringAsFixed(2)} zł. All unsettled '
+            'shares of this person toward you will be closed.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.cardSubtitle(isDark),
@@ -443,12 +452,12 @@ class _SettleConfirmSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Tak, rozlicz'),
+            child: const Text('Yes, settle'),
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(AppTexts.of(context).cancelAction),
           ),
         ],
       ),

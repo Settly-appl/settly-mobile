@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import '../models/quick_add_dialog/sheet_option.dart';
 import 'expense_form_page.dart';
@@ -11,6 +12,8 @@ class QuickAddMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.scaffold(isDark),
@@ -31,14 +34,11 @@ class QuickAddMenu extends StatelessWidget {
             ),
             SizedBox(height: 16),
             Text(
-              'Co chcesz dodać?',
+              texts.quickAddTitle,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 4),
-            Text(
-              'Wybierz typ, który chcesz utworzyć',
-              style: TextStyle(fontSize: 12),
-            ),
+            Text(texts.quickAddSubtitle, style: TextStyle(fontSize: 12)),
             SizedBox(height: 20),
             _SheetOption(
               option: SheetOption(
@@ -46,8 +46,8 @@ class QuickAddMenu extends StatelessWidget {
                 iconColor: AppColors.actionScanIcon(isDark),
                 iconBackground: AppColors.actionScanIconBg(isDark),
                 borderColor: AppColors.sheetOptionExpenseBorder(isDark),
-                title: 'Pojedynczy wydatek',
-                subtitle: 'Sklep, restauracja, transport…',
+                title: texts.singleExpenseLabel,
+                subtitle: texts.quickExpenseExamples,
                 titleColor: AppColors.amountCurrency(isDark),
                 subtitleColor: AppColors.cardSubtitle(isDark),
                 onTap: () async {
@@ -65,7 +65,7 @@ class QuickAddMenu extends StatelessWidget {
                     rootMessenger
                       ..hideCurrentSnackBar()
                       ..showSnackBar(
-                        const SnackBar(content: Text('Dodano wydatek.')),
+                        SnackBar(content: Text(texts.expenseAdded)),
                       );
                     await onSaved();
                   }
@@ -79,8 +79,8 @@ class QuickAddMenu extends StatelessWidget {
                 iconColor: AppColors.actionAddIcon(isDark),
                 iconBackground: AppColors.actionProjectIconBg(isDark),
                 borderColor: AppColors.sheetOptionProjectBorder(isDark),
-                title: 'Projekt grupowy',
-                subtitle: 'Wyjazd, impreza, wspólne zakupy…',
+                title: texts.groupExpenseLabel,
+                subtitle: texts.quickGroupExamples,
                 titleColor: AppColors.iconProject(isDark),
                 subtitleColor: AppColors.cardSubtitle(isDark),
                 onTap: () {
@@ -100,7 +100,7 @@ class QuickAddMenu extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
-                  'Anuluj',
+                  texts.cancelActionLabel,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.cardSubtitle(isDark),

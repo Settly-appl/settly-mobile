@@ -4,6 +4,8 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:intl/intl.dart';
 
+import '../../../const/app_texts.dart';
+
 class SummaryCard extends StatefulWidget {
   const SummaryCard({super.key});
 
@@ -45,17 +47,18 @@ class _SummaryCardState extends State<SummaryCard> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     final String formattedDate = DateFormat(
       'MMMM yyyy',
-      'pl',
+      Localizations.localeOf(context).languageCode,
     ).format(DateTime.now());
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () async {
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BalancesPage()),
-        );
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const BalancesPage()));
         _load();
       },
       child: Container(
@@ -79,7 +82,7 @@ class _SummaryCardState extends State<SummaryCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Podsumowanie — $formattedDate',
+                  '${texts.summaryCardTitle} — $formattedDate',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -98,17 +101,17 @@ class _SummaryCardState extends State<SummaryCard> {
               children: [
                 Expanded(
                   child: _SummaryTile(
-                    label: 'Należności',
+                    label: texts.balancesOwedToYou,
                     amount: _loading ? '—' : _money(_owedToYou),
-                    subtitle: 'inni Tobie',
+                    subtitle: texts.balancesOtherOwes,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _SummaryTile(
-                    label: 'Zobowiązania',
+                    label: texts.balancesYouOwe,
                     amount: _loading ? '—' : _money(_youOwe),
-                    subtitle: 'Ty innym',
+                    subtitle: texts.balancesYouOweOthers,
                   ),
                 ),
               ],

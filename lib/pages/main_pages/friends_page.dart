@@ -10,6 +10,8 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 
+import '../../const/app_texts.dart';
+
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key});
 
@@ -113,7 +115,7 @@ class _FriendsPageState extends State<FriendsPage>
       await _loadRequests();
       if (action == 'ACCEPTED') await _loadFriends();
     } else {
-      _showSnack('Nie udało się zaktualizować zaproszenia.');
+      _showSnack(AppTexts.of(context).friendsSearchFailed);
     }
   }
 
@@ -131,7 +133,7 @@ class _FriendsPageState extends State<FriendsPage>
       if (successMsg != null) _showSnack(successMsg);
       await Future.wait([_loadFriends(), _loadRequests()]);
     } else {
-      _showSnack('Nie udało się wykonać operacji.');
+      _showSnack(AppTexts.of(context).friendsOperationFailed);
     }
   }
 
@@ -141,6 +143,7 @@ class _FriendsPageState extends State<FriendsPage>
 
   // ── Add friend sheet ───────────────────────────────────────────────────────
   Future<void> _openAddFriendSheet() async {
+    final texts = AppTexts.of(context);
     final sent = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -151,14 +154,16 @@ class _FriendsPageState extends State<FriendsPage>
       builder: (_) => _AddFriendSheet(api: _api),
     );
     if (sent == true) {
-      _showSnack('Wysłano zaproszenie.');
+      _showSnack(texts.friendsSentRequest);
       await _loadRequests();
     }
   }
 
   // ── UI ─────────────────────────────────────────────────────────────────────
   @override
+  @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       body: SafeArea(
@@ -169,7 +174,7 @@ class _FriendsPageState extends State<FriendsPage>
               child: Row(
                 children: [
                   Text(
-                    'Znajomi',
+                    texts.friendsTitle,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -185,13 +190,13 @@ class _FriendsPageState extends State<FriendsPage>
               unselectedLabelColor: AppColors.navInactive(isDark),
               indicatorColor: AppColors.navActive(isDark),
               tabs: [
-                const Tab(text: 'Znajomi'),
+                Tab(text: texts.friendsTabTitle),
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Zaproszenia'),
+                      Text(texts.requestsTabTitle),
                       if (_incoming.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -236,14 +241,15 @@ class _FriendsPageState extends State<FriendsPage>
   }
 
   Widget _buildFriendsTab() {
+    final texts = AppTexts.of(context);
     if (_loadingFriends && _friends.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_friends.isEmpty) {
       return _EmptyState(
         icon: Icons.people_outline,
-        title: 'Brak znajomych',
-        subtitle: 'Dodaj pierwszego znajomego przyciskiem poniżej.',
+        title: texts.friendsNoFriendsTitle,
+        subtitle: texts.friendsNoFriendsSubtitle,
         isDark: isDark,
       );
     }
@@ -263,7 +269,7 @@ class _FriendsPageState extends State<FriendsPage>
             controller: _friendsSearchController,
             onChanged: (v) => setState(() => _friendsQuery = v),
             decoration: InputDecoration(
-              hintText: 'Szukaj znajomego',
+              hintText: texts.friendsSearchHint,
               prefixIcon: Icon(
                 Icons.search,
                 color: AppColors.cardSubtitle(isDark),
@@ -305,9 +311,9 @@ class _FriendsPageState extends State<FriendsPage>
                       const SizedBox(height: 48),
                       _EmptyState(
                         icon: Icons.search_off,
-                        title: 'Brak wyników',
+                        title: texts.friendsNoResultsTitle,
                         subtitle:
-                            'Nie znaleziono znajomego o nazwie „$_friendsQuery”.',
+                            '${texts.friendsNoResultsTitle}: „$_friendsQuery"',
                         isDark: isDark,
                       ),
                     ],
@@ -332,14 +338,15 @@ class _FriendsPageState extends State<FriendsPage>
   }
 
   Widget _buildRequestsTab() {
+    final texts = AppTexts.of(context);
     if (_loadingRequests && _incoming.isEmpty && _outgoing.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_incoming.isEmpty && _outgoing.isEmpty) {
       return _EmptyState(
         icon: Icons.mail_outline,
-        title: 'Brak zaproszeń',
-        subtitle: 'Nie masz żadnych oczekujących zaproszeń.',
+        title: texts.friendsNoRequestsTitle,
+        subtitle: texts.friendsNoRequestsSubtitle,
         isDark: isDark,
       );
     }
@@ -349,7 +356,7 @@ class _FriendsPageState extends State<FriendsPage>
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         children: [
           if (_incoming.isNotEmpty) ...[
-            _RequestsHeader(title: 'Przychodzące', isDark: isDark),
+            _RequestsHeader(title: texts.friendsIncomingLabel, isDark: isDark),
             const SizedBox(height: 8),
             for (final r in _incoming) ...[
               _IncomingRequestRow(
@@ -363,7 +370,7 @@ class _FriendsPageState extends State<FriendsPage>
             const SizedBox(height: 16),
           ],
           if (_outgoing.isNotEmpty) ...[
-            _RequestsHeader(title: 'Wychodzące', isDark: isDark),
+            _RequestsHeader(title: texts.friendsOutgoingLabel, isDark: isDark),
             const SizedBox(height: 8),
             for (final r in _outgoing) ...[
               _OutgoingRequestRow(
@@ -371,7 +378,7 @@ class _FriendsPageState extends State<FriendsPage>
                 isDark: isDark,
                 onCancel: () => _deleteFriendship(
                   r.friendshipId,
-                  successMsg: 'Anulowano zaproszenie.',
+                  successMsg: texts.friendRequestCancelled,
                 ),
               ),
               const SizedBox(height: 8),
@@ -383,21 +390,22 @@ class _FriendsPageState extends State<FriendsPage>
   }
 
   Future<void> _confirmRemoveFriend(Friend friend) async {
+    final texts = AppTexts.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Usunąć znajomego?'),
+        title: Text(texts.friendsDeleteFriendTitle),
         content: Text(
-          '${friend.displayName} zostanie usunięty z listy znajomych.',
+          '${friend.displayName} ${texts.friendsDeleteFriendSubtitle}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Anuluj'),
+            child: Text(texts.cancelAction),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Usuń'),
+            child: Text(texts.deleteAction),
           ),
         ],
       ),
@@ -405,19 +413,21 @@ class _FriendsPageState extends State<FriendsPage>
     if (confirmed == true) {
       await _deleteFriendship(
         friend.friendshipId,
-        successMsg: 'Usunięto znajomego.',
+        successMsg: texts.friendsDeleteFriend,
       );
     }
   }
 }
 
-String _formatRelativeTime(DateTime dt) {
+String _formatRelativeTime(BuildContext context, DateTime dt) {
+  final texts = AppTexts.of(context);
   final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'przed chwilą';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} min temu';
-  if (diff.inHours < 24) return '${diff.inHours} godz. temu';
-  if (diff.inDays == 1) return 'wczoraj';
-  if (diff.inDays < 7) return '${diff.inDays} dni temu';
+  if (diff.inMinutes < 1) return texts.relativeTimeJustNow;
+  if (diff.inMinutes < 60)
+    return '${diff.inMinutes} ${texts.relativeTimeMinutes}';
+  if (diff.inHours < 24) return '${diff.inHours} ${texts.relativeTimeHours}';
+  if (diff.inDays == 1) return texts.relativeTimeYesterday;
+  if (diff.inDays < 7) return '${diff.inDays} ${texts.relativeTimeDays}';
   final d = dt.toLocal();
   return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}';
 }
@@ -439,6 +449,7 @@ class _FriendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -467,7 +478,7 @@ class _FriendRow extends StatelessWidget {
               color: AppColors.cardSubtitle(isDark),
               size: 20,
             ),
-            tooltip: 'Usuń znajomego',
+            tooltip: texts.friendsDeleteFriend,
             onPressed: onRemove,
           ),
         ],
@@ -491,6 +502,7 @@ class _IncomingRequestRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -516,7 +528,7 @@ class _IncomingRequestRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Otrzymano ${_formatRelativeTime(request.createdAt)}',
+                  '${texts.friendsReceivedPrefix} ${_formatRelativeTime(context, request.createdAt)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.cardSubtitle(isDark),
@@ -530,7 +542,7 @@ class _IncomingRequestRow extends StatelessWidget {
               Icons.check_circle,
               color: AppColors.amountCurrency(isDark),
             ),
-            tooltip: 'Akceptuj',
+            tooltip: texts.friendsAccept,
             onPressed: onAccept,
           ),
           IconButton(
@@ -538,7 +550,7 @@ class _IncomingRequestRow extends StatelessWidget {
               Icons.cancel_outlined,
               color: AppColors.amountNegative,
             ),
-            tooltip: 'Odrzuć',
+            tooltip: texts.friendsDecline,
             onPressed: onDecline,
           ),
         ],
@@ -560,6 +572,7 @@ class _OutgoingRequestRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -585,7 +598,7 @@ class _OutgoingRequestRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Wysłano ${_formatRelativeTime(request.createdAt)}',
+                  '${texts.friendsSentPrefix} ${_formatRelativeTime(context, request.createdAt)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.cardSubtitle(isDark),
@@ -594,7 +607,7 @@ class _OutgoingRequestRow extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(onPressed: onCancel, child: const Text('Anuluj')),
+          TextButton(onPressed: onCancel, child: Text(texts.cancelAction)),
         ],
       ),
     );
@@ -719,6 +732,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
   }
 
   Future<void> _search() async {
+    final texts = AppTexts.of(context);
     final email = _emailController.text.trim();
     if (email.isEmpty) return;
     setState(() {
@@ -734,22 +748,21 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
     if (!mounted) return;
     setState(() => _searching = false);
     if (response == null) {
-      setState(() => _error = 'Błąd połączenia.');
+      setState(() => _error = texts.networkError);
       return;
     }
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       setState(() => _result = UserSearchResult.fromJson(data));
     } else if (response.statusCode == 404) {
-      setState(
-        () => _error = 'Nie znaleziono użytkownika z tym adresem email.',
-      );
+      setState(() => _error = texts.friendsSearchNotFound);
     } else {
-      setState(() => _error = 'Błąd wyszukiwania (${response.statusCode}).');
+      setState(() => _error = texts.friendsSearchError(response.statusCode));
     }
   }
 
   Future<void> _sendRequest() async {
+    final texts = AppTexts.of(context);
     if (_result == null) return;
     setState(() => _sending = true);
     final response = await widget.api.request(
@@ -764,14 +777,16 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
     } else {
       setState(() {
         _error = response != null
-            ? 'Nie udało się wysłać zaproszenia (${response.statusCode}).'
-            : 'Błąd połączenia.';
+            ? texts.friendsSendRequestFailed(response.statusCode)
+            : texts.networkError;
       });
     }
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -795,7 +810,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Dodaj znajomego',
+            texts.friendAddTitle,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -809,8 +824,8 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => _search(),
             decoration: InputDecoration(
-              labelText: 'Email',
-              hintText: 'adres@domena.pl',
+              labelText: texts.friendEmailLabel,
+              hintText: texts.friendEmailHint,
               prefixIcon: const Icon(Icons.mail_outline),
               suffixIcon: _searching
                   ? const Padding(
@@ -891,7 +906,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Wyślij zaproszenie'),
+                  : Text(texts.friendsSendRequestButton),
             ),
           ],
         ],

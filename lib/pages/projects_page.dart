@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/project_detail_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
@@ -62,13 +63,14 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         title: Text(
-          'Projekty',
+          texts.projectsTitle,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.username(isDark),
@@ -79,7 +81,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
         onPressed: _openCreateSheet,
         backgroundColor: AppColors.avatarFg(isDark),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Nowy projekt', style: TextStyle(color: Colors.white)),
+        label: Text(
+          texts.projectNewProject,
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
       body: SafeArea(
         child: RefreshIndicator(onRefresh: _load, child: _buildBody()),
@@ -88,6 +93,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   Widget _buildBody() {
+    final texts = AppTexts.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -97,16 +103,15 @@ class _ProjectsPageState extends State<ProjectsPage> {
         _error!,
         action: OutlinedButton(
           onPressed: _load,
-          child: const Text('Spróbuj ponownie'),
+          child: Text(texts.retryAction),
         ),
       );
     }
     if (_projects.isEmpty) {
       return _centered(
         Icons.groups_2_outlined,
-        'Brak projektów',
-        subtitle:
-            'Utwórz projekt, aby wspólnie ze znajomymi śledzić wydatki i salda.',
+        texts.noProjects,
+        subtitle: texts.projectNoProjectsHint,
       );
     }
 
@@ -187,6 +192,7 @@ class _ProjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -236,7 +242,7 @@ class _ProjectCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '${project.memberCount} '
-                    '${project.memberCount == 1 ? "uczestnik" : "uczestników"}',
+                    '${project.memberCount == 1 ? texts.projectMembersCountSuffixSingular : texts.projectMembersCountSuffixPlural}',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.cardSubtitle(isDark),
@@ -262,15 +268,16 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.amountPositive.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Text(
-        'Rozliczony',
-        style: TextStyle(
+      child: Text(
+        texts.projectSettledStatus,
+        style: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: AppColors.amountPositive,
@@ -318,13 +325,14 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nie udało się utworzyć projektu.')),
+        SnackBar(content: Text(AppTexts.of(context).projectCreateFailedError)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottomInset),
@@ -333,7 +341,7 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Nowy projekt',
+            AppTexts.of(context).projectNewProject,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -344,10 +352,10 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
           TextField(
             controller: _nameController,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Nazwa',
-              hintText: 'np. Wyjazd w góry',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: texts.projectNameLabel,
+              hintText: texts.projectNameExample,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
@@ -355,9 +363,9 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
             controller: _descController,
             maxLines: 2,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Opis (opcjonalnie)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: texts.projectDescriptionLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 20),
@@ -379,7 +387,10 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('Utwórz', style: TextStyle(color: Colors.white)),
+                : Text(
+                    AppTexts.of(context).createAction,
+                    style: const TextStyle(color: Colors.white),
+                  ),
           ),
         ],
       ),

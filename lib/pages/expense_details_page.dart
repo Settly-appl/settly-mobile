@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/enums/expense_splits_type.dart';
 import 'package:settly_mobile/models/expenses/expense_member_item.dart';
@@ -302,6 +303,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final style = widget.expense.style(isDark);
 
@@ -310,7 +312,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text("Szczegóły"),
+        title: Text(texts.expenseDetailsTitle),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -318,15 +320,20 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           children: [
             _buildHeader(style, isDark),
             const SizedBox(height: 32),
-            _infoRow('Kategoria', widget.expense.category, isDark),
             _infoRow(
-              'Data',
+              texts.expenseDetailsCategory,
+              widget.expense.category,
+              isDark,
+            ),
+            _infoRow(
+              texts.expenseDetailsDate,
               widget.expense.date.toString().split(' ')[0],
               isDark,
             ),
             if (widget.expense.note.isNotEmpty)
-              _infoRow('Notatka', widget.expense.note, isDark),
-            if (_projectName != null) _infoRow('Projekt', _projectName!, isDark),
+              _infoRow(texts.expenseDetailsNote, widget.expense.note, isDark),
+            if (_projectName != null)
+              _infoRow(texts.expenseDetailsProject, _projectName!, isDark),
             const Divider(height: 40),
             _buildSplitSection(isDark),
           ],
@@ -360,6 +367,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
 
   Widget _buildSplitSection(bool isDark) {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    final texts = AppTexts.of(context);
 
     final isByItem = _splitType == ExpenseSplitsType.BY_ITEM;
     final hasAnyProducts = _members.any((m) => m.items.isNotEmpty);
@@ -368,7 +376,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PODZIAŁ: $_splitLabel',
+          '${texts.expenseDetailsSplitLabel}: $_splitLabel',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
@@ -381,7 +389,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              'Brak danych o produktach dla tego podzialu.',
+              texts.expenseDetailsNoData,
               style: TextStyle(color: AppColors.cardSubtitle(isDark)),
             ),
           ),
@@ -461,6 +469,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   }
 
   Widget _settledChip(bool settled) {
+    final texts = AppTexts.of(context);
     final color = settled ? Colors.green : Colors.orange;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -469,7 +478,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        settled ? 'Rozliczone' : 'Do zapłaty',
+        settled ? texts.expenseDetailsSettled : texts.expenseDetailsToPay,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,

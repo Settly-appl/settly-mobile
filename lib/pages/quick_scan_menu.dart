@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/const/api_url.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
@@ -39,6 +40,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.scaffold(widget.isDark),
@@ -59,14 +61,11 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
             ),
             SizedBox(height: 16),
             Text(
-              'Skanuj paragon',
+              texts.quickScanTitle,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 4),
-            Text(
-              'Wybierz typ wydatku do zskanowania',
-              style: TextStyle(fontSize: 12),
-            ),
+            Text(texts.quickScanSubtitle, style: TextStyle(fontSize: 12)),
             SizedBox(height: 20),
             _SheetOption(
               option: SheetOption(
@@ -74,8 +73,8 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                 iconColor: AppColors.actionScanIcon(widget.isDark),
                 iconBackground: AppColors.actionScanIconBg(widget.isDark),
                 borderColor: AppColors.sheetOptionExpenseBorder(widget.isDark),
-                title: 'Pojedynczy wydatek',
-                subtitle: 'Skanuj paragon by stworzyć pojedynczy wydatek',
+                title: texts.singleExpenseLabel,
+                subtitle: texts.quickExpenseExamples,
                 titleColor: AppColors.amountCurrency(widget.isDark),
                 subtitleColor: AppColors.cardSubtitle(widget.isDark),
                 onTap: _isScanning ? () {} : _handleSingleExpenseScan,
@@ -88,8 +87,8 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                 iconColor: AppColors.actionProjectIcon(widget.isDark),
                 iconBackground: AppColors.actionProjectIconBg(widget.isDark),
                 borderColor: AppColors.sheetOptionProjectBorder(widget.isDark),
-                title: 'Wydatek grupowy',
-                subtitle: 'Skanuj paragon by stworzyć wydatek z znajomymi',
+                title: texts.groupExpenseLabel,
+                subtitle: texts.quickGroupExamples,
                 titleColor: AppColors.iconProject(widget.isDark),
                 subtitleColor: AppColors.cardSubtitle(widget.isDark),
                 onTap: _isScanning ? () {} : _handleGroupExpenseScan,
@@ -102,15 +101,15 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                 iconColor: AppColors.actionAddIcon(widget.isDark),
                 iconBackground: AppColors.actionAddIconBg(widget.isDark),
                 borderColor: AppColors.sheetOptionExpenseBorder(widget.isDark),
-                title: 'Wydatek w projekcie',
-                subtitle: 'Do projektu',
+                title: texts.projectExpenseLabel,
+                subtitle: texts.quickProjectExamples,
                 titleColor: AppColors.amountCurrency(widget.isDark),
                 subtitleColor: AppColors.cardSubtitle(widget.isDark),
                 onTap: _isScanning
                     ? () {}
                     : () {
                         Navigator.pop(context);
-                        // TODO: nawigacja do skanowania wydatku w projekcie
+                        // TODO: navigate to project expense scanning
                       },
               ),
             ),
@@ -136,7 +135,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                         ),
                       )
                     : Text(
-                        'Anuluj',
+                        texts.cancelActionLabel,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.cardSubtitle(widget.isDark),
@@ -175,13 +174,10 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
       final result = await _scanService.scanReceipt(imageFile);
       if (result == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Nie udało się zskanować paragonu. Spróbuj ponownie.',
-              ),
-            ),
-          );
+          final texts = AppTexts.of(context);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(texts.expenseScanFailedTitle)));
           setState(() => _isScanning = false);
         }
         return;
@@ -206,19 +202,19 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
       );
 
       if (saved == true) {
+        final texts = AppTexts.of(context);
         rootMessenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Dodano wydatek.')));
+          ..showSnackBar(SnackBar(content: Text(texts.expenseAdded)));
         await widget.onSaved();
       }
     } catch (e) {
       debugPrint('Error in _handleSingleExpenseScan: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Błąd podczas skanowania. Spróbuj ponownie.'),
-          ),
-        );
+        final texts = AppTexts.of(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(texts.expenseScanFailed)));
       }
     } finally {
       if (mounted) {
@@ -229,11 +225,11 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
 
   Future<void> _handleGroupExpenseScan() async {
     if (_loadingFriends) {
-      _snack('Trwa ładowanie znajomych…');
+      _snack(AppTexts.of(context).expenseScanLoadingFriends);
       return;
     }
     if (_availableFriends.isEmpty) {
-      _snack('Nie masz jeszcze znajomych. Dodaj ich w zakładce Znajomi.');
+      _snack(AppTexts.of(context).expenseScanNoFriends);
       return;
     }
 
@@ -258,7 +254,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
           (itemsResponse.statusCode != 200 &&
               itemsResponse.statusCode != 201)) {
         if (mounted) {
-          _snack('Nie udało się zskanować paragonu. Spróbuj ponownie.');
+          _snack(AppTexts.of(context).expenseScanNoReceipt);
         }
         return;
       }
@@ -268,7 +264,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
         parsed = _parseGroupScanPayload(jsonDecode(itemsResponse.body));
       } catch (_) {
         if (mounted) {
-          _snack('Błąd podczas odczytu danych z paragonu.');
+          _snack(AppTexts.of(context).expenseScanReadError);
         }
         return;
       }
@@ -276,7 +272,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
       final itemsData = parsed['items'] as List<Map<String, dynamic>>;
       if (itemsData.isEmpty) {
         if (mounted) {
-          _snack('Nie rozpoznano pozycji na paragonie.');
+          _snack(AppTexts.of(context).expenseScanNoItems);
         }
         return;
       }
@@ -300,15 +296,16 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
       );
 
       if (saved == true) {
+        final texts = AppTexts.of(context);
         rootMessenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Dodano wydatek.')));
+          ..showSnackBar(SnackBar(content: Text(texts.expenseAdded)));
         await widget.onSaved();
       }
     } catch (e) {
       debugPrint('Error in _handleGroupExpenseScan: $e');
       if (mounted) {
-        _snack('Błąd podczas skanowania. Spróbuj ponownie.');
+        _snack(AppTexts.of(context).expenseScanFailed);
       }
     } finally {
       if (mounted) {
@@ -443,6 +440,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
+    final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: AppColors.cardBg(widget.isDark),
@@ -465,7 +463,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Wybierz źródło zdjęcia',
+                texts.chooseImageSourceTitle,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -479,11 +477,11 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                   color: AppColors.actionScanIcon(widget.isDark),
                 ),
                 title: Text(
-                  'Aparat',
+                  texts.cameraLabel,
                   style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
                 ),
                 subtitle: Text(
-                  'Zrób zdjęcie paragonu',
+                  texts.cameraSubtitle,
                   style: TextStyle(
                     color: AppColors.cardSubtitle(widget.isDark),
                   ),
@@ -497,11 +495,11 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                   color: AppColors.actionAddIcon(widget.isDark),
                 ),
                 title: Text(
-                  'Galeria',
+                  texts.galleryLabel,
                   style: TextStyle(color: AppColors.cardTitle(widget.isDark)),
                 ),
                 subtitle: Text(
-                  'Wybierz zdjęcie z galerii',
+                  texts.gallerySubtitle,
                   style: TextStyle(
                     color: AppColors.cardSubtitle(widget.isDark),
                   ),

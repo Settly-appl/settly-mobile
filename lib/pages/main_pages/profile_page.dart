@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/pages/admin_broadcast_page.dart';
+import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 
@@ -18,6 +20,8 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final texts = AppTexts.of(context);
+    final bool isEnglish = Localizations.localeOf(context).languageCode == 'en';
 
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
@@ -25,7 +29,7 @@ class ProfilePage extends StatelessWidget {
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         title: Text(
-          'Profil',
+          texts.profileTitle,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.username(isDark),
@@ -80,7 +84,7 @@ class ProfilePage extends StatelessWidget {
                         );
                       },
                       icon: const Icon(Icons.campaign_outlined),
-                      label: const Text('Wyślij powiadomienie do wszystkich'),
+                      label: Text(texts.adminBroadcastButton),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -91,13 +95,31 @@ class ProfilePage extends StatelessWidget {
                   );
                 },
               ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    MyApp.of(context).changeLocale(
+                      isEnglish ? const Locale('pl', 'PL') : const Locale('en'),
+                    );
+                  },
+                  icon: const Icon(Icons.translate_rounded),
+                  label: Text(texts.switchLanguageLabel),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
               FilledButton.icon(
                 onPressed: () {
                   Navigator.of(context).pop();
                   onLogout();
                 },
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('Wyloguj się'),
+                label: Text(texts.logoutButton),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.amountNegative,
                   padding: const EdgeInsets.symmetric(vertical: 14),

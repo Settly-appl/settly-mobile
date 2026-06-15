@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
@@ -50,12 +51,12 @@ class HomePageState extends State<HomePage> {
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
-  final List<Map<String, dynamic>> _navIcons = [
-    {'icon': Icons.grid_view_rounded, 'label': 'Główna'},
-    {'icon': Icons.attach_money_rounded, 'label': 'Wydatki'},
-    {'icon': Icons.group_outlined, 'label': 'Grupy'},
-    {'icon': Icons.people_outline, 'label': 'Znajomi'},
-    {'icon': Icons.bar_chart_rounded, 'label': 'Analiza'},
+  final List<IconData> _navIcons = [
+    Icons.grid_view_rounded,
+    Icons.attach_money_rounded,
+    Icons.group_outlined,
+    Icons.people_outline,
+    Icons.bar_chart_rounded,
   ];
 
   List<SingleExpense> recentItems = [];
@@ -105,13 +106,16 @@ class HomePageState extends State<HomePage> {
     await Future.wait([_fetchRecentExpenses(), _fetchPinnedItems()]);
   }
 
-  List<Widget> get _pages => [
-    _HomeBody(state: this),
-    ExpensesPage(tabNotifier: _tabNotifier),
-    const ProjectsPage(),
-    const FriendsPage(),
-    const _PlaceholderTab(label: 'Analiza'),
-  ];
+  List<Widget> _pages(BuildContext context) {
+    final texts = AppTexts.of(context);
+    return [
+      _HomeBody(state: this),
+      ExpensesPage(tabNotifier: _tabNotifier),
+      const ProjectsPage(),
+      const FriendsPage(),
+      _PlaceholderTab(label: texts.analysisTab),
+    ];
+  }
 
   void _openProfile() {
     Navigator.of(context).push(
@@ -129,13 +133,15 @@ class HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: _currentTab == 0 ? _buildAppBar() : null,
-      body: IndexedStack(index: _currentTab, children: _pages),
-      bottomNavigationBar: _buildBottomNav(),
+      appBar: _currentTab == 0 ? _buildAppBar(context) : null,
+      body: IndexedStack(index: _currentTab, children: _pages(context)),
+      bottomNavigationBar: _buildBottomNav(context),
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final texts = AppTexts.of(context);
+
     return AppBar(
       leadingWidth: 70,
       scrolledUnderElevation: 0,
@@ -151,7 +157,7 @@ class HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Dzień dobry,',
+              texts.homeGreeting,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.normal,
@@ -192,7 +198,7 @@ class HomePageState extends State<HomePage> {
       actions: [
         IconButton(
           icon: const Icon(Icons.dark_mode_outlined),
-          tooltip: 'Change app theme',
+          tooltip: texts.changeThemeTooltip,
           onPressed: () {
             MyApp.of(
               context,
@@ -271,7 +277,9 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(BuildContext context) {
+    final texts = AppTexts.of(context);
+
     return Container(
       decoration: BoxDecoration(
         border: Border(
@@ -282,7 +290,7 @@ class HomePageState extends State<HomePage> {
       child: Row(
         children: _navIcons.asMap().entries.map((entry) {
           final int idx = entry.key;
-          final item = entry.value;
+          final icon = entry.value;
           final bool isSelected = _currentTab == idx;
 
           return Expanded(
@@ -299,7 +307,7 @@ class HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      item['icon'],
+                      icon,
                       color: isSelected
                           ? AppColors.navActive(isDark)
                           : AppColors.navInactive(isDark),
@@ -307,7 +315,7 @@ class HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item['label'],
+                      _navLabel(texts, idx),
                       style: TextStyle(
                         fontSize: 10,
                         color: isSelected
@@ -337,6 +345,21 @@ class HomePageState extends State<HomePage> {
         }).toList(),
       ),
     );
+  }
+
+  String _navLabel(AppTexts texts, int index) {
+    switch (index) {
+      case 0:
+        return texts.homeTab;
+      case 1:
+        return texts.expensesTab;
+      case 2:
+        return texts.groupsTab;
+      case 3:
+        return texts.friendsTab;
+      default:
+        return texts.analysisTab;
+    }
   }
 
   Future<void> _fetchRecentExpenses() async {
@@ -387,6 +410,8 @@ class _HomeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+
     return RefreshIndicator(
       onRefresh: state._refreshHome,
       child: ListView(
@@ -394,7 +419,7 @@ class _HomeBody extends StatelessWidget {
         children: [
           SummaryCard(key: state._summaryKey),
           const SizedBox(height: 16),
-          state._sectionHeader('Szybkie akcje'),
+          state._sectionHeader(texts.quickActionsSection),
           const SizedBox(height: 10),
           QuickActionsRow(
             isDark: state.isDark,
@@ -402,7 +427,7 @@ class _HomeBody extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          state._sectionHeader('Przypięte', action: 'Edytuj'),
+          state._sectionHeader(texts.pinnedSection, action: texts.editAction),
           const SizedBox(height: 10),
 
           state._isPinnedLoading
@@ -418,8 +443,8 @@ class _HomeBody extends StatelessWidget {
 
           const SizedBox(height: 16),
           state._sectionHeader(
-            'Ostatnie',
-            action: 'Zobacz wszystkie',
+            texts.recentSection,
+            action: texts.seeAllAction,
             onActionTap: () => state.switchTab(1),
           ),
           const SizedBox(height: 10),
@@ -491,7 +516,7 @@ class _PlaceholderTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Wkrótce dostępne',
+            AppTexts.of(context).comingSoon,
             style: TextStyle(
               fontSize: 13,
               color: AppColors.cardSubtitle(isDark),
@@ -523,6 +548,7 @@ class _NotificationsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = NotificationsStore();
+    final texts = AppTexts.of(context);
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -540,10 +566,10 @@ class _NotificationsSheet extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Powiadomienia',
-                          style: TextStyle(
+                          texts.notificationsTitle,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -552,15 +578,15 @@ class _NotificationsSheet extends StatelessWidget {
                       if (items.isNotEmpty)
                         TextButton(
                           onPressed: store.clear,
-                          child: const Text('Wyczyść'),
+                          child: Text(texts.clearAction),
                         ),
                     ],
                   ),
                 ),
                 if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: Text('Brak powiadomień')),
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(child: Text(texts.noNotifications)),
                   )
                 else
                   Flexible(
