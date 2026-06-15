@@ -42,7 +42,8 @@ class PinnedRepository {
         fullItems.add(PinnedItem.fromExpense(expense, isDark));
         validIds.add(id);
       } else if (response != null && response.statusCode == 404) {
-        print("Pinned element $id not found in DB, skipping.");
+        // Komunikat tylko do logów - przetłumaczony na polski
+        print('Nie znaleziono elementu $id w bazie, pomijam.');
       } else {
         validIds.add(id);
       }

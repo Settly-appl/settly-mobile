@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
+import '../../../const/app_texts.dart';
 import '../../../models/expenses/single_expense.dart';
 
 class RecentExpenseCard extends StatefulWidget {
@@ -155,6 +156,7 @@ class EmptyRecentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -166,7 +168,7 @@ class EmptyRecentCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Brak wydatków',
+            texts.noExpenses,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -175,7 +177,7 @@ class EmptyRecentCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Twoje ostatnie transakcje pojawią się tutaj.',
+            texts.recentExpensesEmptySubtitle,
             style: TextStyle(
               fontSize: 13,
               color: AppColors.greeting(isDark).withValues(alpha: 0.7),

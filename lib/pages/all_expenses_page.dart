@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
@@ -15,18 +16,18 @@ import 'package:settly_mobile/services/notifications_store.dart';
 enum AllExpensesPage { all, food, transport, shopping, other }
 
 extension ExpenseCategoryLabel on AllExpensesPage {
-  String get label {
+  String localizedLabel(AppTexts texts) {
     switch (this) {
       case AllExpensesPage.all:
-        return 'Wszystkie';
+        return texts.expensesLabelAll;
       case AllExpensesPage.food:
-        return 'Jedzenie';
+        return texts.expensesLabelFood;
       case AllExpensesPage.transport:
-        return 'Transport';
+        return texts.expensesLabelTransport;
       case AllExpensesPage.shopping:
-        return 'Zakupy';
+        return texts.expensesLabelShopping;
       case AllExpensesPage.other:
-        return 'Inne';
+        return texts.expensesLabelOther;
     }
   }
 
@@ -72,19 +73,19 @@ class _ExpensesPageState extends State<ExpensesPage> {
   final _expenseRepository = ExpenseRepository();
 
   // ── Podsumowanie (hardcoded — docelowo z API) ──────────────────────────────
-  final String _monthLabel = 'Marzec 2026';
+  final String _monthLabel = 'March 2026';
   final String _totalSpent = '1 240 zł';
-  final String _totalCount = '23 transakcje';
+  final String _totalCount = '23 transactions';
   final String _dailyAverage = '41 zł';
-  final String _daysInMonth = 'z 30 dni';
+  final String _daysInMonth = 'of 30 days';
 
   // Kolejność wyświetlania grup
   static const _groupOrder = [
-    'Dziś',
-    'Wczoraj',
-    'W tym tygodniu',
-    'Ostatnie 2 tygodnie',
-    'W tym miesiącu',
+    'Today',
+    'Yesterday',
+    'This week',
+    'Last 2 weeks',
+    'This month',
   ];
 
   // ── Inicjalizacja ──────────────────────────────────────────────────────────
@@ -234,6 +235,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   // ════════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: _buildAppBar(),
@@ -265,6 +267,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── AppBar ─────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
+    final texts = AppTexts.of(context);
     return AppBar(
       scrolledUnderElevation: 0,
       backgroundColor: Colors.transparent,
@@ -273,7 +276,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
       title: Text(
-        'Wydatki',
+        texts.expensesTitle,
         style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
@@ -303,6 +306,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Karta podsumowania ─────────────────────────────────────────────────────
   Widget _buildSummaryCard() {
+    final texts = AppTexts.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -334,7 +338,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
             children: [
               Expanded(
                 child: _SummaryTile(
-                  label: 'Wydano',
+                  label: texts.expensesSummarySpent,
                   value: _totalSpent,
                   sub: _totalCount,
                 ),
@@ -342,7 +346,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _SummaryTile(
-                  label: 'Średnio / dzień',
+                  label: texts.expensesSummaryAverage,
                   value: _dailyAverage,
                   sub: _daysInMonth,
                 ),
@@ -356,6 +360,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Filtry kategorii ───────────────────────────────────────────────────────
   Widget _buildFilterRow() {
+    final texts = AppTexts.of(context);
     return SizedBox(
       height: 34,
       child: ListView(
@@ -370,10 +375,6 @@ class _ExpensesPageState extends State<ExpensesPage> {
                 if (_selectedCategory == cat) return;
                 setState(() => _selectedCategory = cat);
                 _fetchExpenses();
-                if (cat == AllExpensesPage.all) {
-                  setState(() => _selectedCategory = cat);
-                  _fetchExpenses();
-                }
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -394,7 +395,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
                   ),
                 ),
                 child: Text(
-                  cat.label,
+                  cat.localizedLabel(texts),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -413,6 +414,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Wyszukiwarka ───────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
+    final texts = AppTexts.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -441,7 +443,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                   border: InputBorder.none,
-                  hintText: 'Szukaj wydatku…',
+                  hintText: texts.expensesSearchHint,
                   hintStyle: TextStyle(
                     fontSize: 13,
                     color: AppColors.formPlaceholder(isDark),
@@ -480,6 +482,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Pusty stan ─────────────────────────────────────────────────────────────
   Widget _buildEmpty() {
+    final texts = AppTexts.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -491,7 +494,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Brak wydatków',
+            texts.expensesNoExpenses,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -501,8 +504,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
           const SizedBox(height: 6),
           Text(
             _searchQuery.isNotEmpty
-                ? 'Brak wyników dla „$_searchQuery"'
-                : 'W tej kategorii nie ma jeszcze wydatków.',
+                ? texts.expensesNoResults.replaceAll('{query}', _searchQuery)
+                : texts.expensesNoCategory,
             style: TextStyle(
               fontSize: 12,
               color: AppColors.cardSubtitle(isDark),

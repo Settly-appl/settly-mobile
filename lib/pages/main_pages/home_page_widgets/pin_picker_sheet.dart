@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import '../../../const/app_texts.dart';
 import '../../../repository/pinned_item_repository.dart';
 
 class PinPickerSheet extends StatefulWidget {
@@ -70,6 +71,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
 
   // ── Przypinanie wydatku ────────────────────────────────────────────────────
   Future<void> _pinExpense(String expenseId, String name) async {
+    final texts = AppTexts.of(context);
     final success = await _repo.pin(expenseId);
 
     if (!mounted) return;
@@ -78,7 +80,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
       setState(() => _pinnedIds.add(expenseId));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Przypięto: $name'),
+          content: Text('${texts.pinnedPrefix}: $name'),
           backgroundColor: AppColors.actionScanIcon(widget.isDark),
           duration: const Duration(seconds: 2),
         ),
@@ -87,9 +89,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'Osiągnięto limit przypiętych elementów (maks. ${PinnedRepository.maxPinned})',
-          ),
+          content: Text(texts.pinnedLimitReached(PinnedRepository.maxPinned)),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -110,8 +110,10 @@ class _PinPickerSheetState extends State<PinPickerSheet>
   // BUILD
   // ════════════════════════════════════════════════════════════════════════════
   @override
+  @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+    final texts = AppTexts.of(context);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
@@ -121,7 +123,6 @@ class _PinPickerSheetState extends State<PinPickerSheet>
       ),
       child: Column(
         children: [
-          // ── Uchwyt ──────────────────────────────────────────────────────────
           const SizedBox(height: 12),
           Container(
             width: 36,
@@ -132,15 +133,13 @@ class _PinPickerSheetState extends State<PinPickerSheet>
             ),
           ),
           const SizedBox(height: 16),
-
-          // ── Nagłówek ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Co chcesz przypiąć?',
+                    texts.pinPickerTitle,
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -162,7 +161,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Wybierz wydatek lub projekt do sekcji Przypiętych',
+              texts.pinPickerSubtitle,
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.cardSubtitle(isDark),
@@ -170,8 +169,6 @@ class _PinPickerSheetState extends State<PinPickerSheet>
             ),
           ),
           const SizedBox(height: 16),
-
-          // ── TabBar ──────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -195,16 +192,14 @@ class _PinPickerSheetState extends State<PinPickerSheet>
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
-                tabs: const [
-                  Tab(text: 'Wydatki'),
-                  Tab(text: 'Projekty'),
+                tabs: [
+                  Tab(text: texts.expensesTab),
+                  Tab(text: texts.projectsTitle),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 12),
-
-          // ── TabBarView ───────────────────────────────────────────────────────
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -218,6 +213,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
 
   // ── Zakładka: Wydatki ──────────────────────────────────────────────────────
   Widget _buildExpensesTab() {
+    final texts = AppTexts.of(context);
     if (_loadingExpenses) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -233,7 +229,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
             ),
             const SizedBox(height: 12),
             Text(
-              'Brak wydatków',
+              texts.noExpenses,
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.cardSubtitle(widget.isDark),
@@ -268,6 +264,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
   }
 
   Widget _buildProjectsTab() {
+    final texts = AppTexts.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -290,7 +287,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
           ),
           const SizedBox(height: 16),
           Text(
-            'Projekty wkrótce',
+            texts.comingSoon,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,

@@ -40,7 +40,8 @@ class ReceiptScanService {
       if (image == null) return null;
       return File(image.path);
     } catch (e) {
-      print('Error picking image: $e');
+      // Log po polsku
+      print('Błąd przy wybieraniu zdjęcia: $e');
       return null;
     }
   }
@@ -55,7 +56,8 @@ class ReceiptScanService {
       if (image == null) return null;
       return File(image.path);
     } catch (e) {
-      print('Error picking image from gallery: $e');
+      // Log po polsku
+      print('Błąd przy wybieraniu zdjęcia z galerii: $e');
       return null;
     }
   }
@@ -92,12 +94,12 @@ class ReceiptScanService {
         final jsonData = jsonDecode(response.body) as Map<String, dynamic>;
         return ScanReceiptResult.fromJson(jsonData);
       } else {
-        print('Error scanning receipt: ${response.statusCode}');
-        print('Response: ${response.body}');
+        print('Błąd podczas skanowania paragonu: ${response.statusCode}');
+        print('Odpowiedź serwera: ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error in scanReceipt: $e');
+      print('Błąd w scanReceipt: $e');
       return null;
     }
   }

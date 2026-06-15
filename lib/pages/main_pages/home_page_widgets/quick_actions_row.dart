@@ -6,6 +6,8 @@ import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 
+import '../../../const/app_texts.dart';
+
 class QuickActionsRow extends StatelessWidget {
   final bool isDark;
   final Future<void> Function() onExpenseAdded;
@@ -18,13 +20,14 @@ class QuickActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           Expanded(
             child: _ActionButton(
-              label: 'Dodaj',
+              label: texts.addAction,
               icon: Icons.add,
               iconColor: AppColors.actionAddIcon(isDark),
               iconBg: AppColors.actionAddIconBg(isDark),
@@ -36,16 +39,13 @@ class QuickActionsRow extends StatelessWidget {
                   builder: (context) =>
                       QuickAddMenu(isDark: isDark, onSaved: onExpenseAdded),
                 );
-                // if (result != null) {
-                //   onExpenseAdded(result);
-                // }
               },
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: _ActionButton(
-              label: 'Skanuj',
+              label: texts.quickScanTitle,
               icon: Icons.camera_alt_outlined,
               iconColor: AppColors.actionScanIcon(isDark),
               iconBg: AppColors.actionScanIconBg(isDark),
@@ -63,30 +63,30 @@ class QuickActionsRow extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: _ActionButton(
-              label: 'Projekt',
+              label: texts.projectsTitle,
               icon: Icons.group_outlined,
               iconColor: AppColors.actionProjectIcon(isDark),
               iconBg: AppColors.actionProjectIconBg(isDark),
               isDark: isDark,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProjectsPage()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const ProjectsPage()));
               },
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: _ActionButton(
-              label: 'Rozlicz',
+              label: texts.settleAction,
               icon: Icons.check_box_outlined,
               iconColor: AppColors.actionSettleIcon(isDark),
               iconBg: AppColors.actionSettleIconBg(isDark),
               isDark: isDark,
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BalancesPage()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const BalancesPage()));
               },
             ),
           ),

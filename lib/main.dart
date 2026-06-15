@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:settly_mobile/pages/main_pages/home_page.dart';
 import 'package:settly_mobile/pages/main_pages/login_page.dart';
 import 'package:settly_mobile/services/auth_service.dart';
@@ -21,7 +22,10 @@ Future<void> main() async {
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await NotificationService().init();
-  await initializeDateFormatting('pl_PL', null);
+  await Future.wait([
+    initializeDateFormatting('pl_PL', null),
+    initializeDateFormatting('en_US', null),
+  ]);
   runApp(const MyApp());
 }
 
@@ -37,10 +41,38 @@ class MyApp extends StatefulWidget {
 
 class MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  Locale _locale = const Locale('pl', 'PL');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocale();
+  }
+
+  Future<void> _loadLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final languageCode = prefs.getString('app_language');
+    if (!mounted) return;
+
+    setState(() {
+      _locale = languageCode == 'en'
+          ? const Locale('en')
+          : const Locale('pl', 'PL');
+    });
+  }
 
   void changeTheme(ThemeMode themeMode) {
     setState(() {
       _themeMode = themeMode;
+    });
+  }
+
+  Future<void> changeLocale(Locale locale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_language', locale.languageCode);
+    if (!mounted) return;
+    setState(() {
+      _locale = locale;
     });
   }
 
@@ -54,8 +86,8 @@ class MyAppState extends State<MyApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('pl', 'PL')],
-      locale: const Locale('pl', 'PL'),
+      supportedLocales: const [Locale('pl', 'PL'), Locale('en')],
+      locale: _locale,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 
@@ -26,10 +27,11 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
   }
 
   Future<void> _send() async {
+    final texts = AppTexts.of(context);
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
     if (title.isEmpty || body.isEmpty) {
-      _showSnack('Podaj tytuł i treść');
+      _showSnack(texts.adminBroadcastMissing);
       return;
     }
 
@@ -47,10 +49,12 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
         response.statusCode >= 200 &&
         response.statusCode < 300;
     if (ok) {
-      _showSnack('Wysłano powiadomienie');
+      _showSnack(texts.adminBroadcastSent);
       Navigator.of(context).pop();
     } else {
-      _showSnack('Nie udało się wysłać (${response?.statusCode ?? 'brak połączenia'})');
+      _showSnack(
+        '${texts.adminBroadcastFailedPrefix} (${response?.statusCode ?? texts.noConnection})',
+      );
     }
   }
 
@@ -60,13 +64,14 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Powiadomienie do wszystkich',
+          texts.adminBroadcastTitle,
           style: TextStyle(color: AppColors.username(isDark)),
         ),
         iconTheme: IconThemeData(color: AppColors.username(isDark)),
@@ -80,9 +85,9 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
               TextField(
                 controller: _titleController,
                 maxLength: 100,
-                decoration: const InputDecoration(
-                  labelText: 'Tytuł',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: texts.adminBroadcastFieldTitle,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -90,9 +95,9 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                 controller: _bodyController,
                 maxLength: 500,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Treść',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: texts.adminBroadcastFieldBody,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 20),
@@ -105,7 +110,11 @@ class _AdminBroadcastPageState extends State<AdminBroadcastPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send_rounded),
-                label: Text(_sending ? 'Wysyłanie…' : 'Wyślij do wszystkich'),
+                label: Text(
+                  _sending
+                      ? texts.adminBroadcastSending
+                      : texts.adminBroadcastSend,
+                ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(

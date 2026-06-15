@@ -5,6 +5,7 @@ import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import '../../../const/app_texts.dart';
 import 'pin_picker_sheet.dart';
 
 class PinnedScroll extends StatelessWidget {
@@ -31,7 +32,6 @@ class PinnedScroll extends StatelessWidget {
   Future<void> _handlePinnedClick(BuildContext context, PinnedItem item) async {
     if (item.type == PinnedItemType.expense) {
       bool isLoaderOpen = false;
-      // Pokazujemy loader
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -45,15 +45,12 @@ class PinnedScroll extends StatelessWidget {
         );
 
         if (response != null && response.statusCode == 200) {
-          // Najpierw parsujemy dane - jeśli tu wystąpi błąd, przejdzie do catch/finally
           final expense = SingleExpense.fromJson(jsonDecode(response.body));
 
           if (context.mounted) {
-            // Zamykamy dialog przed przejściem dalej
             Navigator.pop(context);
             isLoaderOpen = false;
 
-            // Przechodzimy do szczegółów
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -63,19 +60,16 @@ class PinnedScroll extends StatelessWidget {
           }
         }
       } catch (e) {
-        // Tutaj obsłuż błąd, np. pokaż SnackBar
         print("Błąd: $e");
       } finally {
-        // Kluczowy blok: zamknij dialog tylko, jeśli nadal jest otwarty
         if (isLoaderOpen && context.mounted) {
           Navigator.pop(context);
         }
       }
     } else {
-      // TODO: Obsługa kliknięcia w projekt (ProjectDetailsPage)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Szczegóły projektu wkrótce!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppTexts.of(context).comingSoon)));
     }
   }
 
@@ -113,6 +107,7 @@ class _AddPinTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -141,7 +136,7 @@ class _AddPinTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Przypnij',
+              texts.pinTileAction,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -150,7 +145,7 @@ class _AddPinTile extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'wydatek / projekt',
+              texts.pinTileSubtitle,
               style: TextStyle(
                 fontSize: 9,
                 color: AppColors.cardSubtitle(isDark),
@@ -176,7 +171,9 @@ class _PinnedTile extends StatelessWidget {
   });
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -215,7 +212,9 @@ class _PinnedTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
-                    item.type == PinnedItemType.project ? 'Proj.' : 'Wyd.',
+                    item.type == PinnedItemType.project
+                        ? texts.pinTypeProjLabel
+                        : texts.pinTypeExpLabel,
                     style: TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.w700,

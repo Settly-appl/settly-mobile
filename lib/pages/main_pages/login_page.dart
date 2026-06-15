@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -40,7 +41,8 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
         setState(() {
           _isBusy = false;
-          _errorMessage = uri.queryParameters['error_description'] ??
+          _errorMessage =
+              uri.queryParameters['error_description'] ??
               'Brak kodu autoryzacji w odpowiedzi.';
         });
         return;
@@ -78,6 +80,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final texts = AppTexts.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -99,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Zarządzaj wydatkami razem',
+                texts.loginSubtitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -129,9 +132,9 @@ class _LoginPageState extends State<LoginPage> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text(
-                        'Zaloguj się',
-                        style: TextStyle(fontSize: 16),
+                    : Text(
+                        texts.loginButton,
+                        style: const TextStyle(fontSize: 16),
                       ),
               ),
               const SizedBox(height: 48),

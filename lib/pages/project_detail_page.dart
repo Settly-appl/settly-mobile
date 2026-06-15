@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/models/project.dart';
@@ -44,6 +45,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _load() async {
+    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -66,7 +68,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Nie udało się pobrać projektu. Spróbuj ponownie.';
+        _error = texts.projectRetryError;
         _loading = false;
       });
     }
@@ -80,6 +82,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _settle(FriendBalance balance) async {
+    final texts = AppTexts.of(context);
     setState(() => _settling.add(balance.userId));
     try {
       await _balancesService.settleUp(
@@ -87,18 +90,24 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         projectId: widget.projectId,
       );
       _toast(
-        'Rozliczono ${balance.absAmount.toStringAsFixed(2)} zł z ${balance.label}',
+        texts.balancePaidOut
+            .replaceAll(
+              '{amount}',
+              '${balance.absAmount.toStringAsFixed(2)} zł',
+            )
+            .replaceAll('{name}', balance.label),
         color: AppColors.amountPositive,
       );
       await _load();
     } catch (_) {
-      _toast('Nie udało się rozliczyć.');
+      _toast(texts.settleFailedError);
     } finally {
       if (mounted) setState(() => _settling.remove(balance.userId));
     }
   }
 
   Future<void> _addMember() async {
+    final texts = AppTexts.of(context);
     List<Friend> friends;
     try {
       final res = await _api.request(
@@ -106,20 +115,21 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         method: HttpMethod.get,
       );
       if (res == null || res.statusCode != 200) {
-        _toast('Nie udało się pobrać znajomych.');
+        _toast(texts.friendsOperationFailed);
         return;
       }
       friends = (jsonDecode(res.body) as List<dynamic>)
           .map((e) => Friend.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
-      _toast('Nie udało się pobrać znajomych.');
+      _toast(texts.friendsOperationFailed);
       return;
     }
 
     final memberIds = _members.map((m) => m.userId).toSet();
-    final candidates =
-        friends.where((f) => !memberIds.contains(f.userId)).toList();
+    final candidates = friends
+        .where((f) => !memberIds.contains(f.userId))
+        .toList();
 
     if (!mounted) return;
     final picked = await showModalBottomSheet<Friend>(
@@ -135,15 +145,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       _toast('Dodano ${picked.displayName}', color: AppColors.amountPositive);
       await _load();
     } catch (_) {
-      _toast('Nie udało się dodać uczestnika.');
+      _toast(texts.projectAddMemberFailed);
     }
   }
 
   Future<void> _removeMember(ProjectMember member) async {
+    final texts = AppTexts.of(context);
     final ok = await _confirm(
-      'Usunąć uczestnika?',
-      '${member.label} zostanie usunięty(a) z projektu.',
-      confirmLabel: 'Usuń',
+      texts.projectDeleteMenu,
+      '${member.label} ${texts.friendsDeleteFriendSubtitle}',
+      confirmLabel: texts.deleteAction,
       danger: true,
     );
     if (ok != true) return;
@@ -151,7 +162,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await _service.removeMember(widget.projectId, member.userId);
       await _load();
     } catch (_) {
-      _toast('Nie udało się usunąć uczestnika.');
+      _toast(texts.projectRemoveMemberFailed);
     }
   }
 
@@ -159,20 +170,22 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     final project = _project;
     if (project == null) return;
     final newStatus = project.isSettled ? 'ACTIVE' : 'SETTLED';
+    final texts = AppTexts.of(context);
     try {
       await _service.updateProject(widget.projectId, status: newStatus);
       await _load();
     } catch (_) {
-      _toast('Nie udało się zmienić statusu.');
+      _toast(texts.projectStatusFailed);
     }
   }
 
   Future<void> _rename() async {
+    final texts = AppTexts.of(context);
     final controller = TextEditingController(text: _project?.name ?? '');
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Zmień nazwę'),
+        title: Text(texts.projectRenameTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -181,11 +194,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Anuluj'),
+            child: Text(texts.cancelAction),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('Zapisz'),
+            child: Text(texts.saveAction),
           ),
         ],
       ),
@@ -195,15 +208,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await _service.updateProject(widget.projectId, name: newName);
       await _load();
     } catch (_) {
-      _toast('Nie udało się zmienić nazwy.');
+      _toast(texts.projectRenameFailed);
     }
   }
 
   Future<void> _deleteProject() async {
+    final texts = AppTexts.of(context);
     final ok = await _confirm(
-      'Usunąć projekt?',
-      'Tej operacji nie można cofnąć.',
-      confirmLabel: 'Usuń',
+      texts.projectDeleteTitle,
+      'This action cannot be undone.',
+      confirmLabel: texts.deleteAction,
       danger: true,
     );
     if (ok != true) return;
@@ -211,15 +225,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await _service.deleteProject(widget.projectId);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
-      _toast('Nie udało się usunąć projektu.');
+      _toast(texts.projectDeleteFailed);
     }
   }
 
   Future<void> _leaveProject() async {
+    final texts = AppTexts.of(context);
     final ok = await _confirm(
-      'Opuścić projekt?',
-      'Nie będziesz już widzieć tego projektu.',
-      confirmLabel: 'Opuść',
+      texts.projectLeaveTitle,
+      'You will no longer see this project.',
+      confirmLabel: texts.projectLeaveConfirm,
       danger: true,
     );
     if (ok != true) return;
@@ -227,7 +242,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await _service.leaveProject(widget.projectId);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
-      _toast('Nie udało się opuścić projektu.');
+      _toast(texts.projectLeaveFailed);
     }
   }
 
@@ -263,13 +278,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         title: Text(
-          _project?.name ?? 'Projekt',
+          _project?.name ?? texts.projectsTitle,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.username(isDark),
@@ -292,18 +308,27 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               },
               itemBuilder: (_) => [
                 if (_isOwner) ...[
-                  const PopupMenuItem(value: 'rename', child: Text('Zmień nazwę')),
+                  PopupMenuItem(
+                    value: 'rename',
+                    child: Text(texts.projectRenameMenu),
+                  ),
                   PopupMenuItem(
                     value: 'toggle',
                     child: Text(
                       _project!.isSettled
-                          ? 'Oznacz jako aktywny'
-                          : 'Oznacz jako rozliczony',
+                          ? texts.projectToggleActive
+                          : texts.projectToggleSettled,
                     ),
                   ),
-                  const PopupMenuItem(value: 'delete', child: Text('Usuń projekt')),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text(texts.projectDeleteMenu),
+                  ),
                 ] else
-                  const PopupMenuItem(value: 'leave', child: Text('Opuść projekt')),
+                  PopupMenuItem(
+                    value: 'leave',
+                    child: Text(texts.projectLeaveMenu),
+                  ),
               ],
             ),
         ],
@@ -314,9 +339,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               onPressed: _addExpense,
               backgroundColor: AppColors.avatarFg(isDark),
               icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Dodaj wydatek',
-                style: TextStyle(color: Colors.white),
+              label: Text(
+                texts.projectAddExpenseButton,
+                style: const TextStyle(color: Colors.white),
               ),
             ),
       body: SafeArea(
@@ -336,6 +361,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Widget _buildBody() {
+    final texts = AppTexts.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -354,14 +380,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _error ?? 'Nie znaleziono projektu',
+                  _error ?? texts.projectNotFound,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.cardTitle(isDark)),
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: _load,
-                  child: const Text('Spróbuj ponownie'),
+                  child: Text(texts.retryAction),
                 ),
               ],
             ),
@@ -387,10 +413,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ],
 
         // ── Balances ──────────────────────────────────────────────────────
-        _sectionTitle('Salda w projekcie'),
+        _sectionTitle(texts.projectBalanceSection),
         const SizedBox(height: 8),
         if (_balances.isEmpty)
-          _hintCard('Brak nierozliczonych sald w tym projekcie.')
+          _hintCard(texts.projectNoBalancesLabel)
         else
           ..._balances.map(
             (b) => Padding(
@@ -415,7 +441,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               TextButton.icon(
                 onPressed: _addMember,
                 icon: const Icon(Icons.person_add_alt_1, size: 18),
-                label: const Text('Dodaj'),
+                label: Text(texts.projectAddMemberButton),
               ),
           ],
         ),
@@ -474,8 +500,9 @@ class _BalanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        balance.owesYou ? AppColors.amountPositive : AppColors.amountNegative;
+    final color = balance.owesYou
+        ? AppColors.amountPositive
+        : AppColors.amountNegative;
     final sign = balance.owesYou ? '+' : '-';
     return Container(
       decoration: BoxDecoration(
@@ -542,6 +569,7 @@ class _MemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg(isDark),
@@ -587,7 +615,7 @@ class _MemberRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Właściciel',
+                texts.projectOwnerLabel,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -597,7 +625,7 @@ class _MemberRow extends StatelessWidget {
             ),
           if (canRemove)
             IconButton(
-              tooltip: 'Usuń',
+              tooltip: texts.deleteAction,
               icon: Icon(
                 Icons.remove_circle_outline,
                 color: AppColors.amountNegative,
@@ -618,6 +646,7 @@ class _FriendPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -626,7 +655,7 @@ class _FriendPickerSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Dodaj uczestnika',
+              texts.projectAddMemberTitle,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -638,7 +667,7 @@ class _FriendPickerSheet extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(
-                  'Wszyscy znajomi są już w projekcie.',
+                  texts.projectAllFriendsAlready,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.cardSubtitle(isDark)),
                 ),
