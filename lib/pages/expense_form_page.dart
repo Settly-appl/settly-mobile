@@ -2575,8 +2575,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
-    // Desktop browsers have no camera — go straight to the file picker there.
-    // Mobile browsers keep the camera/gallery choice (camera works via capture).
     if (isDesktopWeb) return ImageSource.gallery;
     final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(

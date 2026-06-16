@@ -94,13 +94,16 @@ class _ExpensesPageState extends State<ExpensesPage> {
     return '${months[now.month]} ${now.year}';
   }
 
-  String get _totalSpent {
-    final sum = _expenses.fold<double>(0.0, (acc, e) {
-      final cleaned = e.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '');
-      return acc + (double.tryParse(cleaned) ?? 0.0);
-    });
-    return '${sum.toStringAsFixed(0)} zł';
+  double _userPaid(SingleExpense e) {
+    final source = e.userShare.isNotEmpty ? e.userShare : e.totalAmount;
+    final cleaned = source.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(cleaned) ?? 0.0;
   }
+
+  double get _userPaidSum =>
+      _expenses.fold<double>(0.0, (acc, e) => acc + _userPaid(e));
+
+  String get _totalSpent => '${_userPaidSum.toStringAsFixed(0)} zł';
 
   String get _totalCount => '${_expenses.length} transactions';
 
@@ -108,11 +111,10 @@ class _ExpensesPageState extends State<ExpensesPage> {
     final now = DateTime.now();
     final days = now.day;
     if (days == 0) return '0 zł';
-    final sum = _expenses.fold<double>(0.0, (acc, e) {
-      final cleaned = e.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '');
-      return acc + (double.tryParse(cleaned) ?? 0.0);
-    });
-    return '${(sum / days).toStringAsFixed(0)} zł';
+    final monthSum = _expenses
+        .where((e) => e.date.year == now.year && e.date.month == now.month)
+        .fold<double>(0.0, (acc, e) => acc + _userPaid(e));
+    return '${(monthSum / days).toStringAsFixed(0)} zł';
   }
 
   String get _daysInMonth {
