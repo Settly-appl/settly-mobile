@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -834,11 +834,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true'
-      ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'receipt',
+          await photo.readAsBytes(),
+          filename: photo.name,
+        ),
+      );
     try {
       final streamed = await req.send();
       return http.Response.fromStream(streamed);
-    } on SocketException {
+    } catch (_) {
       return null;
     }
   }
@@ -849,11 +855,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true'
-      ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'receipt',
+          await photo.readAsBytes(),
+          filename: photo.name,
+        ),
+      );
     try {
       final streamed = await req.send();
       return http.Response.fromStream(streamed);
-    } on SocketException {
+    } catch (_) {
       return null;
     }
   }
@@ -2563,6 +2575,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
+    // No camera on most desktops — go straight to the file picker on web.
+    if (kIsWeb) return ImageSource.gallery;
     final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,

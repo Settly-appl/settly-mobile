@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/const/app_texts.dart';
@@ -8,6 +9,7 @@ import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
 import '../../services/notification_service.dart';
@@ -25,12 +27,14 @@ import 'home_page_widgets/summary_card.dart';
 class HomePage extends StatefulWidget {
   final String userName;
   final String userInitials;
+  final String? userAvatarUrl;
   final VoidCallback onLogout;
 
   const HomePage({
     super.key,
     required this.userName,
     required this.userInitials,
+    this.userAvatarUrl,
     required this.onLogout,
   });
 
@@ -123,19 +127,137 @@ class HomePageState extends State<HomePage> {
         builder: (_) => ProfilePage(
           userName: widget.userName,
           userInitials: widget.userInitials,
+          userAvatarUrl: widget.userAvatarUrl,
           onLogout: widget.onLogout,
         ),
       ),
     );
   }
 
+  static const double _wideBreakpoint = 840;
+
+  static const double _maxContentWidth = 1080;
+
+  Widget _buildAvatar(double radius) {
+    final url = widget.userAvatarUrl;
+    final hasPhoto = url != null && url.isNotEmpty;
+    return CircleAvatar(
+      backgroundColor: AppColors.avatarBg(isDark),
+      radius: radius,
+      backgroundImage: hasPhoto ? NetworkImage(url) : null,
+      child: hasPhoto
+          ? null
+          : Text(
+              widget.userInitials,
+              style: TextStyle(
+                color: AppColors.avatarFg(isDark),
+                fontWeight: FontWeight.bold,
+                fontSize: radius * 0.6,
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: _currentTab == 0 ? _buildAppBar(context) : null,
-      body: IndexedStack(index: _currentTab, children: _pages(context)),
-      bottomNavigationBar: _buildBottomNav(context),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= _wideBreakpoint;
+
+        final Widget body = Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+            child: IndexedStack(index: _currentTab, children: _pages(context)),
+          ),
+        );
+
+        if (isWide) {
+          return Scaffold(
+            resizeToAvoidBottomInset: false,
+            body: SafeArea(
+              child: Row(
+                children: [
+                  _buildNavRail(context),
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: AppColors.navBorder(isDark),
+                  ),
+                  Expanded(child: body),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Scaffold(
+          resizeToAvoidBottomInset: false,
+          appBar: _currentTab == 0 ? _buildAppBar(context) : null,
+          body: body,
+          bottomNavigationBar: _buildBottomNav(context),
+        );
+      },
+    );
+  }
+
+  void _onSelectTab(int index) {
+    _tabNotifier.value = index;
+    setState(() => _currentTab = index);
+  }
+
+  Widget _buildNavRail(BuildContext context) {
+    final texts = AppTexts.of(context);
+
+    return NavigationRail(
+      selectedIndex: _currentTab,
+      onDestinationSelected: _onSelectTab,
+      labelType: NavigationRailLabelType.all,
+      backgroundColor: Colors.transparent,
+      leading: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Hoverable(
+          onTap: _openProfile,
+          child: Tooltip(
+            message: widget.userName,
+            child: _buildAvatar(22),
+          ),
+        ),
+      ),
+      trailing: Expanded(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: IconButton(
+              icon: const Icon(Icons.dark_mode_outlined),
+              tooltip: texts.changeThemeTooltip,
+              onPressed: () {
+                MyApp.of(
+                  context,
+                ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
+              },
+            ),
+          ),
+        ),
+      ),
+      selectedIconTheme: IconThemeData(color: AppColors.navActive(isDark)),
+      unselectedIconTheme: IconThemeData(color: AppColors.navInactive(isDark)),
+      selectedLabelTextStyle: TextStyle(
+        color: AppColors.navActive(isDark),
+        fontWeight: FontWeight.bold,
+        fontSize: 12,
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        color: AppColors.navInactive(isDark),
+        fontSize: 12,
+      ),
+      destinations: [
+        for (var i = 0; i < _navIcons.length; i++)
+          NavigationRailDestination(
+            icon: Icon(_navIcons[i]),
+            label: Text(_navLabel(texts, i)),
+          ),
+      ],
     );
   }
 
@@ -178,20 +300,9 @@ class HomePageState extends State<HomePage> {
       leading: Padding(
         padding: const EdgeInsets.only(left: 15.0),
         child: Center(
-          child: GestureDetector(
+          child: Hoverable(
             onTap: _openProfile,
-            child: CircleAvatar(
-              backgroundColor: AppColors.avatarBg(isDark),
-              radius: 23,
-              child: Text(
-                widget.userInitials,
-                style: TextStyle(
-                  color: AppColors.avatarFg(isDark),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
+            child: _buildAvatar(23),
           ),
         ),
       ),
@@ -205,25 +316,27 @@ class HomePageState extends State<HomePage> {
             ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
           },
         ),
-        const SizedBox(width: 8),
-        ListenableBuilder(
-          listenable: NotificationsStore(),
-          builder: (context, _) {
-            final unread = NotificationsStore().unreadCount;
-            return CircleAvatar(
-              backgroundColor: AppColors.bellBg(isDark),
-              child: IconButton(
-                icon: Badge(
-                  isLabelVisible: unread > 0,
-                  label: Text('$unread'),
-                  child: const Icon(Icons.notifications_none_rounded),
+        if (!kIsWeb) ...[
+          const SizedBox(width: 8),
+          ListenableBuilder(
+            listenable: NotificationsStore(),
+            builder: (context, _) {
+              final unread = NotificationsStore().unreadCount;
+              return CircleAvatar(
+                backgroundColor: AppColors.bellBg(isDark),
+                child: IconButton(
+                  icon: Badge(
+                    isLabelVisible: unread > 0,
+                    label: Text('$unread'),
+                    child: const Icon(Icons.notifications_none_rounded),
+                  ),
+                  color: AppColors.bellIcon(isDark),
+                  onPressed: _openNotifications,
                 ),
-                color: AppColors.bellIcon(isDark),
-                onPressed: _openNotifications,
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
+        ],
         const SizedBox(width: 8),
       ],
     );
@@ -258,9 +371,8 @@ class HomePageState extends State<HomePage> {
             ),
           ),
           if (action != null)
-            GestureDetector(
+            Hoverable(
               onTap: onActionTap,
-              behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 child: Text(

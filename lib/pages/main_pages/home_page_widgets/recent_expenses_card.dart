@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../../const/app_texts.dart';
 import '../../../models/expenses/single_expense.dart';
 
@@ -55,8 +56,9 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
   Widget build(BuildContext context) {
     final style = widget.item.style(widget.isDark);
 
-    return GestureDetector(
+    return Hoverable(
       onTap: widget.onTap,
+      hoverScale: 1.01,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(

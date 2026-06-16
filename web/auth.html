@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Settly — logowanie</title>
+</head>
+<body>
+  <p>Logowanie zakończone. Jeśli to okno nie zamknie się automatycznie, możesz je zamknąć.</p>
+  <script>
+    (function () {
+      var url = window.location.href;
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { 'flutter-web-auth-2': url },
+            window.location.origin
+          );
+        }
+      } catch (e) {
+      }
+      try {
+        localStorage.setItem('flutter-web-auth-2', url);
+      } catch (e) {}
+      window.close();
+    })();
+  </script>
+</body>
+</html>

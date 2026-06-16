@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -19,9 +20,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await NotificationService().init();
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await NotificationService().init();
+  }
   await Future.wait([
     initializeDateFormatting('pl_PL', null),
     initializeDateFormatting('en_US', null),
@@ -117,6 +120,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoggedIn = false;
   String _userName = '';
   String _userInitials = '';
+  String? _userAvatarUrl;
 
   @override
   void initState() {
@@ -150,6 +154,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
       _userName = firstName.isNotEmpty ? firstName : name;
       _userInitials = _buildInitials(firstName, lastName, name);
+      final picture = info['picture'] as String?;
+      _userAvatarUrl = (picture != null && picture.isNotEmpty) ? picture : null;
     }
   }
 
@@ -183,6 +189,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isLoggedIn = false;
         _userName = '';
         _userInitials = '';
+        _userAvatarUrl = null;
       });
     }
   }
@@ -200,6 +207,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return HomePage(
       userName: _userName,
       userInitials: _userInitials,
+      userAvatarUrl: _userAvatarUrl,
       onLogout: _onLogout,
     );
   }

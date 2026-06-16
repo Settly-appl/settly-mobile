@@ -5,6 +5,7 @@ import 'package:settly_mobile/pages/projects_page.dart';
 import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/hoverable.dart';
 
 import '../../../const/app_texts.dart';
 
@@ -115,7 +116,7 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Hoverable(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),

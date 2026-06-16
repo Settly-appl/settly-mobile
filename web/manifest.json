@@ -1,12 +1,12 @@
 {
-    "name": "settly_mobile",
-    "short_name": "settly_mobile",
+    "name": "Settly",
+    "short_name": "Settly",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "description": "Settly — dziel wydatki i rozliczaj się ze znajomymi.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

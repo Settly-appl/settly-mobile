@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -11,7 +12,9 @@ class AuthService {
   factory AuthService() => _instance;
 
   static const _clientId = 'settly';
-  static const _redirectUrl = 'settly://callback';
+
+  static String get _redirectUrl =>
+      kIsWeb ? '${Uri.base.origin}/auth.html' : 'settly://callback';
   static const _authEndpoint =
       '${ProjectApiConst.keycloakBase}/protocol/openid-connect/auth';
   static const _tokenEndpoint =

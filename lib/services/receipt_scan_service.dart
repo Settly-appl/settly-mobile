@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -30,15 +29,12 @@ class ReceiptScanService {
   static const String _endpoint = 'ai/singleExpense';
   final _imagePicker = ImagePicker();
 
-  Future<File?> pickImageFromCamera() async {
+  Future<XFile?> pickImageFromCamera() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      return await _imagePicker.pickImage(
         source: ImageSource.camera,
         imageQuality: 85,
       );
-
-      if (image == null) return null;
-      return File(image.path);
     } catch (e) {
       // Log po polsku
       print('Błąd przy wybieraniu zdjęcia: $e');
@@ -46,15 +42,12 @@ class ReceiptScanService {
     }
   }
 
-  Future<File?> pickImageFromGallery() async {
+  Future<XFile?> pickImageFromGallery() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      return await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
       );
-
-      if (image == null) return null;
-      return File(image.path);
     } catch (e) {
       // Log po polsku
       print('Błąd przy wybieraniu zdjęcia z galerii: $e');
@@ -62,7 +55,7 @@ class ReceiptScanService {
     }
   }
 
-  Future<ScanReceiptResult?> scanReceipt(File imageFile) async {
+  Future<ScanReceiptResult?> scanReceipt(XFile imageFile) async {
     try {
       final token = await AuthService().getAccessToken();
 
@@ -77,7 +70,11 @@ class ReceiptScanService {
       });
 
       request.files.add(
-        await http.MultipartFile.fromPath('receipt', imageFile.path),
+        http.MultipartFile.fromBytes(
+          'receipt',
+          await imageFile.readAsBytes(),
+          filename: imageFile.name,
+        ),
       );
 
       var streamedResponse = await request.send();

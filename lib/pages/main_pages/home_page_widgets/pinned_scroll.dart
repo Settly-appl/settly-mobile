@@ -5,6 +5,7 @@ import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../../const/app_texts.dart';
 import 'pin_picker_sheet.dart';
 
@@ -108,7 +109,7 @@ class _AddPinTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texts = AppTexts.of(context);
-    return GestureDetector(
+    return Hoverable(
       onTap: onTap,
       child: Container(
         width: 90,
@@ -174,7 +175,7 @@ class _PinnedTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texts = AppTexts.of(context);
-    return GestureDetector(
+    return Hoverable(
       onTap: onTap,
       child: Container(
         width: 110,

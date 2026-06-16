@@ -1,0 +1,20 @@
+# Build artifacts and tooling
+build/
+.dart_tool/
+.git/
+.github/
+.idea/
+.vscode/
+
+# Native platforms not needed for the web build
+android/
+ios/
+linux/
+macos/
+windows/
+
+# Misc
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata

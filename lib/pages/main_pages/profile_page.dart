@@ -8,12 +8,14 @@ import 'package:settly_mobile/services/auth_service.dart';
 class ProfilePage extends StatelessWidget {
   final String userName;
   final String userInitials;
+  final String? userAvatarUrl;
   final VoidCallback onLogout;
 
   const ProfilePage({
     super.key,
     required this.userName,
     required this.userInitials,
+    this.userAvatarUrl,
     required this.onLogout,
   });
 
@@ -47,14 +49,20 @@ class ProfilePage extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 48,
                   backgroundColor: AppColors.avatarBg(isDark),
-                  child: Text(
-                    userInitials,
-                    style: TextStyle(
-                      color: AppColors.avatarFg(isDark),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 28,
-                    ),
-                  ),
+                  backgroundImage:
+                      (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
+                      ? NetworkImage(userAvatarUrl!)
+                      : null,
+                  child: (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
+                      ? null
+                      : Text(
+                          userInitials,
+                          style: TextStyle(
+                            color: AppColors.avatarFg(isDark),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
@@ -16,7 +17,7 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
 
-  final _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
   final _api = ApiServiceRequest();
 
   bool _initialised = false;
@@ -93,6 +94,7 @@ class NotificationService {
   /// Registers the current device token with the backend. Call after a
   /// successful login (once an access token is available).
   Future<void> registerCurrentToken() async {
+    if (kIsWeb) return;
     final token = await _messaging.getToken();
     if (token != null) {
       // ignore: avoid_print
@@ -114,6 +116,7 @@ class NotificationService {
   /// Removes this device's token from the backend. Call before logging out,
   /// while the access token is still valid.
   Future<void> unregisterCurrentToken() async {
+    if (kIsWeb) return;
     final token = await _messaging.getToken();
     if (token == null) return;
     await _api.request(

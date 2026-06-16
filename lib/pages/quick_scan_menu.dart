@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -440,6 +440,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
+    if (kIsWeb) return ImageSource.gallery;
     final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,
@@ -514,19 +515,25 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
     );
   }
 
-  Future<http.Response?> _sendReceiptForItems(File photo) async {
+  Future<http.Response?> _sendReceiptForItems(XFile photo) async {
     final token = await AuthService().getAccessToken();
     final uri = Uri.parse('${ProjectApiConst.baseUrl}/ai');
 
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['ngrok-skip-browser-warning'] = 'true'
-      ..files.add(await http.MultipartFile.fromPath('receipt', photo.path));
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'receipt',
+          await photo.readAsBytes(),
+          filename: photo.name,
+        ),
+      );
 
     try {
       final streamed = await req.send();
       return http.Response.fromStream(streamed);
-    } on SocketException {
+    } catch (_) {
       return null;
     }
   }
