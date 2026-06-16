@@ -1,15 +1,25 @@
-enum ExpenseSplitsType {
-  EQUAL('Równomiernie'),
-  BY_ITEM('Według produktów'),
-  CUSTOM('Niestandardowy');
+import '../../const/app_texts.dart';
 
-  final String label;
-  const ExpenseSplitsType(this.label);
+enum ExpenseSplitsType {
+  EQUAL,
+  BY_ITEM,
+  CUSTOM;
 
   static ExpenseSplitsType fromString(String value) {
     return ExpenseSplitsType.values.firstWhere(
       (e) => e.name == value.toUpperCase(),
       orElse: () => ExpenseSplitsType.EQUAL,
     );
+  }
+
+  String localizedLabel(AppTexts texts) {
+    switch (this) {
+      case ExpenseSplitsType.EQUAL:
+        return texts.splitModeEqual;
+      case ExpenseSplitsType.BY_ITEM:
+        return texts.splitModeByItem;
+      case ExpenseSplitsType.CUSTOM:
+        return texts.splitModeCustom;
+    }
   }
 }

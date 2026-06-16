@@ -68,7 +68,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       _splitType = ExpenseSplitsType.fromString(
         membersWithNames.first.splitType,
       );
-      _splitLabel = _splitType.label;
+      _splitLabel = _splitType.localizedLabel(AppTexts.of(context));
 
       if (_splitType != ExpenseSplitsType.BY_ITEM) {
         _members = membersWithNames;
