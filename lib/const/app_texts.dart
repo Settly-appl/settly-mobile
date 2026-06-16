@@ -180,6 +180,18 @@ class AppTexts {
   String get balancesYouOweOthers => _isEnglish ? 'you owe others' : 'Ty innym';
   String get settlesAsReceived =>
       _isEnglish ? 'Mark as received' : 'Oznacz jako zapłacone';
+  String get settleConfirmTitle =>
+      _isEnglish ? 'Mark as settled?' : 'Oznaczyć jako rozliczone?';
+  String settleConfirmBody(String label, String amount) => _isEnglish
+      ? 'You confirm that $label paid you $amount zł. All unsettled '
+          'shares of this person toward you will be closed.'
+      : 'Potwierdzasz, że $label zapłacił(a) Ci $amount zł. Wszystkie '
+          'nierozliczone udziały tej osoby wobec Ciebie zostaną zamknięte.';
+  String get settleConfirmAction =>
+      _isEnglish ? 'Yes, settle' : 'Tak, rozlicz';
+  String get settleWaitConfirmation => _isEnglish
+      ? 'Wait until your friend confirms receiving the payment.'
+      : 'Poczekaj, aż znajomy potwierdzi otrzymanie płatności.';
 
   // Projects
   String get projectNewProject => _isEnglish ? 'New project' : 'Nowy projekt';

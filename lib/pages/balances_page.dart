@@ -33,7 +33,6 @@ class _BalancesPageState extends State<BalancesPage> {
   }
 
   Future<void> _load() async {
-    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -48,7 +47,7 @@ class _BalancesPageState extends State<BalancesPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = texts.balancesRetryMessage;
+        _error = AppTexts.of(context).balancesRetryMessage;
         _loading = false;
       });
     }
@@ -395,7 +394,7 @@ class _BalanceCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Wait until your friend confirms receiving the payment.',
+                texts.settleWaitConfirmation,
                 style: TextStyle(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
@@ -418,6 +417,7 @@ class _SettleConfirmSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       child: Column(
@@ -425,7 +425,7 @@ class _SettleConfirmSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Mark as settled?',
+            texts.settleConfirmTitle,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -434,9 +434,10 @@ class _SettleConfirmSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'You confirm that ${balance.label} paid you '
-            '${balance.absAmount.toStringAsFixed(2)} zł. All unsettled '
-            'shares of this person toward you will be closed.',
+            texts.settleConfirmBody(
+              balance.label,
+              balance.absAmount.toStringAsFixed(2),
+            ),
             style: TextStyle(
               fontSize: 14,
               color: AppColors.cardSubtitle(isDark),
@@ -452,12 +453,12 @@ class _SettleConfirmSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Yes, settle'),
+            child: Text(texts.settleConfirmAction),
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(AppTexts.of(context).cancelAction),
+            child: Text(texts.cancelAction),
           ),
         ],
       ),

@@ -45,7 +45,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 
   Future<void> _load() async {
-    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -68,7 +67,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = texts.projectRetryError;
+        _error = AppTexts.of(context).projectRetryError;
         _loading = false;
       });
     }

@@ -31,7 +31,6 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
   }
 
   Future<void> _load() async {
-    final texts = AppTexts.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -48,7 +47,7 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = texts.historyRetryError;
+        _error = AppTexts.of(context).historyRetryError;
         _loading = false;
       });
     }
