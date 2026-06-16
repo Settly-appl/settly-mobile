@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/utils/web_platform.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:settly_mobile/const/app_texts.dart';
@@ -440,7 +440,7 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
-    if (kIsWeb) return ImageSource.gallery;
+    if (isDesktopWeb) return ImageSource.gallery;
     final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,

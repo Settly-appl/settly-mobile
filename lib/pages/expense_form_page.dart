@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:settly_mobile/utils/web_platform.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -2575,8 +2575,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
-    // No camera on most desktops — go straight to the file picker on web.
-    if (kIsWeb) return ImageSource.gallery;
+    // Desktop browsers have no camera — go straight to the file picker there.
+    // Mobile browsers keep the camera/gallery choice (camera works via capture).
+    if (isDesktopWeb) return ImageSource.gallery;
     final texts = AppTexts.of(context);
     return await showModalBottomSheet<ImageSource>(
       context: context,
