@@ -121,12 +121,14 @@ class _ExpensesPageState extends State<ExpensesPage> {
   }
 
   // Kolejność wyświetlania grup
-  static const _groupOrder = [
-    'Today',
-    'Yesterday',
-    'This week',
-    'Last 2 weeks',
-    'This month',
+  static const _groupPrefixOrder = [
+    'TODAY',
+    'YESTERDAY',
+    'THISWEEK',
+    'LAST2W',
+    'THISMONTH',
+    'MONTH',
+    'OLD',
   ];
 
   // ── Inicjalizacja ──────────────────────────────────────────────────────────
@@ -221,13 +223,11 @@ class _ExpensesPageState extends State<ExpensesPage> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final d = DateTime(date.year, date.month, date.day);
-
-    // różnica w dniach bez problemu DST
     final diff =
         (today.millisecondsSinceEpoch - d.millisecondsSinceEpoch) ~/
         (1000 * 60 * 60 * 24);
 
-    const months = [
+    const polishMonths = [
       '',
       'stycznia',
       'lutego',
@@ -242,31 +242,48 @@ class _ExpensesPageState extends State<ExpensesPage> {
       'listopada',
       'grudnia',
     ];
+    const englishMonths = [
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    final texts = AppTexts.of(context);
+    final isEn = texts.locale.languageCode == 'en';
+    final months = isEn ? englishMonths : polishMonths;
     final dayMonth = '${date.day} ${months[date.month]}';
 
-    if (diff == 0) return 'Dziś — $dayMonth';
-    if (diff == 1) return 'Wczoraj — $dayMonth';
-    if (diff <= 6) return 'W tym tygodniu';
-    if (diff <= 13) return 'Ostatnie 2 tygodnie';
+    if (diff == 0) return 'TODAY - $dayMonth';
+    if (diff == 1) return 'YESTERDAY - $dayMonth';
+    if (diff <= 6) return 'THISWEEK - ${texts.thisWeekLabel}';
+    if (diff <= 13) return 'LAST2W - ${texts.lastTwoWeeksLabel}';
     if (date.month == now.month && date.year == now.year)
-      return 'W tym miesiącu';
-    if (date.year == now.year) return months[date.month];
-    return '${months[date.month]} ${date.year}';
+      return 'THISMONTH|${texts.thisMonthLabel}';
+    if (date.year == now.year) return 'MONTH|${months[date.month]}';
+    return 'OLD|${months[date.month]} ${date.year}';
   }
 
   List<String> get _sortedGroupKeys {
     final keys = _grouped.keys.toList();
     keys.sort((a, b) {
-      int indexA = _groupOrder.indexWhere(
-        (o) => a.startsWith(o.split(' ').first),
-      );
-      int indexB = _groupOrder.indexWhere(
-        (o) => b.startsWith(o.split(' ').first),
-      );
-      // klucze spoza listy (stare miesiące) idą na koniec
-      if (indexA == -1) indexA = 999;
-      if (indexB == -1) indexB = 999;
-      return indexA.compareTo(indexB);
+      final prefixA = a.split('|').first;
+      final prefixB = b.split('|').first;
+      final indexA = _groupPrefixOrder.indexOf(prefixA);
+      final indexB = _groupPrefixOrder.indexOf(prefixB);
+      // Nieznane prefiksy idą na koniec
+      final ia = indexA == -1 ? 999 : indexA;
+      final ib = indexB == -1 ? 999 : indexB;
+      return ia.compareTo(ib);
     });
     return keys;
   }
