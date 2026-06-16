@@ -73,11 +73,52 @@ class _ExpensesPageState extends State<ExpensesPage> {
   final _expenseRepository = ExpenseRepository();
 
   // ── Podsumowanie (hardcoded — docelowo z API) ──────────────────────────────
-  final String _monthLabel = 'March 2026';
-  final String _totalSpent = '1 240 zł';
-  final String _totalCount = '23 transactions';
-  final String _dailyAverage = '41 zł';
-  final String _daysInMonth = 'of 30 days';
+  String get _monthLabel {
+    if (_expenses.isEmpty) return '';
+    final now = DateTime.now();
+    const months = [
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[now.month]} ${now.year}';
+  }
+
+  String get _totalSpent {
+    final sum = _expenses.fold<double>(0.0, (acc, e) {
+      final cleaned = e.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '');
+      return acc + (double.tryParse(cleaned) ?? 0.0);
+    });
+    return '${sum.toStringAsFixed(0)} zł';
+  }
+
+  String get _totalCount => '${_expenses.length} transactions';
+
+  String get _dailyAverage {
+    final now = DateTime.now();
+    final days = now.day;
+    if (days == 0) return '0 zł';
+    final sum = _expenses.fold<double>(0.0, (acc, e) {
+      final cleaned = e.totalAmount.replaceAll(RegExp(r'[^0-9.]'), '');
+      return acc + (double.tryParse(cleaned) ?? 0.0);
+    });
+    return '${(sum / days).toStringAsFixed(0)} zł';
+  }
+
+  String get _daysInMonth {
+    final now = DateTime.now();
+    return 'of ${DateUtils.getDaysInMonth(now.year, now.month)} days';
+  }
 
   // Kolejność wyświetlania grup
   static const _groupOrder = [
