@@ -217,10 +217,7 @@ class HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Hoverable(
           onTap: _openProfile,
-          child: Tooltip(
-            message: widget.userName,
-            child: _buildAvatar(22),
-          ),
+          child: Tooltip(message: widget.userName, child: _buildAvatar(22)),
         ),
       ),
       trailing: Expanded(
@@ -300,10 +297,7 @@ class HomePageState extends State<HomePage> {
       leading: Padding(
         padding: const EdgeInsets.only(left: 15.0),
         child: Center(
-          child: Hoverable(
-            onTap: _openProfile,
-            child: _buildAvatar(23),
-          ),
+          child: Hoverable(onTap: _openProfile, child: _buildAvatar(23)),
         ),
       ),
       actions: [

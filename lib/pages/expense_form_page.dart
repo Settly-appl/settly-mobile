@@ -939,42 +939,48 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             ),
           ),
         ),
-        body: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildAmountCard(texts),
-                  const SizedBox(height: 20),
-                  _sectionHeader(texts.formDetailsSection),
-                  const SizedBox(height: 8),
-                  _detailsCard(texts),
-                  const SizedBox(height: 20),
-                  _sectionHeader(texts.formProjectSection),
-                  const SizedBox(height: 8),
-                  _projectPickerCard(texts),
-                  const SizedBox(height: 20),
-                  _sectionHeader(texts.formSplitSection),
-                  const SizedBox(height: 8),
-                  _friendsPickerCard(texts),
-                  if (_selectedFriendIds.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _splitModeSelector(texts),
-                    const SizedBox(height: 12),
-                    if (_splitType == SplitType.equal) _equalEditor(texts),
-                    if (_splitType == SplitType.custom) _customEditor(texts),
-                    if (_splitType == SplitType.byItems) ...[
-                      const SizedBox(height: 12),
-                      _itemsEditor(texts),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildAmountCard(texts),
+                      const SizedBox(height: 20),
+                      _sectionHeader(texts.formDetailsSection),
+                      const SizedBox(height: 8),
+                      _detailsCard(texts),
+                      const SizedBox(height: 20),
+                      _sectionHeader(texts.formProjectSection),
+                      const SizedBox(height: 8),
+                      _projectPickerCard(texts),
+                      const SizedBox(height: 20),
+                      _sectionHeader(texts.formSplitSection),
+                      const SizedBox(height: 8),
+                      _friendsPickerCard(texts),
+                      if (_selectedFriendIds.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _splitModeSelector(texts),
+                        const SizedBox(height: 12),
+                        if (_splitType == SplitType.equal) _equalEditor(texts),
+                        if (_splitType == SplitType.custom)
+                          _customEditor(texts),
+                        if (_splitType == SplitType.byItems) ...[
+                          const SizedBox(height: 12),
+                          _itemsEditor(texts),
+                        ],
+                      ],
                     ],
-                  ],
-                ],
-              ),
+                  ),
+                ),
+                _buildSaveBar(texts),
+              ],
             ),
-            _buildSaveBar(texts),
-          ],
+          ),
         ),
       ),
     );

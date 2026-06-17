@@ -38,61 +38,87 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 16),
-              Center(
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: AppColors.avatarBg(isDark),
-                  backgroundImage:
-                      (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-                      ? NetworkImage(userAvatarUrl!)
-                      : null,
-                  child: (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-                      ? null
-                      : Text(
-                          userInitials,
-                          style: TextStyle(
-                            color: AppColors.avatarFg(isDark),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 28,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 400),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  Center(
+                    child: CircleAvatar(
+                      radius: 48,
+                      backgroundColor: AppColors.avatarBg(isDark),
+                      backgroundImage:
+                          (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
+                          ? NetworkImage(userAvatarUrl!)
+                          : null,
+                      child:
+                          (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
+                          ? null
+                          : Text(
+                              userInitials,
+                              style: TextStyle(
+                                color: AppColors.avatarFg(isDark),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 28,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      userName,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.username(isDark),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  FutureBuilder<bool>(
+                    future: AuthService().isAdmin(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data != true) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AdminBroadcastPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.campaign_outlined),
+                          label: Text(texts.adminBroadcastButton),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  userName,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.username(isDark),
+                      );
+                    },
                   ),
-                ),
-              ),
-              const Spacer(),
-              FutureBuilder<bool>(
-                future: AuthService().isAdmin(),
-                builder: (context, snapshot) {
-                  if (snapshot.data != true) return const SizedBox.shrink();
-                  return Padding(
+                  Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AdminBroadcastPage(),
-                          ),
+                        MyApp.of(context).changeLocale(
+                          isEnglish
+                              ? const Locale('pl', 'PL')
+                              : const Locale('en'),
                         );
                       },
-                      icon: const Icon(Icons.campaign_outlined),
-                      label: Text(texts.adminBroadcastButton),
+                      icon: const Icon(Icons.translate_rounded),
+                      label: Text(texts.switchLanguageLabel),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
@@ -100,43 +126,25 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    MyApp.of(context).changeLocale(
-                      isEnglish ? const Locale('pl', 'PL') : const Locale('en'),
-                    );
-                  },
-                  icon: const Icon(Icons.translate_rounded),
-                  label: Text(texts.switchLanguageLabel),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onLogout();
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(texts.logoutButton),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.amountNegative,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onLogout();
-                },
-                icon: const Icon(Icons.logout_rounded),
-                label: Text(texts.logoutButton),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.amountNegative,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
