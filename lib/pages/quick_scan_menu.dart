@@ -9,6 +9,7 @@ import 'package:settly_mobile/const/api_url.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/services/receipt_scan_service.dart';
@@ -389,17 +390,12 @@ class _QuickScanMenuState extends State<QuickScanMenu> {
                             color: AppColors.cardTitle(widget.isDark),
                           ),
                         ),
-                        secondary: CircleAvatar(
+                        secondary: UserAvatar(
+                          radius: 20,
+                          avatarUrl: f.avatarUrl,
+                          name: f.displayName,
                           backgroundColor: AppColors.avatarBg(widget.isDark),
-                          child: Text(
-                            f.displayName.trim().isNotEmpty
-                                ? f.displayName.trim()[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: AppColors.avatarFg(widget.isDark),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          foregroundColor: AppColors.avatarFg(widget.isDark),
                         ),
                         activeColor: AppColors.amountCurrency(widget.isDark),
                         controlAffinity: ListTileControlAffinity.trailing,

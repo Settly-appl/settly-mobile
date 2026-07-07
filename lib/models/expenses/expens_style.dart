@@ -27,7 +27,7 @@ class ExpenseStyle {
           badgeBg: Colors.redAccent,
           badgeFg: Colors.white,
         );
-      case 'Shopping':
+      case 'shopping':
         return ExpenseStyle(
           icon: Icons.shopping_bag_rounded,
           iconBg: isDark

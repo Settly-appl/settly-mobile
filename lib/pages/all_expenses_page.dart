@@ -7,13 +7,26 @@ import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
+import 'package:settly_mobile/pages/quick_add_menu.dart';
+import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
-enum AllExpensesPage { all, food, transport, shopping, other }
+// UWAGA: wartości `apiValue` muszą się zgadzać z identyfikatorami kategorii
+// zapisywanymi przez formularz wydatku (_kCategories w expense_form_page.dart):
+// shopping / food / transport / entertainment / health / others.
+enum AllExpensesPage {
+  all,
+  food,
+  transport,
+  shopping,
+  entertainment,
+  health,
+  others,
+}
 
 extension ExpenseCategoryLabel on AllExpensesPage {
   String localizedLabel(AppTexts texts) {
@@ -26,7 +39,11 @@ extension ExpenseCategoryLabel on AllExpensesPage {
         return texts.expensesLabelTransport;
       case AllExpensesPage.shopping:
         return texts.expensesLabelShopping;
-      case AllExpensesPage.other:
+      case AllExpensesPage.entertainment:
+        return texts.categoryEntertainmentLabel;
+      case AllExpensesPage.health:
+        return texts.categoryHealthLabel;
+      case AllExpensesPage.others:
         return texts.expensesLabelOther;
     }
   }
@@ -42,9 +59,35 @@ extension ExpenseCategoryLabel on AllExpensesPage {
         return 'transport';
       case AllExpensesPage.shopping:
         return 'shopping';
-      case AllExpensesPage.other:
-        return 'other';
+      case AllExpensesPage.entertainment:
+        return 'entertainment';
+      case AllExpensesPage.health:
+        return 'health';
+      case AllExpensesPage.others:
+        return 'others';
     }
+  }
+}
+
+/// Mapuje surowy identyfikator kategorii z API na czytelną, przetłumaczoną
+/// etykietę (używane w plakietce wiersza wydatku).
+String localizedCategoryLabel(String rawCategory, AppTexts texts) {
+  switch (rawCategory.toLowerCase()) {
+    case 'food':
+      return texts.expensesLabelFood;
+    case 'transport':
+      return texts.expensesLabelTransport;
+    case 'shopping':
+      return texts.expensesLabelShopping;
+    case 'entertainment':
+      return texts.categoryEntertainmentLabel;
+    case 'health':
+      return texts.categoryHealthLabel;
+    case 'others':
+    case 'other':
+      return texts.expensesLabelOther;
+    default:
+      return rawCategory;
   }
 }
 
@@ -64,11 +107,19 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Stan ───────────────────────────────────────────────────────────────────
   List<SingleExpense> _expenses = [];
-  bool _isLoading = true;
+  bool _isLoading = true; // pierwsza strona
+  bool _isLoadingMore = false; // doładowywanie kolejnych stron
+  bool _hasMore = true; // czy backend ma jeszcze kolejne strony
+  int _nextPage = 0; // numer następnej strony do pobrania
+  int _totalElements = 0; // łączna liczba wydatków (z Page.totalElements)
+  int _generation = 0; // unieważnia wyniki po zmianie filtra/odświeżeniu
   AllExpensesPage _selectedCategory = AllExpensesPage.all;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   StreamSubscription<AppNotification>? _notifSub;
+
+  static const int _pageSize = 20;
 
   final _expenseRepository = ExpenseRepository();
 
@@ -76,22 +127,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   String get _monthLabel {
     if (_expenses.isEmpty) return '';
     final now = DateTime.now();
-    const months = [
-      '',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return '${months[now.month]} ${now.year}';
+    return AppTexts.of(context).monthYear(now.month, now.year);
   }
 
   double _userPaid(SingleExpense e) {
@@ -105,7 +141,9 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   String get _totalSpent => '${_userPaidSum.toStringAsFixed(0)} zł';
 
-  String get _totalCount => '${_expenses.length} transactions';
+  String get _totalCount => AppTexts.of(context).transactionsCount(
+    _totalElements > 0 ? _totalElements : _expenses.length,
+  );
 
   String get _dailyAverage {
     final now = DateTime.now();
@@ -119,25 +157,17 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   String get _daysInMonth {
     final now = DateTime.now();
-    return 'of ${DateUtils.getDaysInMonth(now.year, now.month)} days';
+    return AppTexts.of(
+      context,
+    ).daysInMonthCount(DateUtils.getDaysInMonth(now.year, now.month));
   }
-
-  // Kolejność wyświetlania grup
-  static const _groupPrefixOrder = [
-    'TODAY',
-    'YESTERDAY',
-    'THISWEEK',
-    'LAST2W',
-    'THISMONTH',
-    'MONTH',
-    'OLD',
-  ];
 
   // ── Inicjalizacja ──────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
-    _fetchExpenses();
+    _refreshExpenses();
+    _scrollController.addListener(_onScroll);
     widget.tabNotifier.addListener(_onTabChanged);
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
@@ -145,7 +175,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
     // Refresh when added to a shared expense while this page is up.
     _notifSub = NotificationsStore().stream.listen((n) {
-      if (mounted && n.type == 'EXPENSE_SPLIT') _fetchExpenses();
+      if (mounted && n.type == 'EXPENSE_SPLIT') _refreshExpenses();
     });
   }
 
@@ -153,50 +183,115 @@ class _ExpensesPageState extends State<ExpensesPage> {
   void dispose() {
     _notifSub?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     widget.tabNotifier.removeListener(_onTabChanged);
     super.dispose();
   }
 
   void _onTabChanged() {
     if (widget.tabNotifier.value == 1) {
-      _fetchExpenses();
+      _refreshExpenses();
+    }
+  }
+
+  // Doładuj kolejną stronę, gdy użytkownik dojedzie blisko końca listy.
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
+      _loadMore();
     }
   }
 
   // ── Pobranie danych z API ──────────────────────────────────────────────────
-  Future<void> _fetchExpenses() async {
-    setState(() => _isLoading = true);
+  // Backend zwraca dane stronicowane (Spring Page) i używa STANDARDOWYCH
+  // parametrów Springa — `page`, `size`, `sort=pole,kierunek`. (Wcześniejsze
+  // `pageNumber`/`pageSize`/`sortBy`/`sortDirection` były po cichu ignorowane,
+  // więc API zawsze oddawało tylko pierwszą stronę 10 najstarszych wydatków.)
+  //
+  // Ładujemy stronę po stronie — pierwszą od razu, kolejne dopiero gdy
+  // użytkownik doscrolluje do końca. `userShare` pobieramy tylko dla świeżo
+  // wczytanej strony, żeby nie zasypywać backendu żądaniami na starcie.
 
+  // Odświeżenie od zera (start, zmiana kategorii, powrót na zakładkę, refresh).
+  Future<void> _refreshExpenses() async {
+    _generation++;
+    final gen = _generation;
+    _nextPage = 0;
+    _hasMore = true;
+    _isLoadingMore = false;
+    setState(() {
+      _expenses = [];
+      _isLoading = true;
+    });
+    await _loadPage(gen);
+  }
+
+  // Doładowanie kolejnej strony (infinite scroll).
+  Future<void> _loadMore() async {
+    if (_isLoading || _isLoadingMore || !_hasMore) return;
+    await _loadPage(_generation);
+  }
+
+  Future<void> _loadPage(int gen) async {
+    if (_isLoadingMore) return;
+    _isLoadingMore = true;
+
+    final page = _nextPage;
     final category = _selectedCategory.apiValue;
     final categoryParam = category != null ? '&category=$category' : '';
 
     final response = await ApiServiceRequest().request(
       endpoint:
-          'expenses?pageNumber=0&pageSize=20&sortBy=createdAt&sortDirection=desc$categoryParam',
+          'expenses?page=$page&size=$_pageSize&sort=createdAt,desc$categoryParam',
       method: HttpMethod.get,
     );
 
-    if (response != null && response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final fetched = SingleExpense.listFromJson(data['content']);
-
-      // Pobierz userShare dla każdego wydatku z endpointu
-      for (var expense in fetched) {
-        if (expense.id != null) {
-          final userShare = await _expenseRepository.fetchUserShareForExpense(
-            expenseId: expense.id!,
-            currency: expense.currency,
-          );
-          if (userShare != null) {
-            expense.userShare = userShare;
-          }
-        }
-      }
-
-      setState(() => _expenses = fetched);
+    // Wynik nieaktualny (zmieniono filtr / odświeżono) — porzuć. Flagę
+    // czyścimy tylko jeśli to wciąż nasza generacja; inaczej właścicielem
+    // `_isLoadingMore` jest już nowsze ładowanie i nie wolno go ruszać.
+    if (!mounted || gen != _generation) {
+      if (gen == _generation) _isLoadingMore = false;
+      return;
     }
 
-    setState(() => _isLoading = false);
+    if (response == null || response.statusCode != 200) {
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+      return;
+    }
+
+    final data = jsonDecode(response.body);
+    final content = (data['content'] as List?) ?? const [];
+    final fetched = SingleExpense.listFromJson(content);
+
+    // userShare tylko dla tej jednej strony.
+    for (final expense in fetched) {
+      if (expense.id != null) {
+        final userShare = await _expenseRepository.fetchUserShareForExpense(
+          expenseId: expense.id!,
+          currency: expense.currency,
+        );
+        if (userShare != null) expense.userShare = userShare;
+      }
+      if (gen != _generation) return; // nowsze ładowanie przejęło stan
+    }
+
+    if (!mounted || gen != _generation) {
+      if (gen == _generation) _isLoadingMore = false;
+      return;
+    }
+
+    setState(() {
+      _expenses = [..._expenses, ...fetched];
+      _nextPage = page + 1;
+      _totalElements = (data['totalElements'] as int?) ?? _expenses.length;
+      _hasMore = !(data['last'] == true || content.isEmpty);
+      _isLoading = false;
+      _isLoadingMore = false;
+    });
   }
 
   // ── Filtrowanie lokalne po wyszukiwarce ───────────────────────────────────
@@ -211,83 +306,75 @@ class _ExpensesPageState extends State<ExpensesPage> {
         .toList();
   }
 
-  // ── Grupowanie po dacie (klucz = "dd MMM") ────────────────────────────────
-  Map<String, List<SingleExpense>> get _grouped {
-    final Map<String, List<SingleExpense>> map = {};
-    for (final e in _filteredExpenses) {
-      final key = _formatDateKey(e.date);
-      map.putIfAbsent(key, () => []).add(e);
-    }
-    return map;
-  }
-
-  String _formatDateKey(DateTime date) {
+  // ── Grupowanie po dacie ────────────────────────────────────────────────────
+  // Klucz techniczny (`bucketKey`) służy TYLKO do grupowania i sortowania.
+  // Etykieta (`label`) jest w pełni przetłumaczona i to ją widzi użytkownik —
+  // dzięki temu nie wyciekają już prefiksy typu "MONTH|marca".
+  List<_ExpenseGroup> get _groups {
+    final texts = AppTexts.of(context);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final d = DateTime(date.year, date.month, date.day);
-    final diff =
-        (today.millisecondsSinceEpoch - d.millisecondsSinceEpoch) ~/
-        (1000 * 60 * 60 * 24);
 
-    const polishMonths = [
-      '',
-      'stycznia',
-      'lutego',
-      'marca',
-      'kwietnia',
-      'maja',
-      'czerwca',
-      'lipca',
-      'sierpnia',
-      'września',
-      'października',
-      'listopada',
-      'grudnia',
-    ];
-    const englishMonths = [
-      '',
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
+    final Map<String, List<SingleExpense>> buckets = {};
+    final Map<String, _GroupMeta> meta = {};
 
-    final texts = AppTexts.of(context);
-    final isEn = texts.locale.languageCode == 'en';
-    final months = isEn ? englishMonths : polishMonths;
-    final dayMonth = '${date.day} ${months[date.month]}';
+    for (final e in _filteredExpenses) {
+      final info = _bucketFor(e.date, now, today, texts);
+      buckets.putIfAbsent(info.key, () => []).add(e);
 
-    if (diff == 0) return 'TODAY - $dayMonth';
-    if (diff == 1) return 'YESTERDAY - $dayMonth';
-    if (diff <= 6) return 'THISWEEK - ${texts.thisWeekLabel}';
-    if (diff <= 13) return 'LAST2W - ${texts.lastTwoWeeksLabel}';
-    if (date.month == now.month && date.year == now.year)
-      return 'THISMONTH|${texts.thisMonthLabel}';
-    if (date.year == now.year) return 'MONTH|${months[date.month]}';
-    return 'OLD|${months[date.month]} ${date.year}';
+      final existing = meta[info.key];
+      if (existing == null) {
+        meta[info.key] = _GroupMeta(info.rank, info.label, e.date);
+      } else if (e.date.isAfter(existing.latest)) {
+        meta[info.key] = _GroupMeta(info.rank, info.label, e.date);
+      }
+    }
+
+    final keys = buckets.keys.toList()
+      ..sort((a, b) {
+        final ma = meta[a]!;
+        final mb = meta[b]!;
+        if (ma.rank != mb.rank) return ma.rank.compareTo(mb.rank);
+        // W obrębie tej samej kategorii — najnowsze na górze.
+        return mb.latest.compareTo(ma.latest);
+      });
+
+    return keys
+        .map((k) => _ExpenseGroup(label: meta[k]!.label, items: buckets[k]!))
+        .toList();
   }
 
-  List<String> get _sortedGroupKeys {
-    final keys = _grouped.keys.toList();
-    keys.sort((a, b) {
-      final prefixA = a.split('|').first;
-      final prefixB = b.split('|').first;
-      final indexA = _groupPrefixOrder.indexOf(prefixA);
-      final indexB = _groupPrefixOrder.indexOf(prefixB);
-      // Nieznane prefiksy idą na koniec
-      final ia = indexA == -1 ? 999 : indexA;
-      final ib = indexB == -1 ? 999 : indexB;
-      return ia.compareTo(ib);
-    });
-    return keys;
+  _BucketInfo _bucketFor(
+    DateTime date,
+    DateTime now,
+    DateTime today,
+    AppTexts texts,
+  ) {
+    final d = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(d).inDays;
+    final dayMonth = '${date.day} ${texts.monthGenitive(date.month)}';
+
+    if (diff == 0) return _BucketInfo('0_today', 0, '${texts.todayLabel} · $dayMonth');
+    if (diff == 1) {
+      return _BucketInfo('1_yesterday', 1, '${texts.yesterdayLabel} · $dayMonth');
+    }
+    if (diff <= 6) return _BucketInfo('2_thisweek', 2, texts.thisWeekLabel);
+    if (diff <= 13) return _BucketInfo('3_last2w', 3, texts.lastTwoWeeksLabel);
+    if (date.month == now.month && date.year == now.year) {
+      return _BucketInfo('4_thismonth', 4, texts.thisMonthLabel);
+    }
+    if (date.year == now.year) {
+      return _BucketInfo(
+        '5_month_${date.month}',
+        5,
+        texts.monthNominative(date.month),
+      );
+    }
+    return _BucketInfo(
+      '6_old_${date.year}_${date.month}',
+      6,
+      texts.monthYear(date.month, date.year),
+    );
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -295,15 +382,16 @@ class _ExpensesPageState extends State<ExpensesPage> {
   // ════════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
-    final texts = AppTexts.of(context);
     return Scaffold(
       backgroundColor: AppColors.scaffold(isDark),
       appBar: _buildAppBar(),
+      floatingActionButton: _buildFabs(),
       body: RefreshIndicator(
-        onRefresh: _fetchExpenses,
+        onRefresh: _refreshExpenses,
         color: AppColors.actionScanIcon(isDark),
         backgroundColor: AppColors.cardBg(isDark),
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(child: _buildSummaryCard()),
             SliverToBoxAdapter(child: const SizedBox(height: 12)),
@@ -319,9 +407,73 @@ class _ExpensesPageState extends State<ExpensesPage> {
               SliverFillRemaining(child: _buildEmpty())
             else
               _buildGroupedList(),
+            // Spinner doładowywania kolejnych stron (tylko gdy nie filtrujemy
+            // lokalnie — wyszukiwarka działa na już wczytanych danych).
+            if (_isLoadingMore && _searchQuery.isEmpty)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              ),
+            // Zapas na dole, żeby FAB-y nie zasłaniały ostatniego wiersza.
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
       ),
+    );
+  }
+
+  // ── Przyciski akcji (dodaj wydatek / skanuj paragon) ───────────────────────
+  // Te same arkusze co na stronie głównej (QuickAddMenu / QuickScanMenu).
+  Widget _buildFabs() {
+    final texts = AppTexts.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        FloatingActionButton.small(
+          heroTag: 'expenses_scan_fab',
+          onPressed: _openScanMenu,
+          backgroundColor: AppColors.actionScanIconBg(isDark),
+          foregroundColor: AppColors.actionScanIcon(isDark),
+          tooltip: texts.quickScanTitle,
+          child: const Icon(Icons.camera_alt_outlined),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          heroTag: 'expenses_add_fab',
+          onPressed: _openAddMenu,
+          backgroundColor: AppColors.avatarFg(isDark),
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: Text(
+            texts.projectAddExpense,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openAddMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => QuickAddMenu(isDark: isDark, onSaved: _refreshExpenses),
+    );
+  }
+
+  Future<void> _openScanMenu() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => QuickScanMenu(isDark: isDark, onSaved: _refreshExpenses),
     );
   }
 
@@ -434,7 +586,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
               onTap: () {
                 if (_selectedCategory == cat) return;
                 setState(() => _selectedCategory = cat);
-                _fetchExpenses();
+                _refreshExpenses();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -528,15 +680,17 @@ class _ExpensesPageState extends State<ExpensesPage> {
 
   // ── Lista pogrupowana po dacie ─────────────────────────────────────────────
   Widget _buildGroupedList() {
-    final groups = _grouped;
-    final keys = _sortedGroupKeys;
+    final groups = _groups;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
-        final key = keys[index];
-        final items = groups[key]!;
-        return _ExpenseDateGroup(label: key, items: items, isDark: isDark);
-      }, childCount: keys.length),
+        final group = groups[index];
+        return _ExpenseDateGroup(
+          label: group.label,
+          items: group.items,
+          isDark: isDark,
+        );
+      }, childCount: groups.length),
     );
   }
 
@@ -798,7 +952,7 @@ class _ExpenseRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    item.category,
+                    localizedCategoryLabel(item.category, AppTexts.of(context)),
                     style: TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.w700,
@@ -813,4 +967,34 @@ class _ExpenseRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pomocnicze modele grupowania
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Gotowa do wyświetlenia grupa wydatków (nagłówek + pozycje).
+class _ExpenseGroup {
+  final String label;
+  final List<SingleExpense> items;
+
+  const _ExpenseGroup({required this.label, required this.items});
+}
+
+/// Metadane bucketu używane przy budowie i sortowaniu grup.
+class _GroupMeta {
+  final int rank;
+  final String label;
+  final DateTime latest;
+
+  const _GroupMeta(this.rank, this.label, this.latest);
+}
+
+/// Wynik przydziału pojedynczej daty do grupy.
+class _BucketInfo {
+  final String key;
+  final int rank;
+  final String label;
+
+  const _BucketInfo(this.key, this.rank, this.label);
 }

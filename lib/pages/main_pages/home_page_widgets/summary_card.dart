@@ -82,7 +82,7 @@ class _SummaryCardState extends State<SummaryCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${texts.summaryCardTitle} — $formattedDate',
+                  '${texts.summaryCardTitle} $formattedDate',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,

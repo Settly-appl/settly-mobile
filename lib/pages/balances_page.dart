@@ -3,6 +3,7 @@ import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/pages/settlement_history_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 
 /// Lists net balances between the current user and each friend, and lets the
@@ -312,22 +313,12 @@ class _BalanceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
+              UserAvatar(
                 radius: 22,
+                avatarUrl: balance.avatarUrl,
+                initials: balance.initials,
                 backgroundColor: AppColors.avatarBg(isDark),
-                backgroundImage:
-                    (balance.avatarUrl != null && balance.avatarUrl!.isNotEmpty)
-                    ? NetworkImage(balance.avatarUrl!)
-                    : null,
-                child: (balance.avatarUrl == null || balance.avatarUrl!.isEmpty)
-                    ? Text(
-                        balance.initials,
-                        style: TextStyle(
-                          color: AppColors.avatarFg(isDark),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
+                foregroundColor: AppColors.avatarFg(isDark),
               ),
               const SizedBox(width: 12),
               Expanded(

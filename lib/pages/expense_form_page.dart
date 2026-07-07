@@ -15,6 +15,8 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/utils/money_input.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final bool isDark;
@@ -113,11 +115,22 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
   String? _currentUserId;
   String _currentUserDisplayName = 'Ty';
+  String? _currentUserAvatarUrl;
 
   SplitType _splitType = SplitType.equal;
   String? _amountBeforeByItems;
 
   final Map<String, TextEditingController> _customAmountControllers = {};
+  // Udział właściciela w podziale CUSTOM (właściciel jest po prostu jednym z
+  // wierszy listy uczestników).
+  final TextEditingController _ownerAmountController = TextEditingController(
+    text: '0.00',
+  );
+  // Kolejność uczestników podziału CUSTOM (właściciel + znajomi). Edycja wiersza
+  // „zamraża" ten i wszystkie powyżej, a resztę rozdziela równo między wiersze
+  // poniżej. Kolejność można zmieniać przeciąganiem.
+  final List<String> _customOrder = [];
+  bool _recomputingCustom = false; // zabezpieczenie przed rekurencją
 
   final List<ItemDraft> _items = [];
   int _itemAutoId = 0;
@@ -183,6 +196,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     for (final c in _customAmountControllers.values) {
       c.dispose();
     }
+    _ownerAmountController.dispose();
     super.dispose();
   }
 
@@ -211,6 +225,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           (info['name'] as String?) ??
           (info['preferred_username'] as String?) ??
           'Ty';
+      final picture = info['picture'] as String?;
+      _currentUserAvatarUrl = (picture != null && picture.isNotEmpty)
+          ? picture
+          : null;
     });
     _maybeStartInitialReceiptScan();
   }
@@ -263,16 +281,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   double _parseCtrl(TextEditingController c) =>
       double.tryParse(c.text.replaceAll(',', '.')) ?? 0.0;
 
-  double get _customFriendsTotal {
-    double s = 0;
-    for (final id in _selectedFriendIds) {
-      final c = _customAmountControllers[id];
-      if (c != null) s += _parseCtrl(c);
-    }
-    return s;
-  }
-
-  double get _myCustomShare => _totalAmount - _customFriendsTotal;
 
   double get _itemsSum {
     double s = 0;
@@ -285,26 +293,109 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   void _onAmountChanged() {
     if (_splitType == SplitType.equal) {
       _syncCustomControllersToEqualFriends();
+    } else if (_splitType == SplitType.custom) {
+      // Zmiana kwoty całkowitej → różnicę wchłania dolny wiersz.
+      _cascadeBottomAbsorb();
     }
     setState(() {});
   }
 
-  void _syncCustomControllersToEqualFriends() {
-    final equal = _equalAmounts();
-    for (final friendId in _selectedFriendIds) {
-      final controller = _customAmountControllers.putIfAbsent(
-        friendId,
-        () => TextEditingController(),
-      );
-      final amt = (equal[friendId] ?? 0.0).toStringAsFixed(2);
-      if (controller.text != amt) controller.text = amt;
+  // Kontroler danego uczestnika (właściciel korzysta z osobnego pola).
+  TextEditingController _ctrlFor(String id) {
+    if (id == _currentUserId) return _ownerAmountController;
+    return _customAmountControllers.putIfAbsent(
+      id,
+      () => TextEditingController(text: '0.00'),
+    );
+  }
+
+  // Utrzymuje _customOrder w zgodzie z właścicielem + zaznaczonymi znajomymi,
+  // zachowując kolejność ustawioną przez użytkownika (przeciąganiem).
+  void _ensureCustomOrder() {
+    final ownerId = _currentUserId;
+    _customOrder.removeWhere(
+      (id) => id != ownerId && !_selectedFriendIds.contains(id),
+    );
+    if (ownerId != null && !_customOrder.contains(ownerId)) {
+      _customOrder.insert(0, ownerId);
     }
+    for (final id in _selectedFriendIds) {
+      if (!_customOrder.contains(id)) _customOrder.add(id);
+    }
+  }
+
+  // Suma wszystkich udziałów (właściciel + znajomi).
+  double get _customParticipantsTotal {
+    double s = 0;
+    for (final id in _customOrder) {
+      s += _parseCtrl(_ctrlFor(id));
+    }
+    return s;
+  }
+
+  void _syncCustomControllersToEqualFriends() {
+    _ensureCustomOrder();
+    final equal = _equalAmounts();
+    _recomputingCustom = true;
+    for (final id in _customOrder) {
+      final amt = (equal[id] ?? 0.0).toStringAsFixed(2);
+      final c = _ctrlFor(id);
+      if (c.text != amt) c.text = amt;
+    }
+    _recomputingCustom = false;
     _customAmountControllers.removeWhere((id, c) {
       if (!_selectedFriendIds.contains(id)) {
         c.dispose();
         return true;
       }
       return false;
+    });
+  }
+
+  // Uczestnik zmienił swój udział → zamroź wiersze 0..index, a resztę rozdziel
+  // równo między wiersze poniżej.
+  void _onParticipantEdited(String id) {
+    if (_recomputingCustom) return;
+    final index = _customOrder.indexOf(id);
+    if (index >= 0) _cascadeFromIndex(index);
+    setState(() {});
+  }
+
+  // Zmiana kwoty całkowitej → różnicę wchłania dolny wiersz.
+  void _cascadeBottomAbsorb() {
+    if (_customOrder.length >= 2) _cascadeFromIndex(_customOrder.length - 2);
+  }
+
+  // Rozdziela resztę (total − suma wierszy 0..index) równo między wiersze
+  // poniżej index. Ujemna reszta jest zerowana — walidacja zablokuje zapis.
+  void _cascadeFromIndex(int index) {
+    final belowCount = _customOrder.length - (index + 1);
+    if (belowCount <= 0) return; // nic poniżej, nie ma czego rozdzielać
+
+    double fixedSum = 0;
+    for (var k = 0; k <= index; k++) {
+      fixedSum += _parseCtrl(_ctrlFor(_customOrder[k]));
+    }
+    final remainderCents = ((_totalAmount - fixedSum) * 100).round();
+    final safeCents = remainderCents < 0 ? 0 : remainderCents;
+    final base = safeCents ~/ belowCount;
+    final extra = safeCents - base * belowCount; // grosze reszty → pierwszy poniżej
+
+    _recomputingCustom = true;
+    for (var k = index + 1; k < _customOrder.length; k++) {
+      final cents = base + (k == index + 1 ? extra : 0);
+      final text = (cents / 100.0).toStringAsFixed(2);
+      final c = _ctrlFor(_customOrder[k]);
+      if (c.text != text) c.text = text;
+    }
+    _recomputingCustom = false;
+  }
+
+  void _onReorderParticipants(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex -= 1;
+      final id = _customOrder.removeAt(oldIndex);
+      _customOrder.insert(newIndex, id);
     });
   }
 
@@ -459,11 +550,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     if (_selectedFriendIds.isEmpty) return null;
 
     if (_splitType == SplitType.custom) {
-      if (_customFriendsTotal >= _totalAmount) {
+      // All shares (owner + friends) must add up to the total, and be >= 0.
+      // 0.005 = float slack. A share of exactly 0 is allowed.
+      if ((_customParticipantsTotal - _totalAmount).abs() > 0.005) {
         return texts.errorFriendsExceedTotal;
       }
-      if (_customFriendsTotal < 0 ||
-          _customAmountControllers.values.any((c) => _parseCtrl(c) < 0)) {
+      if (_customOrder.any((id) => _parseCtrl(_ctrlFor(id)) < 0)) {
         return texts.errorNegativeAmounts;
       }
     }
@@ -613,7 +705,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           for (final id in _selectedFriendIds)
             SplitParticipantRequest(
               friendId: id,
-              amount: _parseCtrl(_customAmountControllers[id]!),
+              amount: _parseCtrl(_ctrlFor(id)),
             ),
         ];
       case SplitType.byItems:
@@ -1033,17 +1125,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               ),
               const SizedBox(width: 6),
               IntrinsicWidth(
-                child: TextField(
+                child: _MoneyField(
                   controller: _amountController,
                   readOnly: locked,
                   enableInteractiveSelection: !locked,
                   showCursor: !locked,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ],
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: amountColor,
@@ -1070,6 +1156,31 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 color: AppColors.cardSubtitle(widget.isDark),
                 fontSize: 11,
               ),
+            ),
+          ],
+          // Subtelne czerwone ostrzeżenie, gdy wpisano kwotę równą 0.
+          if (!locked &&
+              _amountController.text.trim().isNotEmpty &&
+              _totalAmount == 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 13,
+                  color: Colors.red.shade400,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  texts.formAmountZeroWarning,
+                  style: TextStyle(
+                    color: Colors.red.shade400,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -1659,7 +1770,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               children: [
                 for (final f in selected)
                   InputChip(
-                    avatar: _initialsAvatar(f.displayName, size: 12),
+                    avatar: _initialsAvatar(
+                      f.displayName,
+                      avatarUrl: f.avatarUrl,
+                      size: 12,
+                    ),
                     label: Text(f.displayName),
                     labelStyle: TextStyle(
                       color: AppColors.cardTitle(widget.isDark),
@@ -1766,7 +1881,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                             color: AppColors.cardTitle(widget.isDark),
                           ),
                         ),
-                        secondary: _initialsAvatar(f.displayName),
+                        secondary: _initialsAvatar(
+                          f.displayName,
+                          avatarUrl: f.avatarUrl,
+                        ),
                         activeColor: AppColors.amountCurrency(widget.isDark),
                         controlAffinity: ListTileControlAffinity.trailing,
                       );
@@ -1934,7 +2052,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          _initialsAvatar(name, highlight: isMe),
+          _initialsAvatar(
+            name,
+            avatarUrl: _avatarUrlFor(userId),
+            highlight: isMe,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1963,51 +2085,33 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
   Widget _customEditor(AppTexts texts) {
     final accent = AppColors.amountCurrency(widget.isDark);
-    final myShare = _myCustomShare;
-    final overflow = myShare <= 0 && _totalAmount > 0;
+    _ensureCustomOrder();
+    // Shares must add up to the total; otherwise flag it (0.005 = float slack).
+    final mismatch =
+        _totalAmount > 0 &&
+        (_customParticipantsTotal - _totalAmount).abs() > 0.005;
 
     return _sectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                _initialsAvatar(_currentUserDisplayName, highlight: true),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    texts.splitCustomYouRest,
-                    style: TextStyle(
-                      color: AppColors.cardTitle(widget.isDark),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${myShare.toStringAsFixed(2)} ${_currencySymbol(_selectedCurrency)}',
-                  style: TextStyle(
-                    color: overflow
-                        ? AppColors.amountNegative
-                        : AppColors.cardTitle(widget.isDark),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: _customOrder.length,
+            onReorder: _onReorderParticipants,
+            itemBuilder: (context, index) =>
+                _participantRow(_customOrder[index], index),
           ),
-          for (final friendId in _selectedFriendIds) _customFriendRow(friendId),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  overflow ? texts.splitCustomOverflow : texts.splitCustomHint,
+                  mismatch ? texts.splitCustomOverflow : texts.splitCustomHint,
                   style: TextStyle(
-                    color: overflow
+                    color: mismatch
                         ? AppColors.amountNegative
                         : AppColors.cardSubtitle(widget.isDark),
                     fontSize: 12,
@@ -2037,17 +2141,33 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
-  Widget _customFriendRow(String friendId) {
-    final controller = _customAmountControllers.putIfAbsent(
-      friendId,
-      () => TextEditingController(text: '0.00'),
-    );
-    final name = _nameFor(friendId);
+  // Jeden wiersz podziału CUSTOM (właściciel lub znajomy) z uchwytem do
+  // przeciągania. Musi mieć klucz — wymóg ReorderableListView.
+  Widget _participantRow(String id, int index) {
+    final isOwner = id == _currentUserId;
+    final name = isOwner ? _currentUserDisplayName : _nameFor(id);
+    final controller = _ctrlFor(id);
     return Padding(
+      key: ValueKey('custom_$id'),
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          _initialsAvatar(name),
+          ReorderableDragStartListener(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(
+                Icons.drag_indicator,
+                size: 18,
+                color: AppColors.cardSubtitle(widget.isDark),
+              ),
+            ),
+          ),
+          _initialsAvatar(
+            name,
+            avatarUrl: _avatarUrlFor(id),
+            highlight: isOwner,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -2055,27 +2175,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               style: TextStyle(
                 color: AppColors.cardTitle(widget.isDark),
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: isOwner ? FontWeight.w600 : FontWeight.w500,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(
             width: 110,
-            child: TextField(
+            child: _MoneyField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-              ],
               textAlign: TextAlign.right,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => _onParticipantEdited(id),
               style: TextStyle(
                 color: AppColors.cardTitle(widget.isDark),
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: isOwner ? FontWeight.w700 : FontWeight.w600,
               ),
               decoration: InputDecoration(
                 isDense: true,
@@ -2304,17 +2418,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
                 SizedBox(
                   width: 90,
-                  child: TextFormField(
+                  child: _MoneyField(
                     key: ValueKey('price_${item.id}'),
                     initialValue: item.price > 0
                         ? item.price.toStringAsFixed(2)
                         : '',
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                    ],
                     textAlign: TextAlign.right,
                     onChanged: (v) => setState(() {
                       item.price =
@@ -2372,7 +2480,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   Widget _itemAssigneeChip(ItemDraft item, String userId) {
     final isMe = userId == _currentUserId;
     final name = isMe ? _currentUserDisplayName : _nameFor(userId);
-    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
     final active = item.assigneeIds.contains(userId);
     final accent = AppColors.amountCurrency(widget.isDark);
 
@@ -2397,19 +2504,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
+            UserAvatar(
               radius: 10,
+              avatarUrl: _avatarUrlFor(userId),
+              name: name,
               backgroundColor: active
                   ? accent.withValues(alpha: 0.3)
                   : AppColors.avatarBg(widget.isDark),
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: active ? accent : AppColors.avatarFg(widget.isDark),
-                ),
-              ),
+              foregroundColor: active
+                  ? accent
+                  : AppColors.avatarFg(widget.isDark),
+              fontSize: 9,
             ),
             const SizedBox(width: 6),
             Text(
@@ -2539,27 +2644,23 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
   Widget _initialsAvatar(
     String name, {
+    String? avatarUrl,
     bool highlight = false,
     double size = 14,
   }) {
-    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
     final bg = highlight
         ? AppColors.amountCurrency(widget.isDark).withValues(alpha: 0.18)
         : AppColors.avatarBg(widget.isDark);
     final fg = highlight
         ? AppColors.amountCurrency(widget.isDark)
         : AppColors.avatarFg(widget.isDark);
-    return CircleAvatar(
+    return UserAvatar(
       radius: size + 2,
+      avatarUrl: avatarUrl,
+      name: name,
       backgroundColor: bg,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: fg,
-          fontSize: size - 2,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      foregroundColor: fg,
+      fontSize: size - 2,
     );
   }
 
@@ -2572,6 +2673,15 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               Friend(friendshipId: '', userId: userId, displayName: '?'),
         )
         .displayName;
+  }
+
+  // Avatar URL uczestnika: własne zdjęcie z tokenu albo avatarUrl znajomego.
+  String? _avatarUrlFor(String userId) {
+    if (userId == _currentUserId) return _currentUserAvatarUrl;
+    for (final f in _availableFriends) {
+      if (f.userId == userId) return f.avatarUrl;
+    }
+    return null;
   }
 
   Future<ImageSource?> _showImageSourceDialog() async {
@@ -2661,4 +2771,112 @@ class _ReceiptItemParsed {
   final double price;
 
   const _ReceiptItemParsed({required this.name, required this.price});
+}
+
+/// Pole kwoty/ceny: wymusza maks. 2 cyfry po separatorze (przez
+/// [MoneyInputFormatter]) i po utracie fokusu uzupełnia końcowe zera
+/// (`5` → `5.00`, `5,1` → `5.10`).
+///
+/// Może korzystać z zewnętrznego [controller] (np. wspólnego dla logiki form
+/// rodzica) albo — gdy go nie podano — z własnego, zainicjowanego [initialValue].
+class _MoneyField extends StatefulWidget {
+  final TextEditingController? controller;
+  final String? initialValue;
+  final bool readOnly;
+  final bool showCursor;
+  final bool enableInteractiveSelection;
+  final TextAlign textAlign;
+  final TextStyle? style;
+  final InputDecoration? decoration;
+  final ValueChanged<String>? onChanged;
+
+  const _MoneyField({
+    super.key,
+    this.controller,
+    this.initialValue,
+    this.readOnly = false,
+    this.showCursor = true,
+    this.enableInteractiveSelection = true,
+    this.textAlign = TextAlign.start,
+    this.style,
+    this.decoration,
+    this.onChanged,
+  });
+
+  @override
+  State<_MoneyField> createState() => _MoneyFieldState();
+}
+
+class _MoneyFieldState extends State<_MoneyField> {
+  // Wewnętrzny kontroler tworzymy tylko, gdy rodzic nie podał własnego.
+  TextEditingController? _internalController;
+  final FocusNode _focusNode = FocusNode();
+
+  // Zawsze aktualny kontroler — jeśli rodzic podmieni `controller` przy
+  // przebudowie listy (np. inna osoba w podziale), czytamy nowy, nie stary.
+  TextEditingController get _controller =>
+      widget.controller ?? _internalController!;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller == null) {
+      _internalController = TextEditingController(
+        text: widget.initialValue ?? '',
+      );
+    }
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  void _handleFocusChange() {
+    if (widget.readOnly) return;
+
+    if (_focusNode.hasFocus) {
+      // Po wejściu w pole: obetnij zbędne końcowe zera, aby łatwo było
+      // zmienić wartość (`5.00` → `5`, `5.10` → `5.1`). Kursor na końcu.
+      final stripped = stripTrailingZeros(_controller.text);
+      if (stripped != _controller.text) {
+        _controller.value = TextEditingValue(
+          text: stripped,
+          selection: TextSelection.collapsed(offset: stripped.length),
+        );
+      }
+      return;
+    }
+
+    // Po utracie fokusu: uzupełnij do dwóch miejsc po przecinku.
+    final normalized = normalizeMoney(_controller.text);
+    if (normalized != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: normalized,
+        selection: TextSelection.collapsed(offset: normalized.length),
+      );
+    }
+    widget.onChanged?.call(_controller.text);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    _internalController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      focusNode: _focusNode,
+      readOnly: widget.readOnly,
+      showCursor: widget.showCursor,
+      enableInteractiveSelection: widget.enableInteractiveSelection,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [MoneyInputFormatter()],
+      textAlign: widget.textAlign,
+      style: widget.style,
+      decoration: widget.decoration,
+      onChanged: widget.onChanged,
+    );
+  }
 }

@@ -9,6 +9,7 @@ import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
@@ -139,22 +140,13 @@ class HomePageState extends State<HomePage> {
   static const double _maxContentWidth = 1080;
 
   Widget _buildAvatar(double radius) {
-    final url = widget.userAvatarUrl;
-    final hasPhoto = url != null && url.isNotEmpty;
-    return CircleAvatar(
-      backgroundColor: AppColors.avatarBg(isDark),
+    return UserAvatar(
       radius: radius,
-      backgroundImage: hasPhoto ? NetworkImage(url) : null,
-      child: hasPhoto
-          ? null
-          : Text(
-              widget.userInitials,
-              style: TextStyle(
-                color: AppColors.avatarFg(isDark),
-                fontWeight: FontWeight.bold,
-                fontSize: radius * 0.6,
-              ),
-            ),
+      avatarUrl: widget.userAvatarUrl,
+      initials: widget.userInitials,
+      backgroundColor: AppColors.avatarBg(isDark),
+      foregroundColor: AppColors.avatarFg(isDark),
+      fontSize: radius * 0.6,
     );
   }
 

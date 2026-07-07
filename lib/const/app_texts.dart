@@ -18,7 +18,7 @@ class AppTexts {
   String get homeGreeting => _isEnglish ? 'Hello,' : 'Dzień dobry,';
   String get homeTab => _isEnglish ? 'Home' : 'Główna';
   String get expensesTab => _isEnglish ? 'Expenses' : 'Wydatki';
-  String get groupsTab => _isEnglish ? 'Groups' : 'Grupy';
+  String get groupsTab => _isEnglish ? 'Projects' : 'Projekty';
   String get friendsTab => _isEnglish ? 'Friends' : 'Znajomi';
   String get analysisTab => _isEnglish ? 'Analytics' : 'Analiza';
   String get quickActionsSection =>
@@ -159,6 +159,53 @@ class AppTexts {
   String get totalTransactionsLabel =>
       _isEnglish ? '23 transactions' : '23 transakcje';
   String get daysInMonthLabel => _isEnglish ? 'of 30 days' : 'z 30 dni';
+
+  // ── Localized month names & counted nouns ──────────────────────────────────
+  static const List<String> _enMonths = [
+    '', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  // Polish nominative — used for standalone headers ("Marzec 2026").
+  static const List<String> _plMonthsNominative = [
+    '', 'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+    'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
+  ];
+  // Polish genitive — used after a day number ("5 marca").
+  static const List<String> _plMonthsGenitive = [
+    '', 'stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca',
+    'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia',
+  ];
+
+  /// Month name for a standalone header, e.g. "March" / "Marzec".
+  String monthNominative(int month) =>
+      _isEnglish ? _enMonths[month] : _plMonthsNominative[month];
+
+  /// Month name following a day number, e.g. "5 March" / "5 marca".
+  String monthGenitive(int month) =>
+      _isEnglish ? _enMonths[month] : _plMonthsGenitive[month];
+
+  /// "March 2026" / "Marzec 2026".
+  String monthYear(int month, int year) =>
+      '${monthNominative(month)} $year';
+
+  /// "12 transactions" / "12 transakcji" (with Polish plural rules).
+  String transactionsCount(int n) {
+    if (_isEnglish) return '$n ${n == 1 ? 'transaction' : 'transactions'}';
+    final mod10 = n % 10;
+    final mod100 = n % 100;
+    final String word;
+    if (n == 1) {
+      word = 'transakcja';
+    } else if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+      word = 'transakcje';
+    } else {
+      word = 'transakcji';
+    }
+    return '$n $word';
+  }
+
+  /// "of 30 days" / "z 30 dni".
+  String daysInMonthCount(int n) => _isEnglish ? 'of $n days' : 'z $n dni';
 
   // Balances / settlements
   String get balancesTitle => _isEnglish ? 'Settlements' : 'Rozliczenia';
@@ -494,6 +541,9 @@ class AppTexts {
   String get formAmountLockedHint => _isEnglish
       ? 'Total updates automatically from added items.'
       : 'Suma aktualizuje się automatycznie z dodanych pozycji.';
+  String get formAmountZeroWarning => _isEnglish
+      ? 'Amount must be greater than 0'
+      : 'Kwota musi być większa od 0';
   String get splitModeEqual => _isEnglish ? 'Equal' : 'Równo';
   String get splitModeCustom => _isEnglish ? 'Amounts' : 'Kwoty';
   String get splitModeByItem => _isEnglish ? 'Per item' : 'Per produkt';
@@ -504,11 +554,11 @@ class AppTexts {
       : 'Po ok. {amount} {currency} na osobę';
   String get splitCustomYouRest => _isEnglish ? 'You (rest)' : 'Ty (reszta)';
   String get splitCustomOverflow => _isEnglish
-      ? "Friends' total ≥ amount. Your share must be > 0."
-      : 'Suma znajomych ≥ total. Ty musisz mieć > 0 zł.';
+      ? 'Shares must add up to the total.'
+      : 'Udziały muszą sumować się do całości.';
   String get splitCustomHint => _isEnglish
-      ? 'Your share = total − friends total.'
-      : 'Twój udział = total − suma znajomych.';
+      ? 'Edit top to bottom — the rest splits equally among those below. Drag to reorder.'
+      : 'Edytuj od góry — reszta dzieli się równo między osoby poniżej. Przeciągnij, aby zmienić kolejność.';
   String get splitCustomDistribute =>
       _isEnglish ? 'Distribute equally' : 'Rozdziel równo';
   String get itemsCount => _isEnglish ? '{count} {noun}' : '{count} {noun}';
@@ -527,8 +577,8 @@ class AppTexts {
   String get errorNoCategory =>
       _isEnglish ? 'Choose an expense category.' : 'Wybierz kategorię wydatku.';
   String get errorFriendsExceedTotal => _isEnglish
-      ? "Friends' amounts cannot cover the full total — you must pay something too."
-      : 'Kwoty znajomych nie mogą pokryć całości — Ty też musisz coś zapłacić.';
+      ? 'Shares must add up to the total.'
+      : 'Udziały muszą sumować się do całości.';
   String get errorNegativeAmounts =>
       _isEnglish ? 'Amounts cannot be negative.' : 'Kwoty nie mogą być ujemne.';
   String get errorNoItems => _isEnglish

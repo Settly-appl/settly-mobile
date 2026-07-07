@@ -4,6 +4,7 @@ import 'package:settly_mobile/pages/admin_broadcast_page.dart';
 import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 
 class ProfilePage extends StatelessWidget {
   final String userName;
@@ -46,23 +47,13 @@ class ProfilePage extends StatelessWidget {
             children: [
               const SizedBox(height: 16),
               Center(
-                child: CircleAvatar(
+                child: UserAvatar(
                   radius: 48,
+                  avatarUrl: userAvatarUrl,
+                  initials: userInitials,
                   backgroundColor: AppColors.avatarBg(isDark),
-                  backgroundImage:
-                      (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-                      ? NetworkImage(userAvatarUrl!)
-                      : null,
-                  child: (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-                      ? null
-                      : Text(
-                          userInitials,
-                          style: TextStyle(
-                            color: AppColors.avatarFg(isDark),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 28,
-                          ),
-                        ),
+                  foregroundColor: AppColors.avatarFg(isDark),
+                  fontSize: 28,
                 ),
               ),
               const SizedBox(height: 16),

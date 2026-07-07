@@ -13,7 +13,9 @@ env:
 jobs:
   build-and-push:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    # Native ARM runner (free for public repos): the server is arm64, so we build
+    # only arm64 with no QEMU emulation — the old amd64+arm64 QEMU build was slow.
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -21,8 +23,6 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v3
 
@@ -43,7 +43,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           build-args: |
             SETTLY_HOST=${{ env.SETTLY_HOST }}
@@ -55,27 +55,25 @@ jobs:
 
   deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    # Runs on the self-hosted runner ON the server — no inbound SSH needed.
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Deploy
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}:sha-${{ github.sha }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN
-          script: |
-            set -e
-            cd ${{ env.DEPLOY_PATH }}
+        run: |
+          set -e
+          cd "${{ env.DEPLOY_PATH }}"
 
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-            echo "Deploying web ${IMAGE}"
-            export SETTLY_WEB_IMAGE="${IMAGE}"
-            docker compose -f docker-compose.prod.yml pull settly-web
-            docker compose -f docker-compose.prod.yml up -d settly-web
-            docker image prune -f
-            docker logout ghcr.io || true
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+          echo "Deploying web ${IMAGE}"
+          export SETTLY_WEB_IMAGE="${IMAGE}"
+          docker compose -f docker-compose.prod.yml pull settly-web
+          docker compose -f docker-compose.prod.yml up -d settly-web
+          docker image prune -f
+          docker logout ghcr.io || true

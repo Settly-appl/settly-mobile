@@ -7,6 +7,7 @@ import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/models/frends/friendship_request.dart';
 import 'package:settly_mobile/models/frends/user_search_result.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 
@@ -459,7 +460,11 @@ class _FriendRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _Avatar(displayName: friend.displayName, isDark: isDark),
+          _Avatar(
+            displayName: friend.displayName,
+            avatarUrl: friend.avatarUrl,
+            isDark: isDark,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -512,7 +517,11 @@ class _IncomingRequestRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _Avatar(displayName: request.displayName, isDark: isDark),
+          _Avatar(
+            displayName: request.displayName,
+            avatarUrl: request.avatarUrl,
+            isDark: isDark,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -582,7 +591,11 @@ class _OutgoingRequestRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _Avatar(displayName: request.displayName, isDark: isDark),
+          _Avatar(
+            displayName: request.displayName,
+            avatarUrl: request.avatarUrl,
+            isDark: isDark,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -635,23 +648,23 @@ class _RequestsHeader extends StatelessWidget {
 
 class _Avatar extends StatelessWidget {
   final String displayName;
+  final String? avatarUrl;
   final bool isDark;
 
-  const _Avatar({required this.displayName, required this.isDark});
+  const _Avatar({
+    required this.displayName,
+    this.avatarUrl,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
-    return CircleAvatar(
+    return UserAvatar(
       radius: 20,
+      avatarUrl: avatarUrl,
+      name: displayName,
       backgroundColor: AppColors.avatarBg(isDark),
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: AppColors.avatarFg(isDark),
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      foregroundColor: AppColors.avatarFg(isDark),
     );
   }
 }
@@ -863,7 +876,11 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
               ),
               child: Row(
                 children: [
-                  _Avatar(displayName: _result!.displayName, isDark: isDark),
+                  _Avatar(
+                    displayName: _result!.displayName,
+                    avatarUrl: _result!.avatarUrl,
+                    isDark: isDark,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

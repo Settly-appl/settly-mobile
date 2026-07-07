@@ -6,6 +6,7 @@ import 'package:settly_mobile/models/enums/expense_splits_type.dart';
 import 'package:settly_mobile/models/expenses/expense_member_item.dart';
 import 'package:settly_mobile/models/expenses/expens_style.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
 import '../services/api_service/projects_service.dart';
@@ -412,10 +413,14 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(
-            child: Text(
-              m.displayName.isEmpty ? '?' : m.displayName[0].toUpperCase(),
-            ),
+          leading: UserAvatar(
+            radius: 20,
+            // ExpenseMember/ExpenseSplitResponse carry no avatarUrl yet — shows
+            // initials. Add avatarUrl to the split response to show photos here.
+            avatarUrl: null,
+            name: m.displayName,
+            backgroundColor: AppColors.avatarBg(isDark),
+            foregroundColor: AppColors.avatarFg(isDark),
           ),
           title: Text(m.displayName),
           trailing: Column(

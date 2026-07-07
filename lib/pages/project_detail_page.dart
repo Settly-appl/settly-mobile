@@ -7,6 +7,7 @@ import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
@@ -578,22 +579,12 @@ class _MemberRow extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          CircleAvatar(
+          UserAvatar(
             radius: 20,
+            avatarUrl: member.avatarUrl,
+            initials: member.initials,
             backgroundColor: AppColors.avatarBg(isDark),
-            backgroundImage:
-                (member.avatarUrl != null && member.avatarUrl!.isNotEmpty)
-                ? NetworkImage(member.avatarUrl!)
-                : null,
-            child: (member.avatarUrl == null || member.avatarUrl!.isEmpty)
-                ? Text(
-                    member.initials,
-                    style: TextStyle(
-                      color: AppColors.avatarFg(isDark),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+            foregroundColor: AppColors.avatarFg(isDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -679,23 +670,12 @@ class _FriendPickerSheet extends StatelessWidget {
                   itemBuilder: (_, i) {
                     final f = friends[i];
                     return ListTile(
-                      leading: CircleAvatar(
+                      leading: UserAvatar(
+                        radius: 20,
+                        avatarUrl: f.avatarUrl,
+                        name: f.displayName,
                         backgroundColor: AppColors.avatarBg(isDark),
-                        backgroundImage:
-                            (f.avatarUrl != null && f.avatarUrl!.isNotEmpty)
-                            ? NetworkImage(f.avatarUrl!)
-                            : null,
-                        child: (f.avatarUrl == null || f.avatarUrl!.isEmpty)
-                            ? Text(
-                                f.displayName.isNotEmpty
-                                    ? f.displayName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  color: AppColors.avatarFg(isDark),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
+                        foregroundColor: AppColors.avatarFg(isDark),
                       ),
                       title: Text(
                         f.displayName,
