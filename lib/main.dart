@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
+import 'package:settly_mobile/firebase_web_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:settly_mobile/pages/main_pages/home_page.dart';
 import 'package:settly_mobile/pages/main_pages/login_page.dart';
@@ -24,6 +25,16 @@ Future<void> main() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     await NotificationService().init();
+  } else if (kFirebaseWebConfigured) {
+    // Web push (opt-in). Wrapped so a bad/missing config can never break the
+    // web app — worst case, push just stays off. The background handler on web
+    // is the JS service worker (web/firebase-messaging-sw.js), not Dart.
+    try {
+      await Firebase.initializeApp(options: kFirebaseWebOptions);
+      await NotificationService().init();
+    } catch (e) {
+      debugPrint('Web push init skipped: $e');
+    }
   }
   await Future.wait([
     initializeDateFormatting('pl_PL', null),

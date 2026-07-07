@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
+import 'package:settly_mobile/firebase_web_config.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
@@ -91,33 +92,40 @@ class NotificationService {
     );
   }
 
+  /// FCM token for this device/browser. On web it needs the VAPID key and
+  /// requires the web config to be filled in.
+  Future<String?> _currentToken() {
+    if (kIsWeb) {
+      if (!kFirebaseWebConfigured) return Future.value(null);
+      return _messaging.getToken(vapidKey: kFirebaseWebVapidKey);
+    }
+    return _messaging.getToken();
+  }
+
+  String get _platform {
+    if (kIsWeb) return 'WEB';
+    return defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+  }
+
   /// Registers the current device token with the backend. Call after a
   /// successful login (once an access token is available).
   Future<void> registerCurrentToken() async {
-    if (kIsWeb) return;
-    final token = await _messaging.getToken();
-    if (token != null) {
-      // ignore: avoid_print
-      print(
-        'Token urządzenia FCM: $token',
-      ); // do lokalnych testów z Firebase Console
-      await _sendToken(token);
-    }
+    final token = await _currentToken();
+    if (token != null) await _sendToken(token);
   }
 
   Future<void> _sendToken(String token) async {
     await _api.request(
       endpoint: 'notifications/device-tokens',
       method: HttpMethod.post,
-      body: {'token': token, 'platform': 'ANDROID'},
+      body: {'token': token, 'platform': _platform},
     );
   }
 
   /// Removes this device's token from the backend. Call before logging out,
   /// while the access token is still valid.
   Future<void> unregisterCurrentToken() async {
-    if (kIsWeb) return;
-    final token = await _messaging.getToken();
+    final token = await _currentToken();
     if (token == null) return;
     await _api.request(
       endpoint: 'notifications/device-tokens/${Uri.encodeComponent(token)}',

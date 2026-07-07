@@ -162,5 +162,22 @@ between friends and projects (Splitwise-style). Package name: `settly_mobile`.
   - Not yet wired: expense **details** split-member avatars — `ExpenseMember` /
     `ExpenseSplitResponse` carry no `avatarUrl`, so those still show initials.
 
+- **2026-07-08** — Web/desktop push (FCM) scaffolding, off by default:
+  - The app is already a PWA (`web/manifest.json`, Flutter service worker), so it
+    is installable as-is. Web push was fully disabled (`main.dart` skipped Firebase
+    on web; `NotificationService` had `if (kIsWeb) return`; no web `FirebaseOptions`;
+    no FCM service worker).
+  - Added: `lib/firebase_web_config.dart` (web `FirebaseOptions` + VAPID key +
+    `kFirebaseWebConfigured` flag) and `web/firebase-messaging-sw.js`. `main.dart`
+    now inits Firebase on web **only when `kFirebaseWebConfigured == true`**, wrapped
+    in try/catch so it can never break the web build. `NotificationService` sends
+    `platform: WEB` (and now correctly `IOS` on iOS) and fetches the token with the
+    VAPID key on web.
+  - **To turn it on**: register a Web app in Firebase, paste its config + the Web
+    Push VAPID key into `lib/firebase_web_config.dart` AND
+    `web/firebase-messaging-sw.js`, set `kFirebaseWebConfigured = true`, rebuild.
+    Backend: `FIREBASE_ENABLED=true` + FCM service-account JSON on the server.
+    Requires HTTPS (already have it). iOS web push works only for an installed PWA.
+
 > When you change behavior, update this file (esp. the localization and category
 > notes and this change log).
