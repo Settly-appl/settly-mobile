@@ -70,6 +70,15 @@ jobs:
           set -e
           cd "${{ env.DEPLOY_PATH }}"
 
+          # Persist the pinned SHA image to .env so the deployed version is
+          # durable and this deploy doesn't depend on the mutable :develop tag.
+          touch .env
+          if grep -q '^SETTLY_WEB_IMAGE=' .env; then
+            sed -i "s#^SETTLY_WEB_IMAGE=.*#SETTLY_WEB_IMAGE=${IMAGE}#" .env
+          else
+            echo "SETTLY_WEB_IMAGE=${IMAGE}" >> .env
+          fi
+
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           echo "Deploying web ${IMAGE}"
           export SETTLY_WEB_IMAGE="${IMAGE}"
