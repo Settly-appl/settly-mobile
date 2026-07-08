@@ -28,15 +28,7 @@ firebase.initializeApp({
 // (The notification's look/icon is controlled by the backend's WebpushConfig.)
 firebase.messaging();
 
-// Focus / open the app when the user clicks the notification.
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ('focus' in client) return client.focus();
-      }
-      if (clients.openWindow) return clients.openWindow('/');
-    }),
-  );
-});
+// No custom notificationclick handler: the backend sets webpush.fcmOptions.link
+// to a deep-link URL (…/?notif_type=…&notif_id=…), and the FCM SDK's built-in
+// click handler opens/focuses it. The app reads those query params on launch
+// (NotificationService.consumeWebLaunch) and navigates accordingly.

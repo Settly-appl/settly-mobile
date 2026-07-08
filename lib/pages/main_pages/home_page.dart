@@ -85,6 +85,7 @@ class HomePageState extends State<HomePage> {
     // home screen (and navigator) is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationService().consumePendingNavigation();
+      NotificationService().consumeWebLaunch();
       _maybeOfferInstall();
     });
   }

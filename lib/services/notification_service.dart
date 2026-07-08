@@ -9,6 +9,7 @@ import 'package:settly_mobile/firebase_web_config.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
+import 'package:settly_mobile/pages/main_pages/friends_page.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 
@@ -77,10 +78,29 @@ class NotificationService {
       navigateForData(notification.data);
 
   Future<void> navigateForData(Map<String, dynamic> data) async {
-    if (data['type'] == 'EXPENSE_SPLIT') {
+    final type = data['type']?.toString();
+    if (type == 'EXPENSE_SPLIT') {
       final id = data['expenseId']?.toString();
       if (id != null && id.isNotEmpty) await _openExpense(id);
+    } else if (type == 'FRIEND_REQUEST' || type == 'FRIEND_REQUEST_ACCEPTED') {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const FriendsPage()),
+      );
     }
+  }
+
+  /// Web only: when the app is opened by clicking a push notification, the
+  /// service worker launches it with `?notif_type=...&notif_id=...`. Consume
+  /// those once the UI is ready and deep-link accordingly.
+  void consumeWebLaunch() {
+    if (!kIsWeb) return;
+    final params = Uri.base.queryParameters;
+    final type = params['notif_type'];
+    if (type == null || type.isEmpty) return;
+    navigateForData({
+      'type': type,
+      if (params['notif_id'] != null) 'expenseId': params['notif_id'],
+    });
   }
 
   Future<void> _openExpense(String expenseId) async {
