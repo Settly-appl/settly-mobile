@@ -416,11 +416,14 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildHeader(style, isDark),
+      body: RefreshIndicator(
+        onRefresh: _loadDetails,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _buildHeader(style, isDark),
             const SizedBox(height: 32),
             _infoRow(
               texts.expenseDetailsCategory,
@@ -438,7 +441,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
               _infoRow(texts.expenseDetailsProject, _projectName!, isDark),
             const Divider(height: 40),
             _buildSplitSection(isDark),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -597,10 +601,18 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   Widget _infoRow(String label, String value, bool isDark) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(color: AppColors.cardSubtitle(isDark))),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+        const SizedBox(width: 16),
+        // Flexible + right-align so long notes wrap instead of overflowing.
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
       ],
     ),
   );

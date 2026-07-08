@@ -1218,7 +1218,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         body: Stack(
           children: [
             SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+              // Add the keyboard height to the bottom padding so a focused
+              // split/price field can scroll up above the on-screen keyboard.
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                120 + MediaQuery.of(context).viewInsets.bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

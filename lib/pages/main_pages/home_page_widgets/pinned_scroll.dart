@@ -52,12 +52,13 @@ class PinnedScroll extends StatelessWidget {
             Navigator.pop(context);
             isLoaderOpen = false;
 
-            Navigator.push(
+            final changed = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
                 builder: (_) => ExpenseDetailsPage(expense: expense),
               ),
             );
+            if (changed == true) await onRefresh();
           }
         }
       } catch (e) {

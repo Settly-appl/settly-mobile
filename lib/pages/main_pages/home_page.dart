@@ -322,6 +322,7 @@ class HomePageState extends State<HomePage> {
 
     return AppBar(
       leadingWidth: 70,
+      toolbarHeight: 80, // more top breathing room for the greeting
       scrolledUnderElevation: 0,
       backgroundColor: Colors.transparent,
       systemOverlayStyle: SystemUiOverlayStyle(
@@ -635,8 +636,8 @@ class _HomeBody extends StatelessWidget {
                       child: RecentExpenseCard(
                         item: state.recentItems[index],
                         isDark: state.isDark,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          final changed = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (context) => ExpenseDetailsPage(
@@ -644,6 +645,7 @@ class _HomeBody extends StatelessWidget {
                               ),
                             ),
                           );
+                          if (changed == true) state._refreshHome();
                         },
                       ),
                     ),
