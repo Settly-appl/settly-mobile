@@ -689,6 +689,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           label: group.label,
           items: group.items,
           isDark: isDark,
+          onChanged: _refreshExpenses,
         );
       }, childCount: groups.length),
     );
@@ -821,11 +822,13 @@ class _ExpenseDateGroup extends StatelessWidget {
   final String label;
   final List<SingleExpense> items;
   final bool isDark;
+  final VoidCallback onChanged;
 
   const _ExpenseDateGroup({
     required this.label,
     required this.items,
     required this.isDark,
+    required this.onChanged,
   });
 
   @override
@@ -861,7 +864,11 @@ class _ExpenseDateGroup extends StatelessWidget {
           ...items.map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 7),
-              child: _ExpenseRow(item: item, isDark: isDark),
+              child: _ExpenseRow(
+                item: item,
+                isDark: isDark,
+                onChanged: onChanged,
+              ),
             ),
           ),
         ],
@@ -873,20 +880,26 @@ class _ExpenseDateGroup extends StatelessWidget {
 class _ExpenseRow extends StatelessWidget {
   final SingleExpense item;
   final bool isDark;
+  final VoidCallback onChanged;
 
-  const _ExpenseRow({required this.item, required this.isDark});
+  const _ExpenseRow({
+    required this.item,
+    required this.isDark,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final style = item.style(isDark);
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final changed = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) => ExpenseDetailsPage(expense: item),
           ),
         );
+        if (changed == true) onChanged();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),

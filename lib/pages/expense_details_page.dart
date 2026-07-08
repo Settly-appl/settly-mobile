@@ -5,7 +5,9 @@ import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/enums/expense_splits_type.dart';
 import 'package:settly_mobile/models/expenses/expense_member_item.dart';
 import 'package:settly_mobile/models/expenses/expens_style.dart';
+import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
@@ -27,11 +29,72 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   String? _projectName;
   final ApiServiceRequest _api = ApiServiceRequest();
   final ProjectsService _projectsService = ProjectsService();
+  String? _currentUserId;
+
+  bool get _isOwner =>
+      _currentUserId != null && _currentUserId == widget.expense.ownerId;
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final info = await AuthService().getUserInfo();
+    if (!mounted) return;
+    setState(() => _currentUserId = info?['sub'] as String?);
+  }
+
+  Future<void> _openEdit() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            ExpenseFormPage(isDark: isDark, editExpense: widget.expense),
+      ),
+    );
+    // The header shown here comes from the (immutable) passed expense, so after
+    // a successful edit go back to the list, which reloads fresh data.
+    if (saved == true && mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _confirmDelete(AppTexts texts) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(texts.expenseDeleteTitle),
+        content: Text(texts.expenseDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(texts.cancelAction),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              texts.deleteAction,
+              style: TextStyle(color: AppColors.amountNegative),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final resp = await _api.request(
+      endpoint: 'expenses/${widget.expense.id}',
+      method: HttpMethod.delete,
+    );
+    if (!mounted) return;
+    if (resp != null && (resp.statusCode == 200 || resp.statusCode == 204)) {
+      Navigator.of(context).pop(true); // back to the list, which refreshes
+    } else {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(texts.expenseDeleteFailed)));
+    }
   }
 
   @override
@@ -314,6 +377,44 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(texts.expenseDetailsTitle),
+        actions: [
+          if (_isOwner)
+            PopupMenuButton<String>(
+              onSelected: (v) {
+                if (v == 'edit') _openEdit();
+                if (v == 'delete') _confirmDelete(texts);
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_outlined, size: 18),
+                      const SizedBox(width: 10),
+                      Text(texts.editAction),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: AppColors.amountNegative,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        texts.deleteAction,
+                        style: TextStyle(color: AppColors.amountNegative),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

@@ -386,6 +386,7 @@ class AppTexts {
       ? 'Could not scan the receipt. Please try again.'
       : 'Nie udało się zskanować paragonu. Spróbuj ponownie.';
   String get formNewExpense => _isEnglish ? 'New expense' : 'Nowy wydatek';
+  String get formEditExpense => _isEnglish ? 'Edit expense' : 'Edytuj wydatek';
   String get formDetailsSection => _isEnglish ? 'DETAILS' : 'SZCZEGÓŁY';
   String get formProjectSection => _isEnglish ? 'PROJECT' : 'PROJEKT';
   String get formSplitSection => _isEnglish ? 'SPLIT' : 'PODZIAŁ';
@@ -478,6 +479,14 @@ class AppTexts {
       : 'Brak danych o produktach dla tego podzialu.';
   String get expenseDetailsSettled => _isEnglish ? 'Settled' : 'Rozliczone';
   String get expenseDetailsToPay => _isEnglish ? 'To pay' : 'Do zapłaty';
+  String get expenseDeleteTitle =>
+      _isEnglish ? 'Delete expense?' : 'Usunąć wydatek?';
+  String get expenseDeleteBody => _isEnglish
+      ? 'This permanently removes the expense and its split.'
+      : 'To trwale usunie wydatek i jego podział.';
+  String get expenseDeleteFailed => _isEnglish
+      ? 'Could not delete the expense.'
+      : 'Nie udało się usunąć wydatku.';
 
   // Quick scan / source picker
   String get chooseImageSourceTitle =>

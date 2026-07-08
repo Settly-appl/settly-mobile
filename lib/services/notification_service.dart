@@ -33,7 +33,12 @@ class NotificationService {
     if (_initialised) return;
     _initialised = true;
 
-    await _messaging.requestPermission();
+    // Only prompt when the user hasn't decided yet — otherwise the permission
+    // dialog would pop on every launch (already granted/denied stays as-is).
+    final settings = await _messaging.getNotificationSettings();
+    if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+      await _messaging.requestPermission();
+    }
 
     // Re-register whenever FCM rotates the token.
     _messaging.onTokenRefresh.listen(_sendToken);

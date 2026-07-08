@@ -21,21 +21,12 @@ firebase.initializeApp({
   projectId: 'settly-491611',
 });
 
-const messaging = firebase.messaging();
-
-// Shown when a push arrives and the app tab is in the background / closed.
-// (Messages with a `notification` payload may be auto-displayed by the browser;
-// this handles data-only messages and keeps a consistent look.)
-messaging.onBackgroundMessage((payload) => {
-  const n = payload.notification || {};
-  const data = payload.data || {};
-  self.registration.showNotification(n.title || 'Settly', {
-    body: n.body || '',
-    icon: '/icons/Icon-192.png',
-    badge: '/icons/Icon-192.png',
-    data,
-  });
-});
+// Initializing messaging in the SW is what lets the FCM SDK auto-display
+// incoming `notification` payloads. We deliberately do NOT add an
+// onBackgroundMessage handler that calls showNotification — the SDK already
+// shows the notification, and doing it again produces a DUPLICATE toast.
+// (The notification's look/icon is controlled by the backend's WebpushConfig.)
+firebase.messaging();
 
 // Focus / open the app when the user clicks the notification.
 self.addEventListener('notificationclick', (event) => {

@@ -9,6 +9,7 @@ import 'package:settly_mobile/const/api_url.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/dto/expense_request.dart';
 import 'package:settly_mobile/models/expenses/item_draft.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
@@ -29,6 +30,10 @@ class ExpenseFormPage extends StatefulWidget {
   final String? initialReceiptImagePath;
   final List<Map<String, dynamic>>? initialReceiptItems;
 
+  /// When set, the form edits this existing expense (PUT) instead of creating a
+  /// new one. Its splits/items are loaded and prefilled.
+  final SingleExpense? editExpense;
+
   const ExpenseFormPage({
     super.key,
     required this.isDark,
@@ -40,6 +45,7 @@ class ExpenseFormPage extends StatefulWidget {
     this.initialSplitType,
     this.initialReceiptImagePath,
     this.initialReceiptItems,
+    this.editExpense,
   });
 
   @override
@@ -117,6 +123,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   String _currentUserDisplayName = 'Ty';
   String? _currentUserAvatarUrl;
 
+  String? _editExpenseId; // non-null while editing an existing expense
+  bool get _isEditing => _editExpenseId != null;
+
   SplitType _splitType = SplitType.equal;
   String? _amountBeforeByItems;
 
@@ -166,17 +175,142 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         orElse: () => _kCategories.first,
       );
     }
+    // Edit mode: prefill the header from the existing expense; splits/items are
+    // loaded asynchronously once the current user + friends are known.
+    final edit = widget.editExpense;
+    if (edit != null) {
+      _editExpenseId = edit.id;
+      _placeController.text = edit.name;
+      _noteController.text = edit.note;
+      _amountController.text = _cleanAmount(edit.totalAmount);
+      _selectedCurrency = edit.currency;
+      _selectedDate = edit.date;
+      _selectedProjectId = edit.projectId;
+      _selectedCategory = _kCategories.firstWhere(
+        (c) => c.id == edit.category,
+        orElse: () => _kCategories.last,
+      );
+    }
+
     if (_splitType == SplitType.byItems) {
       _amountBeforeByItems = _amountController.text;
     }
 
-    _loadCurrentUser();
-    _loadFriends();
-    _loadProjects();
+    _bootstrap();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeStartInitialReceiptScan();
     });
+  }
+
+  // Loads the base data, then (in edit mode) prefills splits/items — which needs
+  // the current user id and friends to be resolved first.
+  Future<void> _bootstrap() async {
+    await Future.wait([_loadCurrentUser(), _loadFriends()]);
+    _loadProjects();
+    if (widget.editExpense != null) await _prefillSplitsAndItems();
+  }
+
+  static String _cleanAmount(String raw) {
+    final v = double.tryParse(raw.replaceAll(RegExp(r'[^0-9.]'), ''));
+    return v == null ? '' : v.toStringAsFixed(2);
+  }
+
+  SplitType _splitTypeFromApi(String? s) {
+    switch (s) {
+      case 'CUSTOM':
+        return SplitType.custom;
+      case 'BY_ITEM':
+        return SplitType.byItems;
+      default:
+        return SplitType.equal;
+    }
+  }
+
+  // Loads the existing split (type, participants, custom amounts) and, for
+  // BY_ITEM, the items and their assignees, into the form for editing.
+  Future<void> _prefillSplitsAndItems() async {
+    final id = _editExpenseId;
+    if (id == null) return;
+
+    final splitsResp = await _api.request(
+      endpoint: 'expenses/$id/splits',
+      method: HttpMethod.get,
+    );
+    List<dynamic> splits = const [];
+    if (splitsResp != null && splitsResp.statusCode == 200) {
+      splits = jsonDecode(splitsResp.body) as List<dynamic>;
+    }
+
+    if (splits.isNotEmpty) {
+      final type = _splitTypeFromApi(splits.first['splitType'] as String?);
+      final friendIds = <String>[
+        for (final s in splits)
+          if ((s['userId'] as String?) != null && s['userId'] != _currentUserId)
+            s['userId'] as String,
+      ];
+      if (!mounted) return;
+      setState(() {
+        _splitType = type;
+        _selectedFriendIds
+          ..clear()
+          ..addAll(friendIds);
+      });
+      // Establish the participant order + controllers, then set real amounts.
+      _syncCustomControllersToEqualFriends();
+      if (type == SplitType.custom) {
+        _recomputingCustom = true;
+        for (final s in splits) {
+          final uid = s['userId'] as String?;
+          final amt = (s['amount'] as num?)?.toDouble();
+          if (uid != null && amt != null) {
+            _ctrlFor(uid).text = amt.toStringAsFixed(2);
+          }
+        }
+        _recomputingCustom = false;
+      }
+    }
+
+    if (_splitType == SplitType.byItems) {
+      final itemsResp = await _api.request(
+        endpoint: 'expenses/$id/items',
+        method: HttpMethod.get,
+      );
+      if (itemsResp != null && itemsResp.statusCode == 200) {
+        final drafts = <ItemDraft>[];
+        for (final it in jsonDecode(itemsResp.body) as List<dynamic>) {
+          final itemId = it['id']?.toString();
+          final assignees = <String>{};
+          if (itemId != null) {
+            final usersResp = await _api.request(
+              endpoint: 'expenses/items/$itemId/users',
+              method: HttpMethod.get,
+            );
+            if (usersResp != null && usersResp.statusCode == 200) {
+              for (final u in jsonDecode(usersResp.body) as List<dynamic>) {
+                final uid = (u['userId'] ?? u['id'])?.toString();
+                if (uid != null) assignees.add(uid);
+              }
+            }
+          }
+          drafts.add(
+            ItemDraft(
+              id: 'item_${_itemAutoId++}',
+              name: (it['name'] as String?) ?? '',
+              price: (it['price'] as num?)?.toDouble() ?? 0.0,
+              assigneeIds: assignees,
+            ),
+          );
+        }
+        if (!mounted) return;
+        setState(() {
+          _items
+            ..clear()
+            ..addAll(drafts);
+        });
+        _syncAmountFromItems();
+      }
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -612,18 +746,36 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         date: _selectedDate,
         projectId: _selectedProjectId,
       );
-      final expResp = await _api.request(
-        endpoint: 'expenses',
-        method: HttpMethod.post,
-        body: req.toJson(),
-      );
-      if (expResp == null ||
-          (expResp.statusCode != 200 && expResp.statusCode != 201)) {
-        _snack(_apiErrorMessage(expResp, texts.errorCreateExpense));
-        return;
+      final String expenseId;
+      if (_isEditing) {
+        final resp = await _api.request(
+          endpoint: 'expenses/$_editExpenseId',
+          method: HttpMethod.put,
+          body: req.toJson(),
+        );
+        if (resp == null ||
+            (resp.statusCode != 200 && resp.statusCode != 201)) {
+          _snack(_apiErrorMessage(resp, texts.errorCreateExpense));
+          return;
+        }
+        expenseId = _editExpenseId!;
+        // Wipe the old split + items so they're recreated from the current form
+        // state below. Aborts (with a message) if a participant already settled.
+        if (!await _clearSplitsAndItems(expenseId, texts)) return;
+      } else {
+        final expResp = await _api.request(
+          endpoint: 'expenses',
+          method: HttpMethod.post,
+          body: req.toJson(),
+        );
+        if (expResp == null ||
+            (expResp.statusCode != 200 && expResp.statusCode != 201)) {
+          _snack(_apiErrorMessage(expResp, texts.errorCreateExpense));
+          return;
+        }
+        expenseId =
+            (jsonDecode(expResp.body) as Map<String, dynamic>)['id'] as String;
       }
-      final expenseId =
-          (jsonDecode(expResp.body) as Map<String, dynamic>)['id'] as String;
 
       if (_selectedFriendIds.isEmpty && _splitType != SplitType.byItems) {
         _finishSuccessfully();
@@ -644,7 +796,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           );
           if (itemResp == null ||
               (itemResp.statusCode != 200 && itemResp.statusCode != 201)) {
-            await _rollbackExpense(expenseId);
+            if (!_isEditing) await _rollbackExpense(expenseId);
             _snack(
               _apiErrorMessage(
                 itemResp,
@@ -681,7 +833,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       );
       if (splitResp == null ||
           (splitResp.statusCode != 200 && splitResp.statusCode != 201)) {
-        await _rollbackExpense(expenseId);
+        if (!_isEditing) await _rollbackExpense(expenseId);
         _snack(_apiErrorMessage(splitResp, texts.errorSaveSplit));
         return;
       }
@@ -721,6 +873,38 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       endpoint: 'expenses/$expenseId',
       method: HttpMethod.delete,
     );
+  }
+
+  /// Removes the existing split + items of an expense (edit flow), so the form
+  /// can recreate them. Returns false (with a message) if the split can't be
+  /// deleted because a participant already settled.
+  Future<bool> _clearSplitsAndItems(String expenseId, AppTexts texts) async {
+    final delSplits = await _api.request(
+      endpoint: 'expenses/$expenseId/splits',
+      method: HttpMethod.delete,
+    );
+    // 204 = deleted, 404 = none to delete; 400 = a participant already settled.
+    if (delSplits != null && delSplits.statusCode == 400) {
+      _snack(_apiErrorMessage(delSplits, texts.errorSaveSplit));
+      return false;
+    }
+
+    final itemsResp = await _api.request(
+      endpoint: 'expenses/$expenseId/items',
+      method: HttpMethod.get,
+    );
+    if (itemsResp != null && itemsResp.statusCode == 200) {
+      for (final it in jsonDecode(itemsResp.body) as List<dynamic>) {
+        final itemId = it['id']?.toString();
+        if (itemId != null) {
+          await _api.request(
+            endpoint: 'expenses/$expenseId/items/$itemId',
+            method: HttpMethod.delete,
+          );
+        }
+      }
+    }
+    return true;
   }
 
   // ── Receipt scan ──────────────────────────────────────────────────────────
@@ -1024,7 +1208,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           elevation: 0,
           iconTheme: IconThemeData(color: AppColors.username(widget.isDark)),
           title: Text(
-            texts.formNewExpense,
+            _isEditing ? texts.formEditExpense : texts.formNewExpense,
             style: TextStyle(
               color: AppColors.username(widget.isDark),
               fontWeight: FontWeight.bold,

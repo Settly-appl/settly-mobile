@@ -12,6 +12,7 @@ class SingleExpense {
   final DateTime date;
   final DateTime createdAt;
   final String? projectId;
+  final String? ownerId; // creator; only the owner may edit/delete
 
   SingleExpense({
     this.id,
@@ -25,6 +26,7 @@ class SingleExpense {
     required this.date,
     required this.createdAt,
     this.projectId,
+    this.ownerId,
   });
 
   // ── GETTER STYLI ───────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ class SingleExpense {
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(),
       projectId: json['projectId']?.toString(),
+      ownerId: json['userId']?.toString(),
     );
   }
 
