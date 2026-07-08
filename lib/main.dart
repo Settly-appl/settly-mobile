@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -25,22 +27,24 @@ Future<void> main() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     await NotificationService().init();
-  } else if (kFirebaseWebConfigured) {
-    // Web push (opt-in). Wrapped so a bad/missing config can never break the
-    // web app — worst case, push just stays off. The background handler on web
-    // is the JS service worker (web/firebase-messaging-sw.js), not Dart.
-    try {
-      await Firebase.initializeApp(options: kFirebaseWebOptions);
-      await NotificationService().init();
-    } catch (e) {
-      debugPrint('Web push init skipped: $e');
-    }
   }
   await Future.wait([
     initializeDateFormatting('pl_PL', null),
     initializeDateFormatting('en_US', null),
   ]);
   runApp(const MyApp());
+
+  // Web push (opt-in): set up AFTER the first frame so nothing — Firebase init,
+  // the permission prompt, or token fetch — can block the UI from painting.
+  // Fire-and-forget; the JS service worker (web/firebase-messaging-sw.js)
+  // handles background messages, not Dart.
+  if (kIsWeb && kFirebaseWebConfigured) {
+    Firebase.initializeApp(options: kFirebaseWebOptions)
+        .then((_) => NotificationService().init())
+        .catchError((Object e) {
+          debugPrint('Web push init skipped: $e');
+        });
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -143,7 +147,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final loggedIn = await _authService.isLoggedIn();
     if (loggedIn) {
       await _loadUserData();
-      await NotificationService().registerCurrentToken();
+      // Fire-and-forget: token registration must never block showing the app.
+      unawaited(NotificationService().registerCurrentToken());
     }
     if (mounted) {
       setState(() {
@@ -181,7 +186,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _onLoginSuccess() async {
     await _loadUserData();
-    await NotificationService().registerCurrentToken();
+    unawaited(NotificationService().registerCurrentToken());
     if (mounted) {
       setState(() {
         _isLoggedIn = true;

@@ -672,4 +672,18 @@ class AppTexts {
       ? 'Your recent transactions will appear here.'
       : 'Twoje ostatnie transakcje pojawią się tutaj.';
   String get summaryCardTitle => _isEnglish ? 'Summary' : 'Podsumowanie';
+
+  // PWA install
+  String get pwaInstallBanner => _isEnglish
+      ? 'Install Settly on your device for quick access.'
+      : 'Zainstaluj Settly na urządzeniu, aby mieć szybki dostęp.';
+  String get pwaInstallAction => _isEnglish ? 'Install' : 'Zainstaluj';
+  String get pwaInstallNotNow => _isEnglish ? 'Not now' : 'Nie teraz';
+  String get pwaInstallProfileOption =>
+      _isEnglish ? 'Install app' : 'Zainstaluj aplikację';
+  String get pwaInstallIosHint => _isEnglish
+      ? 'In your browser, use the share menu → “Add to Home Screen”.'
+      : 'W przeglądarce użyj menu udostępniania → „Do ekranu głównego”.';
+  String get pwaInstalledAlready =>
+      _isEnglish ? 'App is already installed.' : 'Aplikacja jest już zainstalowana.';
 }

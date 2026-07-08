@@ -31,6 +31,36 @@
 
   <title>Settly</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- PWA install: capture the (Chromium) install prompt so Flutter can trigger
+       it on demand. Fires only on Chrome/Edge/Android; iOS never fires it. -->
+  <script>
+    (function () {
+      var deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+      });
+      window.addEventListener('appinstalled', function () {
+        deferredPrompt = null;
+      });
+      window.settlyIsInstalled = function () {
+        return (window.matchMedia
+                 && window.matchMedia('(display-mode: standalone)').matches)
+               || window.navigator.standalone === true;
+      };
+      window.settlyCanInstall = function () {
+        return deferredPrompt !== null && !window.settlyIsInstalled();
+      };
+      window.settlyPromptInstall = async function () {
+        if (!deferredPrompt) return 'unavailable';
+        deferredPrompt.prompt();
+        var choice = await deferredPrompt.userChoice;
+        deferredPrompt = null; // a captured prompt can only be used once
+        return choice.outcome; // 'accepted' | 'dismissed'
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--

@@ -15,15 +15,21 @@ import 'package:firebase_core/firebase_core.dart';
 ///
 /// NOTE: keep [kFirebaseWebOptions] in sync with `web/firebase-messaging-sw.js`
 /// (the background service worker can't read Dart, so its config is duplicated).
-const bool kFirebaseWebConfigured = false;
+///
+/// Flip this to `true` once [kFirebaseWebVapidKey] is filled in below.
+const bool kFirebaseWebConfigured = true;
 
 const FirebaseOptions kFirebaseWebOptions = FirebaseOptions(
-  apiKey: 'PASTE_WEB_API_KEY',
-  appId: 'PASTE_WEB_APP_ID',
-  messagingSenderId: 'PASTE_MESSAGING_SENDER_ID',
-  projectId: 'PASTE_PROJECT_ID',
-  authDomain: 'PASTE_PROJECT_ID.firebaseapp.com',
-  storageBucket: 'PASTE_PROJECT_ID.appspot.com',
+  apiKey: 'AIzaSyDCVXFmvJsYNfD-uSLBj6LmdyABAGBVe5E',
+  appId: '1:240217906279:web:b35efc59b05e5683b648c2',
+  messagingSenderId: '240217906279',
+  projectId: 'settly-491611',
+  authDomain: 'settly-491611.firebaseapp.com',
+  storageBucket: 'settly-491611.firebasestorage.app',
+  measurementId: 'G-QZG4PZSQSR',
 );
 
-const String kFirebaseWebVapidKey = 'PASTE_VAPID_PUBLIC_KEY';
+// Firebase console → Project settings → Cloud Messaging → Web Push certificates
+// → "Key pair" (a long string starting with "B...").
+const String kFirebaseWebVapidKey =
+    'BBKvqQowd32HTYWJU0f68rw_NKdXmnx0ozl9G2N7bz8_lBeGh0ZmsFnAC7VpPBSvNk8ouWB6vpXSRDIQQ5SFKgw';

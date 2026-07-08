@@ -178,6 +178,15 @@ between friends and projects (Splitwise-style). Package name: `settly_mobile`.
     `web/firebase-messaging-sw.js`, set `kFirebaseWebConfigured = true`, rebuild.
     Backend: `FIREBASE_ENABLED=true` + FCM service-account JSON on the server.
     Requires HTTPS (already have it). iOS web push works only for an installed PWA.
+  - **PWA install prompt**: `web/index.html` captures `beforeinstallprompt` and
+    exposes `settlyCanInstall/settlyIsInstalled/settlyPromptInstall`. Dart side is
+    `lib/services/pwa_install.dart` (+ `_stub`/`_web` via `dart.library.js_interop`
+    conditional import). Home shows a one-time `MaterialBanner` (persisted with
+    SharedPreferences key `pwa_install_prompt_dismissed`, marked on first show so it
+    never re-appears); Profile has an always-available "Install app" button
+    (native prompt on Chromium, manual "Add to Home Screen" hint on iOS). The
+    notification 🔔 was also added to the wide/desktop nav-rail layout (it only
+    existed in the mobile app-bar before).
 
 > When you change behavior, update this file (esp. the localization and category
 > notes and this change log).

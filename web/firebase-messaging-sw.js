@@ -15,10 +15,10 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: 'PASTE_WEB_API_KEY',
-  appId: 'PASTE_WEB_APP_ID',
-  messagingSenderId: 'PASTE_MESSAGING_SENDER_ID',
-  projectId: 'PASTE_PROJECT_ID',
+  apiKey: 'AIzaSyDCVXFmvJsYNfD-uSLBj6LmdyABAGBVe5E',
+  appId: '1:240217906279:web:b35efc59b05e5683b648c2',
+  messagingSenderId: '240217906279',
+  projectId: 'settly-491611',
 });
 
 const messaging = firebase.messaging();

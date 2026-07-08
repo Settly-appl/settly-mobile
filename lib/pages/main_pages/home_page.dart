@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:settly_mobile/firebase_web_config.dart';
+import 'package:settly_mobile/services/pwa_install.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:settly_mobile/const/app_texts.dart';
@@ -83,7 +85,46 @@ class HomePageState extends State<HomePage> {
     // home screen (and navigator) is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationService().consumePendingNavigation();
+      _maybeOfferInstall();
     });
+  }
+
+  // One-time PWA install banner. Shown at most once (per device); dismissing it
+  // — by either action — records the choice so it never auto-shows again.
+  Future<void> _maybeOfferInstall() async {
+    if (!await PwaInstall.shouldOfferAutoPrompt()) return;
+    if (!mounted) return;
+    final texts = AppTexts.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    void close() {
+      messenger.hideCurrentMaterialBanner();
+      PwaInstall.markAutoPromptDismissed();
+    }
+
+    // Count it as shown right away so it never auto-appears again, even if the
+    // user ignores it.
+    PwaInstall.markAutoPromptDismissed();
+
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        content: Text(texts.pwaInstallBanner),
+        leading: const Icon(Icons.install_mobile_outlined),
+        actions: [
+          TextButton(
+            onPressed: () {
+              close();
+              PwaInstall.promptInstall();
+            },
+            child: Text(texts.pwaInstallAction),
+          ),
+          TextButton(
+            onPressed: close,
+            child: Text(texts.pwaInstallNotNow),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -220,14 +261,36 @@ class HomePageState extends State<HomePage> {
           alignment: Alignment.bottomCenter,
           child: Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: IconButton(
-              icon: const Icon(Icons.dark_mode_outlined),
-              tooltip: texts.changeThemeTooltip,
-              onPressed: () {
-                MyApp.of(
-                  context,
-                ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!kIsWeb || kFirebaseWebConfigured)
+                  ListenableBuilder(
+                    listenable: NotificationsStore(),
+                    builder: (context, _) {
+                      final unread = NotificationsStore().unreadCount;
+                      return IconButton(
+                        icon: Badge(
+                          isLabelVisible: unread > 0,
+                          label: Text('$unread'),
+                          child: const Icon(Icons.notifications_none_rounded),
+                        ),
+                        color: AppColors.bellIcon(isDark),
+                        tooltip: texts.notificationsTitle,
+                        onPressed: _openNotifications,
+                      );
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.dark_mode_outlined),
+                  tooltip: texts.changeThemeTooltip,
+                  onPressed: () {
+                    MyApp.of(
+                      context,
+                    ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
+                  },
+                ),
+              ],
             ),
           ),
         ),
@@ -308,7 +371,7 @@ class HomePageState extends State<HomePage> {
             ).changeTheme(isDark ? ThemeMode.light : ThemeMode.dark);
           },
         ),
-        if (!kIsWeb) ...[
+        if (!kIsWeb || kFirebaseWebConfigured) ...[
           const SizedBox(width: 8),
           ListenableBuilder(
             listenable: NotificationsStore(),

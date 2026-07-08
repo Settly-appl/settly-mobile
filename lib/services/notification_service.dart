@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
@@ -94,12 +95,22 @@ class NotificationService {
 
   /// FCM token for this device/browser. On web it needs the VAPID key and
   /// requires the web config to be filled in.
-  Future<String?> _currentToken() {
-    if (kIsWeb) {
-      if (!kFirebaseWebConfigured) return Future.value(null);
-      return _messaging.getToken(vapidKey: kFirebaseWebVapidKey);
+  Future<String?> _currentToken() async {
+    if (kIsWeb && !kFirebaseWebConfigured) return null;
+    try {
+      final future = kIsWeb
+          ? _messaging.getToken(vapidKey: kFirebaseWebVapidKey)
+          : _messaging.getToken();
+      // Never let a slow/blocked getToken (e.g. permission not yet granted on
+      // web) hang the caller.
+      return await future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+    } catch (e) {
+      debugPrint('FCM getToken failed: $e');
+      return null;
     }
-    return _messaging.getToken();
   }
 
   String get _platform {

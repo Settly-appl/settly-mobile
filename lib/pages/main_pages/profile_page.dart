@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/pages/admin_broadcast_page.dart';
 import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/services/pwa_install.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -94,6 +96,39 @@ class ProfilePage extends StatelessWidget {
                   );
                 },
               ),
+              if (kIsWeb && !PwaInstall.isInstalled)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      if (PwaInstall.canInstall) {
+                        await PwaInstall.promptInstall();
+                      } else if (context.mounted) {
+                        // iOS / prompt not available → show the manual steps.
+                        showDialog<void>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            content: Text(texts.pwaInstallIosHint),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: Text(texts.doneAction),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.install_mobile_outlined),
+                    label: Text(texts.pwaInstallProfileOption),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: OutlinedButton.icon(
