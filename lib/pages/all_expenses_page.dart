@@ -495,24 +495,6 @@ class _ExpensesPageState extends State<ExpensesPage> {
           color: AppColors.username(isDark),
         ),
       ),
-      actions: [
-        _AppBarIconBtn(
-          isDark: isDark,
-          icon: Icons.sort_rounded,
-          onTap: () {
-            // TODO: bottomSheet sortowania
-          },
-        ),
-        const SizedBox(width: 8),
-        _AppBarIconBtn(
-          isDark: isDark,
-          icon: Icons.calendar_month_outlined,
-          onTap: () {
-            // TODO: picker miesiąca
-          },
-        ),
-        const SizedBox(width: 12),
-      ],
     );
   }
 
@@ -589,6 +571,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
                 _refreshExpenses();
               },
               child: Container(
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 6,
