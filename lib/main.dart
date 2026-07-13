@@ -32,10 +32,6 @@ Future<void> main() async {
     initializeDateFormatting('pl_PL', null),
     initializeDateFormatting('en_US', null),
   ]);
-  // Wczytaj zapisane powiadomienia, żeby dzwonek pokazywał też te, których
-  // użytkownik nie otworzył przed odświeżeniem aplikacji.
-  unawaited(NotificationsStore().load());
-
   runApp(const MyApp());
 
   // Web push (opt-in): set up AFTER the first frame so nothing — Firebase init,
@@ -153,6 +149,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       await _loadUserData();
       // Fire-and-forget: token registration must never block showing the app.
       unawaited(NotificationService().registerCurrentToken());
+      // Skrzynka z backendu: pokazuje też powiadomienia, których push nie dowiózł.
+      unawaited(NotificationsStore().refresh());
     }
     if (mounted) {
       setState(() {
@@ -191,6 +189,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _onLoginSuccess() async {
     await _loadUserData();
     unawaited(NotificationService().registerCurrentToken());
+    unawaited(NotificationsStore().refresh());
     if (mounted) {
       setState(() {
         _isLoggedIn = true;

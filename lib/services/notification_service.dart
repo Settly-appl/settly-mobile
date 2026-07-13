@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart'
@@ -13,6 +14,7 @@ import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/main_pages/friends_page.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
+import 'package:settly_mobile/widgets/heads_up_notification.dart';
 
 /// Handles FCM: permission, token lifecycle, and (un)registration with the
 /// Settly backend (`/api/notifications/device-tokens`).
@@ -45,12 +47,17 @@ class NotificationService {
     // Re-register whenever FCM rotates the token.
     _messaging.onTokenRefresh.listen(_sendToken);
 
-    // Foreground messages (Android doesn't show these in the tray on its own):
-    // record only, the bell shows them.
-    FirebaseMessaging.onMessage.listen(_handleMessage);
-    // User tapped a notification that opened the app from the background: record + open.
+    // Foreground: the system draws no toast while the app is open, so we show our
+    // own heads-up bar (tap to open, swipe to dismiss) as well as recording it.
+    FirebaseMessaging.onMessage.listen((message) {
+      _handleMessage(message);
+      _showHeadsUp(message);
+    });
+    // User tapped a notification that opened the app from the background: record,
+    // mark it read (they acted on it) and open.
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       _handleMessage(message);
+      _markTapped(message.data);
       navigateForData(message.data);
     });
     // App launched from terminated state by tapping a notification: record now,
@@ -66,17 +73,62 @@ class NotificationService {
     NotificationsStore().add(AppNotification.fromRemoteMessage(message));
   }
 
+  /// Powiadomienie przy otwartej aplikacji: system nie rysuje wtedy własnego
+  /// dymka, więc pokazujemy własny pasek u góry — klikalny i do zsunięcia.
+  void _showHeadsUp(RemoteMessage message) {
+    final overlay = navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+
+    final notification = AppNotification.fromRemoteMessage(message);
+    if (notification.title.isEmpty && notification.body.isEmpty) return;
+
+    late OverlayEntry entry;
+    var removed = false;
+    void remove() {
+      if (removed) return;
+      removed = true;
+      entry.remove();
+    }
+
+    entry = OverlayEntry(
+      builder: (_) => HeadsUpNotification(
+        notification: notification,
+        onTap: () {
+          remove();
+          // Kliknięcie = załatwione: znika z dzwonka i prowadzi do celu.
+          unawaited(NotificationsStore().markRead(notification.id));
+          navigateForData(message.data);
+        },
+        onDismiss: remove,
+      ),
+    );
+    overlay.insert(entry);
+  }
+
+  /// Powiadomienie kliknięte przez użytkownika — oznacz je jako przeczytane,
+  /// żeby przestało wisieć w dzwonku.
+  void _markTapped(Map<String, dynamic> data) {
+    final id = data['notificationId']?.toString();
+    if (id != null && id.isNotEmpty) {
+      unawaited(NotificationsStore().markRead(id));
+    }
+  }
+
   /// Handle a notification tap that happened before the UI existed (cold launch).
   /// Call once the home screen is shown (and the user is authenticated).
   void consumePendingNavigation() {
     final pending = _pendingMessage;
     _pendingMessage = null;
-    if (pending != null) navigateForData(pending.data);
+    if (pending == null) return;
+    _markTapped(pending.data);
+    navigateForData(pending.data);
   }
 
   /// Opens the relevant screen for a notification (e.g. from a bell-list tap).
-  Future<void> navigateForNotification(AppNotification notification) =>
-      navigateForData(notification.data);
+  Future<void> navigateForNotification(AppNotification notification) {
+    unawaited(NotificationsStore().markRead(notification.id));
+    return navigateForData(notification.data);
+  }
 
   Future<void> navigateForData(Map<String, dynamic> data) async {
     final type = data['type']?.toString();
@@ -114,6 +166,13 @@ class NotificationService {
     final params = Uri.base.queryParameters;
     final type = params['notif_type'];
     if (type == null || type.isEmpty) return;
+
+    // Otwarte z systemowego dymka = użytkownik je kliknął, więc znika z dzwonka.
+    final ref = params['notif_ref'];
+    if (ref != null && ref.isNotEmpty) {
+      unawaited(NotificationsStore().markRead(ref));
+    }
+
     navigateForData({
       'type': type,
       if (params['notif_id'] != null) 'expenseId': params['notif_id'],

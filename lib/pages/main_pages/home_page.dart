@@ -444,12 +444,14 @@ class HomePageState extends State<HomePage> {
   }
 
   void _openNotifications() {
-    NotificationsStore().markAllRead();
+    // Nie oznaczamy hurtem jako przeczytane — nieklikniete mają zostać w dzwonku.
+    // Odświeżamy ze skrzynki, żeby były też te, których push nie dowiózł.
+    unawaited(NotificationsStore().refresh());
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       backgroundColor: AppColors.scaffold(isDark),
-      builder: (_) => _NotificationsSheet(onOpenFriends: () => switchTab(3)),
+      builder: (_) => const _NotificationsSheet(),
     );
   }
 
@@ -749,9 +751,7 @@ class _PlaceholderTab extends StatelessWidget {
 }
 
 class _NotificationsSheet extends StatelessWidget {
-  final VoidCallback onOpenFriends;
-
-  const _NotificationsSheet({required this.onOpenFriends});
+  const _NotificationsSheet();
 
   IconData _iconFor(String? type) {
     switch (type) {
@@ -850,14 +850,12 @@ class _NotificationsSheet extends StatelessWidget {
                           leading: Icon(_iconFor(n.type)),
                           title: Text(n.title),
                           subtitle: n.body.isEmpty ? null : Text(n.body),
+                          // Każde kliknięcie oznacza wpis jako przeczytany i
+                          // prowadzi tam, gdzie trzeba — wcześniej część typów
+                          // nie robiła nic i wpis wisiał w dzwonku na zawsze.
                           onTap: () {
                             Navigator.of(context).pop();
-                            if (n.type == 'FRIEND_REQUEST' ||
-                                n.type == 'FRIEND_REQUEST_ACCEPTED') {
-                              onOpenFriends();
-                            } else if (n.type == 'EXPENSE_SPLIT') {
-                              NotificationService().navigateForNotification(n);
-                            }
+                            NotificationService().navigateForNotification(n);
                           },
                         );
                       },

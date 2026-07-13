@@ -2,49 +2,47 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:settly_mobile/models/app_notification.dart';
+import 'package:settly_mobile/services/api_service/api_service_request.dart';
 
-/// App-wide store of received notifications. The bell listens to it for the
-/// unread badge + list; screens can also listen to [stream] to react to
-/// specific notification types (e.g. refresh a list).
+/// Skrzynka powiadomień pokazywana pod dzwonkiem.
 ///
-/// Powiadomienia są **zapisywane na dysku**, żeby nie znikały po odświeżeniu
-/// aplikacji: ktoś, kto nie otworzył (albo zamknął) powiadomienia, ma je nadal
-/// pod dzwonkiem i o nim nie zapomni.
+/// Źródłem prawdy jest **backend**, nie push. Push jest „wyślij i zapomnij":
+/// jeśli użytkownik zamknie powiadomienie systemowe, nigdy go nie kliknie, nie
+/// ma tokenu albo przeglądarka odmawia rejestracji (np. Brave), aplikacja nigdy
+/// by się o nim nie dowiedziała. Dlatego backend zapisuje każde powiadomienie i
+/// stąd je pobieramy — dzwonek pokazuje **nieprzeczytane**, a kliknięcie
+/// (systemowego dymka albo wpisu na liście) oznacza je jako przeczytane, więc
+/// znika i nie wraca.
 class NotificationsStore extends ChangeNotifier {
   NotificationsStore._internal();
   static final NotificationsStore _instance = NotificationsStore._internal();
   factory NotificationsStore() => _instance;
 
-  static const _storageKey = 'notifications_inbox';
-
-  /// Ile powiadomień trzymamy — starsze wypadają, żeby lista nie rosła bez końca.
-  static const _maxItems = 50;
+  final _api = ApiServiceRequest();
 
   final List<AppNotification> _items = [];
   final StreamController<AppNotification> _controller =
       StreamController<AppNotification>.broadcast();
 
-  bool _loaded = false;
-
   List<AppNotification> get items => List.unmodifiable(_items);
-  int get unreadCount => _items.where((n) => !n.read).length;
+  int get unreadCount => _items.length; // pobieramy wyłącznie nieprzeczytane
 
   /// Emits each notification as it arrives, for screens that need to react
   /// rather than just show a badge.
   Stream<AppNotification> get stream => _controller.stream;
 
-  /// Wczytuje zapisane powiadomienia. Wywołaj raz przy starcie aplikacji.
-  Future<void> load() async {
-    if (_loaded) return;
-    _loaded = true;
+  /// Pobiera nieprzeczytane powiadomienia z backendu. Wywołuj przy starcie i
+  /// przy otwarciu dzwonka.
+  Future<void> refresh() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw == null || raw.isEmpty) return;
+      final response = await _api.request(
+        endpoint: 'notifications',
+        method: HttpMethod.get,
+      );
+      if (response == null || response.statusCode != 200) return;
 
-      final decoded = jsonDecode(raw);
+      final decoded = jsonDecode(response.body);
       if (decoded is! List) return;
 
       _items
@@ -56,54 +54,55 @@ class NotificationsStore extends ChangeNotifier {
         );
       notifyListeners();
     } catch (_) {
-      // Uszkodzony zapis nie może wywrócić startu aplikacji — zaczynamy pusto.
+      // Brak sieci nie może wywrócić dzwonka — zostaje to, co już mamy.
     }
   }
 
-  Future<void> _persist() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _storageKey,
-        jsonEncode(_items.map((n) => n.toJson()).toList()),
-      );
-    } catch (_) {
-      // Zapis to tylko wygoda — nie przerywamy działania, gdy się nie uda.
-    }
-  }
-
+  /// Powiadomienie, które przyszło przy otwartej aplikacji. Jest już zapisane na
+  /// backendzie, więc trzymamy je tylko lokalnie, żeby dzwonek zareagował od razu.
   void add(AppNotification notification) {
-    // To samo powiadomienie potrafi trafić tu dwa razy (np. z pierwszego planu,
-    // a potem przy kliknięciu) — nie duplikujemy go na liście.
-    final key = notification.dedupeKey;
-    if (_items.any((n) => n.dedupeKey == key)) return;
+    final id = notification.id;
+    if (id != null && _items.any((n) => n.id == id)) return; // już mamy
 
     _items.insert(0, notification);
-    if (_items.length > _maxItems) {
-      _items.removeRange(_maxItems, _items.length);
-    }
     _controller.add(notification);
     notifyListeners();
-    unawaited(_persist());
   }
 
-  void markAllRead() {
-    var changed = false;
-    for (final n in _items) {
-      if (!n.read) {
-        n.read = true;
-        changed = true;
-      }
+  /// Oznacza jedno powiadomienie jako przeczytane — znika z dzwonka na dobre.
+  Future<void> markRead(String? notificationId) async {
+    if (notificationId == null) return;
+
+    _items.removeWhere((n) => n.id == notificationId);
+    notifyListeners();
+
+    try {
+      await _api.request(
+        endpoint: 'notifications/$notificationId/read',
+        method: HttpMethod.patch,
+      );
+    } catch (_) {
+      // Nawet gdy zapis się nie uda, kolejne odświeżenie przywróci stan z serwera.
     }
-    if (changed) {
-      notifyListeners();
-      unawaited(_persist());
+  }
+
+  Future<void> markAllRead() async {
+    if (_items.isEmpty) return;
+    _items.clear();
+    notifyListeners();
+
+    try {
+      await _api.request(
+        endpoint: 'notifications/read-all',
+        method: HttpMethod.post,
+      );
+    } catch (_) {
+      // j.w.
     }
   }
 
   void clear() {
     _items.clear();
     notifyListeners();
-    unawaited(_persist());
   }
 }

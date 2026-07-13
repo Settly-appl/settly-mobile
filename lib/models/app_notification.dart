@@ -1,7 +1,14 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-/// An in-app notification, built from an FCM [RemoteMessage].
+/// Powiadomienie widoczne pod dzwonkiem.
+///
+/// Źródłem prawdy jest skrzynka na backendzie (`GET /notifications`) — push jest
+/// „wyślij i zapomnij", więc powiadomienie zamknięte albo nigdy niekliknięte i
+/// tak tam jest. [id] to identyfikator wpisu w skrzynce; po kliknięciu oznaczamy
+/// go jako przeczytany, żeby zniknął z dzwonka.
 class AppNotification {
+  /// Id wpisu w skrzynce. Null tylko dla powiadomień sprzed tej zmiany.
+  final String? id;
   final String title;
   final String body;
   final String? type;
@@ -10,6 +17,7 @@ class AppNotification {
   bool read;
 
   AppNotification({
+    this.id,
     required this.title,
     required this.body,
     this.type,
@@ -20,6 +28,9 @@ class AppNotification {
 
   factory AppNotification.fromRemoteMessage(RemoteMessage message) {
     return AppNotification(
+      // Backend dokłada notificationId do payloadu, żeby kliknięcie dało się
+      // powiązać z konkretnym wpisem w skrzynce.
+      id: message.data['notificationId'] as String?,
       title:
           message.notification?.title ??
           message.data['title'] as String? ??
@@ -31,30 +42,17 @@ class AppNotification {
     );
   }
 
-  /// Klucz do rozpoznania duplikatu tego samego powiadomienia (np. gdy przyjdzie
-  /// i z serwisu, i z pierwszego planu).
-  String get dedupeKey =>
-      '$title|$body|${receivedAt.millisecondsSinceEpoch ~/ 1000}';
-
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'body': body,
-    'type': type,
-    'data': data,
-    'receivedAt': receivedAt.toIso8601String(),
-    'read': read,
-  };
-
+  /// Wpis pobrany ze skrzynki na backendzie.
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
+      id: json['id']?.toString(),
       title: json['title']?.toString() ?? 'Powiadomienie',
       body: json['body']?.toString() ?? '',
       type: json['type'] as String?,
       data: (json['data'] as Map?)?.cast<String, dynamic>() ?? const {},
       receivedAt:
-          DateTime.tryParse(json['receivedAt']?.toString() ?? '') ??
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),
-      read: json['read'] == true,
     );
   }
 }
