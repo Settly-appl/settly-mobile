@@ -174,6 +174,19 @@ class _FriendsPageState extends State<FriendsPage>
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
+                  // Zwykle to zakładka (wtedy nie ma dokąd wracać), ale z
+                  // powiadomienia trafia tu jako osobny ekran — bez tego
+                  // przycisku zakrywa panel boczny i nie da się wyjść.
+                  if (Navigator.of(context).canPop()) ...[
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      color: AppColors.username(isDark),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   Text(
                     texts.friendsTitle,
                     style: TextStyle(
