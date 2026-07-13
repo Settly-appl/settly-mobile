@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/debt_record.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 
@@ -75,6 +76,47 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
     );
   }
 
+  /// Cofa całe rozliczenie: wszystkie objęte nim udziały wracają do
+  /// nierozliczonych, a wpis znika z historii. To jedyny sposób, by odwrócić
+  /// zbiorcze rozliczenie — pojedynczych wydatków z niego nie da się cofnąć,
+  /// bo pieniądze naprawdę zostały przekazane.
+  Future<void> _confirmUndo(DebtRecord record) async {
+    final texts = AppTexts.of(context);
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(texts.undoSettlementTitle),
+        content: Text(texts.undoSettlementBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(texts.cancelAction),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              texts.undoSettlementAction,
+              style: TextStyle(color: AppColors.amountNegative),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final result = await ExpenseRepository().undoSettleUp(record.id);
+    if (!mounted) return;
+
+    if (result != SettleResult.ok) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(texts.undoSettlementFailed)));
+      return;
+    }
+    await _load();
+  }
+
   Widget _buildBody() {
     final texts = AppTexts.of(context);
     if (_loading) {
@@ -107,6 +149,7 @@ class _SettlementHistoryPageState extends State<SettlementHistoryPage> {
         record: _records[i],
         isDark: isDark,
         youReceived: _records[i].toUserId == _currentUserId,
+        onUndo: () => _confirmUndo(_records[i]),
       ),
     );
   }
@@ -162,10 +205,14 @@ class _RecordCard extends StatelessWidget {
   /// True when the current user was the creditor (money came in).
   final bool youReceived;
 
+  /// Cofnięcie całego rozliczenia (przywraca objęte nim wydatki).
+  final VoidCallback onUndo;
+
   const _RecordCard({
     required this.record,
     required this.isDark,
     required this.youReceived,
+    required this.onUndo,
   });
 
   @override
@@ -238,6 +285,14 @@ class _RecordCard extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: color,
             ),
+          ),
+          // Jedyny sposób, by odwrócić zbiorcze rozliczenie — pojedynczych
+          // wydatków objętych nim nie da się cofnąć (backend zwraca 409).
+          IconButton(
+            icon: const Icon(Icons.undo_rounded, size: 18),
+            color: AppColors.cardSubtitle(isDark),
+            tooltip: texts.undoSettlementAction,
+            onPressed: onUndo,
           ),
         ],
       ),

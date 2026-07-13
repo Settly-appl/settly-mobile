@@ -14,6 +14,20 @@ class SingleExpense {
   final String? projectId;
   final String? ownerId; // creator; only the owner may edit/delete
 
+  // Settlement, as seen by the current user (see backend ExpenseResponse):
+  //  - splitCount: people who owe the owner. 0 = personal expense, nothing to settle.
+  //  - settledCount: how many of them have settled.
+  //  - settled: owner -> everyone paid; participant -> their own share is paid.
+  int splitCount;
+  int settledCount;
+  bool settled;
+
+  bool get isShared => splitCount > 0;
+
+  /// Some but not all participants have settled (only meaningful to the owner).
+  bool get isPartiallySettled =>
+      isShared && settledCount > 0 && settledCount < splitCount;
+
   SingleExpense({
     this.id,
     required this.name,
@@ -27,6 +41,9 @@ class SingleExpense {
     required this.createdAt,
     this.projectId,
     this.ownerId,
+    this.splitCount = 0,
+    this.settledCount = 0,
+    this.settled = false,
   });
 
   // ── GETTER STYLI ───────────────────────────────────────────────────────────
@@ -49,6 +66,9 @@ class SingleExpense {
           : DateTime.now(),
       projectId: json['projectId']?.toString(),
       ownerId: json['userId']?.toString(),
+      splitCount: (json['splitCount'] as num?)?.toInt() ?? 0,
+      settledCount: (json['settledCount'] as num?)?.toInt() ?? 0,
+      settled: json['settled'] as bool? ?? false,
     );
   }
 

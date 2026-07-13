@@ -2,6 +2,10 @@ import 'expense_member_item.dart';
 
 class ExpenseMember {
   final String userId;
+
+  /// Id wiersza podziału — potrzebne, by rozliczyć pojedynczą osobę
+  /// (PATCH expenses/{id}/splits/{splitId}/settle).
+  final String? splitId;
   final String amount;
   final String splitType;
   final String displayName;
@@ -10,6 +14,7 @@ class ExpenseMember {
 
   ExpenseMember({
     required this.userId,
+    this.splitId,
     required this.amount,
     required this.splitType,
     required this.displayName,
@@ -20,6 +25,7 @@ class ExpenseMember {
   factory ExpenseMember.fromJson(Map<String, dynamic> json) {
     return ExpenseMember(
       userId: (json['userId'] as String?) ?? '',
+      splitId: json['id']?.toString(),
       amount: (json['amount']?.toString()) ?? '0.00',
       splitType: json['splitType']?.toString() ?? '',
       displayName: '',
@@ -42,6 +48,7 @@ class ExpenseMember {
   }) {
     return ExpenseMember(
       userId: this.userId,
+      splitId: this.splitId,
       splitType: this.splitType,
       amount: amount ?? this.amount,
       displayName: displayName ?? this.displayName,

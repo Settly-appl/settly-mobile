@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
+import 'package:settly_mobile/widgets/settlement.dart';
 import '../../../const/app_texts.dart';
 import '../../../models/expenses/single_expense.dart';
 
@@ -109,6 +111,10 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
             color: AppColors.cardSubtitle(widget.isDark),
           ),
         ),
+        if (widget.item.isShared) ...[
+          const SizedBox(height: 3),
+          SettledBadge(item: widget.item, isDark: widget.isDark),
+        ],
       ],
     );
   }
@@ -138,7 +144,7 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            widget.item.category,
+            localizedCategoryLabel(widget.item.category, AppTexts.of(context)),
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,

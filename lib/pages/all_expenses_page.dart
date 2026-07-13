@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
+import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
@@ -13,6 +14,8 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
+import 'package:settly_mobile/utils/category_label.dart';
+import 'package:settly_mobile/widgets/settlement.dart';
 
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
 // UWAGA: wartości `apiValue` muszą się zgadzać z identyfikatorami kategorii
@@ -69,27 +72,6 @@ extension ExpenseCategoryLabel on AllExpensesPage {
   }
 }
 
-/// Mapuje surowy identyfikator kategorii z API na czytelną, przetłumaczoną
-/// etykietę (używane w plakietce wiersza wydatku).
-String localizedCategoryLabel(String rawCategory, AppTexts texts) {
-  switch (rawCategory.toLowerCase()) {
-    case 'food':
-      return texts.expensesLabelFood;
-    case 'transport':
-      return texts.expensesLabelTransport;
-    case 'shopping':
-      return texts.expensesLabelShopping;
-    case 'entertainment':
-      return texts.categoryEntertainmentLabel;
-    case 'health':
-      return texts.categoryHealthLabel;
-    case 'others':
-    case 'other':
-      return texts.expensesLabelOther;
-    default:
-      return rawCategory;
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 // ExpensesPage
@@ -214,6 +196,42 @@ class _ExpensesPageState extends State<ExpensesPage> {
   // wczytanej strony, żeby nie zasypywać backendu żądaniami na starcie.
 
   // Odświeżenie od zera (start, zmiana kategorii, powrót na zakładkę, refresh).
+  /// Rozlicza / cofa rozliczenie wydatku (swipe). Aktualizuje kafelek w miejscu,
+  /// żeby nie przewijać listy od nowa; przy błędzie pokazuje komunikat.
+  Future<void> _setSettled(SingleExpense item, bool settled) async {
+    final id = item.id;
+    if (id == null) return;
+
+    final texts = AppTexts.of(context);
+    final result = await _expenseRepository.setExpenseSettled(
+      expenseId: id,
+      settled: settled,
+    );
+
+    if (!mounted) return;
+    if (result != SettleResult.ok) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result == SettleResult.lockedBySettleUp
+                  ? texts.settleLockedBySettleUp
+                  : texts.expenseSettleFailed,
+            ),
+          ),
+        );
+      return;
+    }
+
+    setState(() {
+      item.settled = settled;
+      // Właściciel rozlicza wszystkich naraz; uczestnik tylko siebie — w obu
+      // przypadkach z perspektywy tego użytkownika wydatek jest (nie)rozliczony.
+      item.settledCount = settled ? item.splitCount : 0;
+    });
+  }
+
   Future<void> _refreshExpenses() async {
     _generation++;
     final gen = _generation;
@@ -495,6 +513,31 @@ class _ExpensesPageState extends State<ExpensesPage> {
           color: AppColors.username(isDark),
         ),
       ),
+      actions: [
+        TextButton.icon(
+          onPressed: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BalancesPage()),
+            );
+            // Rozliczenie na tamtej stronie zmienia stan splitów — odśwież listę.
+            if (mounted) _refreshExpenses();
+          },
+          icon: Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 17,
+            color: AppColors.actionScanIcon(isDark),
+          ),
+          label: Text(
+            texts.balancesAction,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.actionScanIcon(isDark),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+      ],
     );
   }
 
@@ -673,6 +716,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           items: group.items,
           isDark: isDark,
           onChanged: _refreshExpenses,
+          onSetSettled: _setSettled,
         );
       }, childCount: groups.length),
     );
@@ -719,35 +763,6 @@ class _ExpensesPageState extends State<ExpensesPage> {
 // ════════════════════════════════════════════════════════════════════════════
 // Widgety prywatne
 // ════════════════════════════════════════════════════════════════════════════
-
-class _AppBarIconBtn extends StatelessWidget {
-  final bool isDark;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _AppBarIconBtn({
-    required this.isDark,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: AppColors.cardBg(isDark),
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.cardBorder(isDark)),
-        ),
-        child: Icon(icon, size: 16, color: AppColors.cardSubtitle(isDark)),
-      ),
-    );
-  }
-}
 
 class _SummaryTile extends StatelessWidget {
   final String label;
@@ -806,12 +821,14 @@ class _ExpenseDateGroup extends StatelessWidget {
   final List<SingleExpense> items;
   final bool isDark;
   final VoidCallback onChanged;
+  final Future<void> Function(SingleExpense item, bool settled) onSetSettled;
 
   const _ExpenseDateGroup({
     required this.label,
     required this.items,
     required this.isDark,
     required this.onChanged,
+    required this.onSetSettled,
   });
 
   @override
@@ -847,10 +864,15 @@ class _ExpenseDateGroup extends StatelessWidget {
           ...items.map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 7),
-              child: _ExpenseRow(
+              child: SettleSwipe(
                 item: item,
                 isDark: isDark,
-                onChanged: onChanged,
+                onSetSettled: (settled) => onSetSettled(item, settled),
+                child: _ExpenseRow(
+                  item: item,
+                  isDark: isDark,
+                  onChanged: onChanged,
+                ),
               ),
             ),
           ),
@@ -923,6 +945,10 @@ class _ExpenseRow extends StatelessWidget {
                         color: AppColors.cardSubtitle(isDark),
                       ),
                     ),
+                  if (item.isShared) ...[
+                    const SizedBox(height: 3),
+                    SettledBadge(item: item, isDark: isDark),
+                  ],
                 ],
               ),
             ),

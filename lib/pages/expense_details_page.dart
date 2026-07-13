@@ -7,7 +7,9 @@ import 'package:settly_mobile/models/expenses/expense_member_item.dart';
 import 'package:settly_mobile/models/expenses/expens_style.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
@@ -29,7 +31,12 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   String? _projectName;
   final ApiServiceRequest _api = ApiServiceRequest();
   final ProjectsService _projectsService = ProjectsService();
+  final ExpenseRepository _expenseRepo = ExpenseRepository();
   String? _currentUserId;
+
+  /// Ustawione, gdy rozliczenie zmieniło się na tej stronie — wtedy przy
+  /// powrocie oddajemy `true`, żeby lista się odświeżyła.
+  bool _settlementChanged = false;
 
   bool get _isOwner =>
       _currentUserId != null && _currentUserId == widget.expense.ownerId;
@@ -377,6 +384,11 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(texts.expenseDetailsTitle),
+        // Oddaj informację, czy rozliczenie się zmieniło — lista to odświeży.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(_settlementChanged),
+        ),
         actions: [
           if (_isOwner)
             PopupMenuButton<String>(
@@ -427,7 +439,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             const SizedBox(height: 32),
             _infoRow(
               texts.expenseDetailsCategory,
-              widget.expense.category,
+              localizedCategoryLabel(widget.expense.category, texts),
               isDark,
             ),
             _infoRow(
@@ -537,7 +549,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
-              _settledChip(m.settled),
+              _settledChip(m),
             ],
           ),
         ),
@@ -578,24 +590,91 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     );
   }
 
-  Widget _settledChip(bool settled) {
+  /// Chip rozliczenia. Klikalny, gdy wolno zmienić stan tej osoby: właściciel
+  /// może rozliczyć każdego uczestnika, uczestnik tylko siebie. Własny udział
+  /// właściciela nie podlega rozliczeniu (jest opłacony z definicji).
+  Widget _settledChip(ExpenseMember m) {
     final texts = AppTexts.of(context);
-    final color = settled ? Colors.green : Colors.orange;
-    return Container(
+    final color = m.settled ? Colors.green : Colors.orange;
+
+    final isOwnersShare = m.userId == widget.expense.ownerId;
+    final canToggle =
+        m.splitId != null &&
+        !isOwnersShare &&
+        (_isOwner || m.userId == _currentUserId);
+
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
+        border: canToggle
+            ? Border.all(color: color.withValues(alpha: 0.5))
+            : null,
       ),
-      child: Text(
-        settled ? texts.expenseDetailsSettled : texts.expenseDetailsToPay,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            m.settled ? texts.expenseDetailsSettled : texts.expenseDetailsToPay,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          if (canToggle) ...[
+            const SizedBox(width: 3),
+            Icon(
+              m.settled ? Icons.undo_rounded : Icons.check_rounded,
+              size: 11,
+              color: color,
+            ),
+          ],
+        ],
       ),
     );
+
+    if (!canToggle) return chip;
+    return GestureDetector(onTap: () => _toggleMemberSettled(m), child: chip);
+  }
+
+  /// Rozlicza / cofa rozliczenie pojedynczej osoby w tym wydatku.
+  Future<void> _toggleMemberSettled(ExpenseMember m) async {
+    final expenseId = widget.expense.id;
+    final splitId = m.splitId;
+    if (expenseId == null || splitId == null) return;
+
+    final texts = AppTexts.of(context);
+    final target = !m.settled;
+
+    final result = await _expenseRepo.setSplitSettled(
+      expenseId: expenseId,
+      splitId: splitId,
+      settled: target,
+    );
+    if (!mounted) return;
+
+    if (result != SettleResult.ok) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result == SettleResult.lockedBySettleUp
+                  ? texts.settleLockedBySettleUp
+                  : texts.expenseSettleFailed,
+            ),
+          ),
+        );
+      return;
+    }
+
+    setState(() {
+      final i = _members.indexOf(m);
+      if (i != -1) _members[i] = m.copyWith(settled: target);
+      _settlementChanged = true; // lista musi się odświeżyć po powrocie
+    });
   }
 
   Widget _infoRow(String label, String value, bool isDark) => Padding(

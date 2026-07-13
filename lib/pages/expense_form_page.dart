@@ -2596,14 +2596,26 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    item.name.trim().isEmpty ? texts.untitledItem : item.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: TextFormField(
+                    key: ValueKey('name_${item.id}'),
+                    initialValue: item.name,
+                    onChanged: (v) => item.name = v,
+                    textCapitalization: TextCapitalization.sentences,
                     style: TextStyle(
                       color: AppColors.cardTitle(widget.isDark),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: texts.formItemNameHint,
+                      hintStyle: TextStyle(
+                        color: AppColors.cardSubtitle(widget.isDark),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.only(bottom: 4),
                     ),
                   ),
                 ),

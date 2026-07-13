@@ -420,6 +420,8 @@ class AppTexts {
       ? 'Add items manually or scan a receipt to fill them automatically.'
       : 'Dodaj pozycje ręcznie albo zeskanuj paragon, aby je wypełnić automatycznie.';
   String get untitledItem => _isEnglish ? 'Untitled' : 'Bez nazwy';
+  String get formItemNameHint =>
+      _isEnglish ? 'Item name' : 'Nazwa produktu';
   String get noProjectsYet => _isEnglish
       ? 'You do not have any projects yet.'
       : 'Nie masz jeszcze projektów.';
@@ -478,6 +480,37 @@ class AppTexts {
       ? 'No product data for this split.'
       : 'Brak danych o produktach dla tego podzialu.';
   String get expenseDetailsSettled => _isEnglish ? 'Settled' : 'Rozliczone';
+
+  // ── Rozliczanie wydatków (swipe / oznaczenia) ──────────────────────────────
+  // `settleAction` ("Rozlicz") jest już zdefiniowane wyżej — używamy go tutaj.
+  String get unsettleAction => _isEnglish ? 'Unsettle' : 'Cofnij';
+  String get expenseSettledBadge => _isEnglish ? 'Settled' : 'Rozliczone';
+  String get expenseSettleFailed => _isEnglish
+      ? "Couldn't update the settlement."
+      : 'Nie udało się zmienić rozliczenia.';
+
+  /// Udział rozliczony zbiorczo — pieniądze naprawdę wpłynęły, więc nie można
+  /// cofnąć pojedynczego wydatku. Trzeba cofnąć całe rozliczenie.
+  String get settleLockedBySettleUp => _isEnglish
+      ? 'This was settled as part of a settle-up. Undo that settlement in Balances.'
+      : 'To zostało rozliczone zbiorczo. Cofnij całe rozliczenie w „Rozliczeniach”.';
+
+  String get undoSettlementAction =>
+      _isEnglish ? 'Undo settlement' : 'Cofnij rozliczenie';
+  String get undoSettlementTitle =>
+      _isEnglish ? 'Undo this settlement?' : 'Cofnąć to rozliczenie?';
+  String get undoSettlementBody => _isEnglish
+      ? 'Every expense it covered goes back to unsettled, and the payment is removed from the history.'
+      : 'Wszystkie objęte nim wydatki wrócą do nierozliczonych, a wpłata zniknie z historii.';
+  String get undoSettlementFailed => _isEnglish
+      ? "Couldn't undo the settlement."
+      : 'Nie udało się cofnąć rozliczenia.';
+  String get balancesAction => _isEnglish ? 'Balances' : 'Rozliczenia';
+
+  /// np. "2/3 rozliczone" — gdy część uczestników już zapłaciła.
+  String settledOfCount(int settled, int total) => _isEnglish
+      ? '$settled/$total settled'
+      : '$settled/$total rozliczone';
   String get expenseDetailsToPay => _isEnglish ? 'To pay' : 'Do zapłaty';
   String get expenseDeleteTitle =>
       _isEnglish ? 'Delete expense?' : 'Usunąć wydatek?';

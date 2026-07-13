@@ -11,6 +11,8 @@ import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/widgets/settlement.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../repository/pinned_item_repository.dart';
@@ -151,6 +153,41 @@ class HomePageState extends State<HomePage> {
   Future<void> _refreshHome() async {
     if (mounted) setState(() => _summaryKey = UniqueKey());
     await Future.wait([_fetchRecentExpenses(), _fetchPinnedItems()]);
+  }
+
+  /// Settle / unsettle an expense from the home list (swipe). Refreshes the
+  /// summary card too, since the balance changes.
+  Future<void> _setSettled(SingleExpense item, bool settled) async {
+    final id = item.id;
+    if (id == null) return;
+
+    final texts = AppTexts.of(context);
+    final result = await ExpenseRepository().setExpenseSettled(
+      expenseId: id,
+      settled: settled,
+    );
+
+    if (!mounted) return;
+    if (result != SettleResult.ok) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result == SettleResult.lockedBySettleUp
+                  ? texts.settleLockedBySettleUp
+                  : texts.expenseSettleFailed,
+            ),
+          ),
+        );
+      return;
+    }
+
+    setState(() {
+      item.settled = settled;
+      item.settledCount = settled ? item.splitCount : 0;
+      _summaryKey = UniqueKey(); // balances changed
+    });
   }
 
   List<Widget> _pages(BuildContext context) {
@@ -633,20 +670,26 @@ class _HomeBody extends StatelessWidget {
                   for (var index = 0; index < state.recentItems.length; index++)
                     Padding(
                       padding: EdgeInsets.only(top: index == 0 ? 0 : 8),
-                      child: RecentExpenseCard(
+                      child: SettleSwipe(
                         item: state.recentItems[index],
                         isDark: state.isDark,
-                        onTap: () async {
-                          final changed = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ExpenseDetailsPage(
-                                expense: state.recentItems[index],
+                        onSetSettled: (settled) =>
+                            state._setSettled(state.recentItems[index], settled),
+                        child: RecentExpenseCard(
+                          item: state.recentItems[index],
+                          isDark: state.isDark,
+                          onTap: () async {
+                            final changed = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ExpenseDetailsPage(
+                                  expense: state.recentItems[index],
+                                ),
                               ),
-                            ),
-                          );
-                          if (changed == true) state._refreshHome();
-                        },
+                            );
+                            if (changed == true) state._refreshHome();
+                          },
+                        ),
                       ),
                     ),
                 ],
