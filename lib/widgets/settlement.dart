@@ -69,7 +69,9 @@ class SettleSwipe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!item.isShared) return child; // nie ma czego rozliczać
+    // Nie ma czego rozliczać, albo ten użytkownik nie może (cudzy wydatek widziany
+    // tylko dzięki członkostwu w projekcie) — backend i tak by odmówił.
+    if (!item.isShared || !item.canSettle) return child;
 
     final texts = AppTexts.of(context);
 

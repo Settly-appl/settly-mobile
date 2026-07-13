@@ -24,6 +24,13 @@ class SingleExpense {
   int settledCount;
   bool settled;
 
+  /// Czy ten użytkownik może w ogóle rozliczyć ten wydatek.
+  ///
+  /// `false` dla członka projektu, który widzi cudzy wydatek we wspólnej księdze
+  /// projektu — nie ma w nim udziału, backend i tak by odmówił, więc nie
+  /// pokazujemy gestu rozliczenia.
+  bool canSettle;
+
   bool get isShared => splitCount > 0;
 
   /// Some but not all participants have settled (only meaningful to the owner).
@@ -46,6 +53,7 @@ class SingleExpense {
     this.splitCount = 0,
     this.settledCount = 0,
     this.settled = false,
+    this.canSettle = false,
   });
 
   // ── GETTER STYLI ───────────────────────────────────────────────────────────
@@ -74,6 +82,7 @@ class SingleExpense {
       splitCount: (json['splitCount'] as num?)?.toInt() ?? 0,
       settledCount: (json['settledCount'] as num?)?.toInt() ?? 0,
       settled: json['settled'] as bool? ?? false,
+      canSettle: json['canSettle'] as bool? ?? false,
     );
   }
 
