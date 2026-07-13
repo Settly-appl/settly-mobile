@@ -190,6 +190,13 @@ Non-obvious and easy to break:
 - A daily 18:00 (Europe/Warsaw) job reminds **debtors only** to settle up. The
   scheduler is in-process, so it would fire once per instance if the API is ever
   scaled out.
+- **Orientation lives in `web/manifest.json`, not in Dart.** `SystemChrome.
+  setPreferredOrientations` is the *native* path and does nothing for the shipped
+  PWA. The manifest used to say `"orientation": "any"` — that is not a neutral
+  default but an assertion that the app may use any orientation, and an installed
+  standalone PWA takes it as permission to rotate **even when the device's
+  rotation lock is on**. It is now `"portrait"`. A manifest change may only take
+  effect after the PWA is reinstalled.
 - Icons (`web/icons/*`, `web/favicon.png`) are generated from `settly_icon.png`.
   **Maskable** icons need a generous safe-zone margin or Android's adaptive mask
   clips them. An installed PWA caches its launcher icon at install time — it only

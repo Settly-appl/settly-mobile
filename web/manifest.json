@@ -6,7 +6,7 @@
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
     "description": "Settly — dziel wydatki i rozliczaj się ze znajomymi.",
-    "orientation": "any",
+    "orientation": "portrait",
     "prefer_related_applications": false,
     "icons": [
         {
