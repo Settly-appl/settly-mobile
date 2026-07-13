@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import '../dto/expense_request.dart' show SplitType;
 import '../models/quick_add_dialog/sheet_option.dart';
 import 'expense_form_page.dart';
 
@@ -83,9 +84,31 @@ class QuickAddMenu extends StatelessWidget {
                 subtitle: texts.quickGroupExamples,
                 titleColor: AppColors.iconProject(isDark),
                 subtitleColor: AppColors.cardSubtitle(isDark),
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: nawigacja do formularza projektu
+                // Wydatek grupowy = wydatek dzielony ze znajomymi (wyjazd,
+                // impreza…). Otwieramy ten sam formularz z włączonym podziałem
+                // po równo; znajomych wybiera się już w formularzu.
+                onTap: () async {
+                  final rootMessenger = ScaffoldMessenger.of(context);
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+
+                  final saved = await navigator.push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => ExpenseFormPage(
+                        isDark: isDark,
+                        initialSplitType: SplitType.equal,
+                      ),
+                    ),
+                  );
+
+                  if (saved == true) {
+                    rootMessenger
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(content: Text(texts.expenseAdded)),
+                      );
+                    await onSaved();
+                  }
                 },
               ),
             ),
