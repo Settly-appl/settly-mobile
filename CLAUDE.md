@@ -154,6 +154,49 @@ importing both causes an ambiguous-import error.
   pushes it must `await` the push and refresh on `true` (list, home recent,
   pinned) — otherwise stale rows linger.
 
+## Projects — domain notes
+
+A project groups expenses (a trip, a party). Any **member** — not just the owner —
+may add expenses to it.
+
+- **A project is a shared ledger.** Scoped to a project, a member sees **every**
+  expense in it, including expenses between other members they are not party to.
+  This is a deliberate exception to the normal visibility rule (you see an expense
+  if you created it *or* are in its split). Without it each member saw a different
+  subset of "the trip's expenses" and the project total disagreed with the list
+  under it. Membership is checked in `ExpenseService.searchExpenses` — it is the
+  only thing between a stranger and everyone else's spending, so it must not be
+  left to the query. `ExpenseAccessService` has the matching rule, or tapping such
+  an expense would 404.
+- **`ExpenseResponse.canSettle`** says whether *this viewer* may settle it. A
+  member seeing someone else's project expense has no share in it, so the backend
+  refuses — the UI must not offer the gesture (`SettleSwipe` honours this).
+- Only an expense's **creator** may edit/delete it. The *project* owner has no
+  power over other people's expenses; they can only rename/delete the project and
+  manage members.
+- Filtering by project happens **server-side** (`GET /expenses?projectId=…`). The
+  list is paginated, so filtering client-side would only ever cover the page that
+  happened to be loaded.
+- `ProjectResponse.expenseCount`/`totalAmount` come from **one grouped query** for
+  the whole list (`ExpenseRepository.sumByProject`), not a lookup per project.
+- **Deleting a project detaches, never deletes.** Expenses and settlements are real
+  money and outlive the grouping. This is also load-bearing: `debts.project_id`
+  carries a FK, so a project that had ever been settled up could not be deleted at
+  all; `expenses.project_id` has **no** FK, so it was silently orphaning rows.
+
+### Open questions (deliberately not built)
+
+- **Project-wide "who owes whom" is missing.** `getBalances(userId, projectId)` and
+  the settlement history are both anchored on `:userId`, so a member sees only
+  *their own* balances within the trip — never "Anna owes Piotr 50 zł". A member can
+  see an expense is `1/3 settled` but not who the outstanding party is unless they
+  are personally involved. A project-wide pairwise overview is the natural missing
+  piece, but it is a **privacy decision**, not just UI: it exposes every member's
+  debts to every other member. Right for a holiday with friends; possibly wrong
+  otherwise.
+- Should the **project owner** be able to remove/detach expenses from their own
+  project? Today they cannot touch an expense they did not create.
+
 ## Notifications / PWA (web push)
 
 Non-obvious and easy to break:
@@ -239,5 +282,17 @@ Non-obvious and easy to break:
   / friends page. Real Settly favicon + PWA icons. Pull-to-refresh audited across
   data pages; screens that push expense details now refresh on return.
 
-> When you change behavior, update this file (esp. the localization, expenses and
-> notifications notes, and this change log).
+- **2026-07-14** — Notification **inbox** (backend `notifications` table, V7): a push
+  is fire-and-forget, so a dismissed/undelivered one used to vanish. `sendToUser`
+  now records it *first and unconditionally* — the inbox, not the push, is the
+  source of truth, so a user whose browser refuses push still sees it in the bell.
+  Tapping the toast marks that exact entry read (the payload carries the inbox id).
+  Foreground pushes get an in-app heads-up bar (the system draws no toast while the
+  app is open). "Enable notifications" recovery in Profile + the bell — **Brave
+  ships with "Use Google services for push messaging" OFF, so a granted permission
+  still yields no token**; that case is reported separately from "blocked".
+  **Projects made end-to-end** (see the Projects section): a project's expenses were
+  previously invisible — the feature was write-only.
+
+> When you change behavior, update this file (esp. the localization, expenses,
+> projects and notifications notes, and this change log).
