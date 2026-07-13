@@ -519,6 +519,33 @@ class AppTexts {
   String get undoSettlementFailed => _isEnglish
       ? "Couldn't undo the settlement."
       : 'Nie udało się cofnąć rozliczenia.';
+
+  // ── Admin: ręczne wywołanie przypomnienia o rozliczeniach ──────────────────
+  String get adminSettlementReminderButton => _isEnglish
+      ? 'Send settle-up reminders'
+      : 'Wyślij przypomnienia o rozliczeniach';
+  String get adminSettlementReminderFailed => _isEnglish
+      ? "Couldn't send the reminders."
+      : 'Nie udało się wysłać przypomnień.';
+
+  /// Ile osób dostało przypomnienie (0 = nikt nic nie jest winien).
+  String adminSettlementReminderSent(int count) {
+    if (count == 0) {
+      return _isEnglish
+          ? 'Nobody has anything to settle.'
+          : 'Nikt nie ma nic do rozliczenia.';
+    }
+    if (_isEnglish) {
+      return count == 1
+          ? 'Reminder sent to 1 person.'
+          : 'Reminders sent to $count people.';
+    }
+    // Po „do" idzie dopełniacz, więc liczba mnoga to zawsze „osób"
+    // („do 2 osób", „do 5 osób") — odmienia się tylko liczba pojedyncza.
+    return count == 1
+        ? 'Wysłano przypomnienie do 1 osoby.'
+        : 'Wysłano przypomnienia do $count osób.';
+  }
   String get balancesAction => _isEnglish ? 'Balances' : 'Rozliczenia';
 
   /// np. "2/3 rozliczone" — gdy część uczestników już zapłaciła.

@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/pages/admin_broadcast_page.dart';
 import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/services/pwa_install.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
@@ -74,25 +76,33 @@ class ProfilePage extends StatelessWidget {
                 future: AuthService().isAdmin(),
                 builder: (context, snapshot) {
                   if (snapshot.data != true) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AdminBroadcastPage(),
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AdminBroadcastPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.campaign_outlined),
+                          label: Text(texts.adminBroadcastButton),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.campaign_outlined),
-                      label: Text(texts.adminBroadcastButton),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                    ),
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: _AdminReminderButton(),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -164,6 +174,87 @@ class ProfilePage extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Admin: wyślij codzienne przypomnienie o rozliczeniach od razu, zamiast czekać
+/// na 18:00. Backend zwraca liczbę powiadomionych osób, więc „nikt nic nie jest
+/// winien" da się odróżnić od cichej awarii.
+class _AdminReminderButton extends StatefulWidget {
+  const _AdminReminderButton();
+
+  @override
+  State<_AdminReminderButton> createState() => _AdminReminderButtonState();
+}
+
+class _AdminReminderButtonState extends State<_AdminReminderButton> {
+  bool _sending = false;
+
+  Future<void> _trigger() async {
+    final texts = AppTexts.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() => _sending = true);
+    try {
+      final response = await ApiServiceRequest().request(
+        endpoint: 'notifications/settlement-reminder',
+        method: HttpMethod.post,
+      );
+
+      if (!mounted) return;
+
+      final ok = response != null &&
+          (response.statusCode == 200 || response.statusCode == 202);
+      if (!ok) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text(texts.adminSettlementReminderFailed)),
+          );
+        return;
+      }
+
+      var reminded = 0;
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['reminded'] is int) {
+          reminded = body['reminded'] as int;
+        }
+      } catch (_) {
+        // brak czytelnego ciała — pokaż 0
+      }
+
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(texts.adminSettlementReminderSent(reminded))),
+        );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+
+    return OutlinedButton.icon(
+      onPressed: _sending ? null : _trigger,
+      icon: _sending
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.alarm_on_outlined),
+      label: Text(texts.adminSettlementReminderButton),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
