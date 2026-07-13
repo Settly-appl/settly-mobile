@@ -87,15 +87,23 @@ class NotificationService {
       final id = data['expenseId']?.toString();
       if (id != null && id.isNotEmpty) await _openExpense(id);
     } else if (type == 'FRIEND_REQUEST' || type == 'FRIEND_REQUEST_ACCEPTED') {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const FriendsPage()),
-      );
+      _pushFromNotification(const FriendsPage());
     } else if (type == 'SETTLEMENT_REMINDER') {
       // Codzienne przypomnienie nie dotyczy jednego wydatku — otwórz salda.
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const BalancesPage()),
-      );
+      _pushFromNotification(const BalancesPage());
     }
+  }
+
+  /// Otwiera stronę z powiadomienia tak, żeby przycisk „wstecz" telefonu wracał
+  /// na stronę główną, a nie zamykał aplikację.
+  ///
+  /// Aplikacja jest instalowana jako PWA, więc „wstecz" to cofnięcie w historii
+  /// przeglądarki. Po wejściu z powiadomienia okno ma zwykle jeden wpis historii,
+  /// więc bez tego cofnięcie wyrzuca użytkownika z aplikacji.
+  void _pushFromNotification(Widget page) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => _NotificationRoute(child: page)),
+    );
   }
 
   /// Web only: when the app is opened by clicking a push notification, the
@@ -122,9 +130,7 @@ class NotificationService {
     final expense = SingleExpense.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-    navigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => ExpenseDetailsPage(expense: expense)),
-    );
+    _pushFromNotification(ExpenseDetailsPage(expense: expense));
   }
 
   /// FCM token for this device/browser. On web it needs the VAPID key and
@@ -175,6 +181,36 @@ class NotificationService {
     await _api.request(
       endpoint: 'notifications/device-tokens/${Uri.encodeComponent(token)}',
       method: HttpMethod.delete,
+    );
+  }
+}
+
+/// Strona otwarta z powiadomienia.
+///
+/// Przycisk „wstecz" telefonu (w PWA to cofnięcie w historii przeglądarki)
+/// sprowadza użytkownika na stronę główną zamiast wyrzucać go z aplikacji —
+/// po wejściu z powiadomienia okno ma zwykle jeden wpis historii, więc bez tego
+/// cofnięcie zamyka aplikację.
+///
+/// `PopScope` przechwytuje wyłącznie cofnięcie systemowe (`Navigator.maybePop`).
+/// Strzałka „wstecz" w aplikacji woła `Navigator.pop` bezpośrednio, więc działa
+/// jak dotąd — i nadal zwraca swój wynik (np. „coś się zmieniło, odśwież listę").
+class _NotificationRoute extends StatelessWidget {
+  final Widget child;
+
+  const _NotificationRoute({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // Zejdź do strony głównej. Gdy nie ma dokąd wracać, popUntil nic nie
+        // robi — i o to chodzi: zostajemy w aplikacji.
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      },
+      child: child,
     );
   }
 }

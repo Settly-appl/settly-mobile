@@ -6,7 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Flutter app for **Settly**: shared/personal expense tracking and settling balances
 between friends and projects (Splitwise-style). Package name: `settly_mobile`.
-Ships to Android **and** as an installable **PWA** from one codebase.
+
+## The target is the PWA, not the Android app — IMPORTANT
+
+Despite the repo name, **the Android/APK build is no longer developed.** The app
+ships as an installable **PWA** (web), and that is the only platform that gets
+tested and deployed. When you make a call, optimise for web:
+
+- "The phone's back button" means the **browser/PWA back gesture**, not Android's
+  native back — it is a browser history pop, so a page opened from a notification
+  can otherwise *leave the app* (its window has one history entry). See
+  `_NotificationRoute` in `services/notification_service.dart`.
+- Don't spend effort on Android-only concerns (native notification channels, APK
+  icons/mipmaps, platform channels) unless explicitly asked.
+- Native code paths still exist and must keep compiling; they're just not the
+  thing being shipped.
 
 ## The two-repo system — read this first
 
@@ -162,6 +176,20 @@ Non-obvious and easy to break:
   Do not add a custom `notificationclick` handler — it fights the SDK's.
 - Permission is requested **only when undetermined**; requesting on every launch
   re-prompts forever and leaves the FCM token unregistered.
+- **Pages opened from a notification must be pushed via `_pushFromNotification`**
+  (`notification_service.dart`), which wraps them in `_NotificationRoute`. Its
+  `PopScope` sends the **system/browser back** to the home page instead of letting
+  it leave the PWA — a notification opens a window with a single history entry, so
+  a plain back would close the app. `PopScope` only intercepts the *system* back
+  (`Navigator.maybePop`); an in-app `Navigator.pop()` still works normally and
+  still returns its result (e.g. "something changed, refresh the list").
+- Notification text is composed on the **backend** and is hardcoded **Polish**
+  (`NotificationEventListener`, `SettlementReminderJob`). Polish counted nouns
+  need the real plural rules — see `SettlementReminderJob.expensesPlural`
+  (1 wydatek / 2-4 wydatki / 5+ wydatków, with the 12-14 exception).
+- A daily 18:00 (Europe/Warsaw) job reminds **debtors only** to settle up. The
+  scheduler is in-process, so it would fire once per instance if the API is ever
+  scaled out.
 - Icons (`web/icons/*`, `web/favicon.png`) are generated from `settly_icon.png`.
   **Maskable** icons need a generous safe-zone margin or Android's adaptive mask
   clips them. An installed PWA caches its launcher icon at install time — it only
