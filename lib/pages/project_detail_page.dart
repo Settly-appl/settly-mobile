@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/frends/friend.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/project.dart';
+import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/utils/category_label.dart';
+import 'package:settly_mobile/widgets/settlement.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
@@ -32,6 +37,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Project? _project;
   List<ProjectMember> _members = [];
   List<FriendBalance> _balances = [];
+  List<SingleExpense> _expenses = [];
+  final _expenseRepo = ExpenseRepository();
   String? _currentUserId;
   final Set<String> _settling = {};
 
@@ -56,6 +63,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         _service.getProject(widget.projectId),
         _service.getMembers(widget.projectId),
         _balancesService.getBalances(projectId: widget.projectId),
+        // Wydatki projektu filtruje backend — lista jest stronicowana, więc
+        // odsiewanie po stronie aplikacji pokazałoby tylko wczytany kawałek.
+        _expenseRepo.fetchProjectExpenses(projectId: widget.projectId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -63,6 +73,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         _project = results[0] as Project;
         _members = results[1] as List<ProjectMember>;
         _balances = results[2] as List<FriendBalance>;
+        _expenses = results[3] as List<SingleExpense>;
         _loading = false;
       });
     } catch (_) {
@@ -412,6 +423,43 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(height: 16),
         ],
 
+        // ── Podsumowanie ──────────────────────────────────────────────────
+        _summaryCard(texts),
+        const SizedBox(height: 20),
+
+        // ── Wydatki projektu ──────────────────────────────────────────────
+        // Najważniejsza sekcja: to po nią się tu wchodzi. Wcześniej wydatków
+        // projektu nie dało się w ogóle zobaczyć.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _sectionTitle(
+              '${texts.projectExpensesSection} (${_expenses.length})',
+            ),
+            TextButton.icon(
+              onPressed: _addExpense,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(texts.projectAddExpenseButton),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_expenses.isEmpty)
+          _hintCard(texts.projectNoExpensesLabel)
+        else
+          ..._expenses.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _ProjectExpenseRow(
+                item: e,
+                isDark: isDark,
+                onTap: () => _openExpense(e),
+              ),
+            ),
+          ),
+
+        const SizedBox(height: 20),
+
         // ── Balances ──────────────────────────────────────────────────────
         _sectionTitle(texts.projectBalanceSection),
         const SizedBox(height: 8),
@@ -459,6 +507,86 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
       ],
     );
+  }
+
+  /// Ile projekt kosztował i kto w nim jest — pierwsze, o co pyta się przy
+  /// wspólnym wyjeździe.
+  Widget _summaryCard(AppTexts texts) {
+    final total = _project?.totalAmount ?? 0;
+    final count = _expenses.isNotEmpty
+        ? _expenses.length
+        : (_project?.expenseCount ?? 0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.summaryGradientLeft,
+            AppColors.summaryGradientRight,
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  texts.projectTotalSpent,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.summaryTileLabel,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${total.toStringAsFixed(2)} zł',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.summaryTileValue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                texts.transactionsCount(count),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.summaryTileSub,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                texts.projectMembersCount(_members.length),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.summaryTileSub,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Otwiera wydatek; po powrocie odświeżamy, bo mógł zostać zmieniony,
+  /// usunięty albo rozliczony — a wtedy zmienia się i suma, i salda.
+  Future<void> _openExpense(SingleExpense expense) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ExpenseDetailsPage(expense: expense)),
+    );
+    if (mounted) _load();
   }
 
   Widget _sectionTitle(String text) => Text(
@@ -686,6 +814,105 @@ class _FriendPickerSheet extends StatelessWidget {
                   },
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Wiersz wydatku na stronie projektu — ten sam język wizualny co lista
+/// wydatków (ikona kategorii, kwota, plakietka), żeby nie uczyć się go od nowa.
+class _ProjectExpenseRow extends StatelessWidget {
+  final SingleExpense item;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ProjectExpenseRow({
+    required this.item,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+    final style = item.style(isDark);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder(isDark)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: style.iconBg,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(style.icon, size: 17, color: style.iconColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.cardTitle(isDark),
+                    ),
+                  ),
+                  if (item.isShared) ...[
+                    const SizedBox(height: 3),
+                    SettledBadge(item: item, isDark: isDark),
+                  ],
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  item.userShare.isNotEmpty ? item.userShare : item.totalAmount,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.cardAmount(isDark),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: style.badgeBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    localizedCategoryLabel(item.category, texts),
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      color: style.badgeFg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

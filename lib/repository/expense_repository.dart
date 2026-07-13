@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/utils/money_input.dart';
 
@@ -30,6 +31,33 @@ class ExpenseRepository {
     }
 
     return null;
+  }
+
+  /// Wydatki należące do projektu (najnowsze pierwsze).
+  ///
+  /// Filtrowanie robi backend (`?projectId=`), a nie my po pobraniu wszystkiego —
+  /// lista wydatków jest stronicowana, więc filtrowanie lokalnie pokazywałoby
+  /// tylko to, co akurat zdążyło się wczytać.
+  Future<List<SingleExpense>> fetchProjectExpenses({
+    required String projectId,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _api.request(
+        endpoint:
+            'expenses?page=0&size=$limit&sort=date,desc&projectId=$projectId',
+        method: HttpMethod.get,
+      );
+      if (response == null || response.statusCode != 200) return const [];
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final content = data['content'];
+      if (content is! List) return const [];
+
+      return SingleExpense.listFromJson(content);
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Rozlicza / cofa rozliczenie całego wydatku. Właściciel rozlicza wszystkich

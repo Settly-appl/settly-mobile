@@ -5,6 +5,12 @@ class Project {
   final String? ownerId;
   final String status; // ACTIVE | SETTLED
   final int memberCount;
+
+  /// Ile wydatków należy do projektu i na jaką łączną kwotę — backend liczy to
+  /// jednym zapytaniem, więc lista projektów może to pokazać bez dopytywania.
+  final int expenseCount;
+  final double totalAmount;
+
   final DateTime? createdAt;
 
   const Project({
@@ -14,6 +20,8 @@ class Project {
     this.ownerId,
     required this.status,
     required this.memberCount,
+    this.expenseCount = 0,
+    this.totalAmount = 0,
     this.createdAt,
   });
 
@@ -25,6 +33,8 @@ class Project {
       ownerId: json['ownerId'] as String?,
       status: json['status']?.toString() ?? 'ACTIVE',
       memberCount: (json['memberCount'] as num?)?.toInt() ?? 0,
+      expenseCount: (json['expenseCount'] as num?)?.toInt() ?? 0,
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.tryParse(json['createdAt'].toString())?.toLocal(),

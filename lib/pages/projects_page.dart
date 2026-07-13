@@ -242,7 +242,8 @@ class _ProjectCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '${project.memberCount} '
-                    '${project.memberCount == 1 ? texts.projectMembersCountSuffixSingular : texts.projectMembersCountSuffixPlural}',
+                    '${project.memberCount == 1 ? texts.projectMembersCountSuffixSingular : texts.projectMembersCountSuffixPlural}'
+                    ' · ${texts.transactionsCount(project.expenseCount)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.cardSubtitle(isDark),
@@ -251,6 +252,18 @@ class _ProjectCard extends StatelessWidget {
                 ],
               ),
             ),
+            // Ile projekt kosztował — bez tego trzeba było wejść i policzyć.
+            if (project.expenseCount > 0) ...[
+              Text(
+                '${project.totalAmount.toStringAsFixed(2)} zł',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.cardAmount(isDark),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
             Icon(
               Icons.chevron_right_rounded,
               color: AppColors.cardSubtitle(isDark),

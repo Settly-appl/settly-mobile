@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
+import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';
@@ -13,6 +14,7 @@ import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
@@ -104,6 +106,17 @@ class _ExpensesPageState extends State<ExpensesPage> {
   static const int _pageSize = 20;
 
   final _expenseRepository = ExpenseRepository();
+  final _projectsService = ProjectsService();
+
+  // Filtr projektu (null = wszystkie). Filtruje backend, bo lista jest
+  // stronicowana — odsiewanie lokalnie pokazałoby tylko wczytany kawałek.
+  List<Project> _projects = [];
+  String? _selectedProjectId;
+
+  /// id -> nazwa, żeby kafelek mógł pokazać plakietkę projektu.
+  Map<String, String> get _projectNames => {
+    for (final p in _projects) p.id: p.name,
+  };
 
   // ── Podsumowanie (hardcoded — docelowo z API) ──────────────────────────────
   String get _monthLabel {
@@ -148,6 +161,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   @override
   void initState() {
     super.initState();
+    _loadProjects();
     _refreshExpenses();
     _scrollController.addListener(_onScroll);
     widget.tabNotifier.addListener(_onTabChanged);
@@ -232,6 +246,21 @@ class _ExpensesPageState extends State<ExpensesPage> {
     });
   }
 
+  Future<void> _loadProjects() async {
+    try {
+      final projects = await _projectsService.getMyProjects();
+      if (mounted) setState(() => _projects = projects);
+    } catch (_) {
+      // Filtr projektów to dodatek — bez niego lista wydatków nadal działa.
+    }
+  }
+
+  void _selectProject(String? projectId) {
+    if (_selectedProjectId == projectId) return;
+    setState(() => _selectedProjectId = projectId);
+    _refreshExpenses();
+  }
+
   Future<void> _refreshExpenses() async {
     _generation++;
     final gen = _generation;
@@ -258,10 +287,13 @@ class _ExpensesPageState extends State<ExpensesPage> {
     final page = _nextPage;
     final category = _selectedCategory.apiValue;
     final categoryParam = category != null ? '&category=$category' : '';
+    final projectParam =
+        _selectedProjectId != null ? '&projectId=$_selectedProjectId' : '';
 
     final response = await ApiServiceRequest().request(
       endpoint:
-          'expenses?page=$page&size=$_pageSize&sort=createdAt,desc$categoryParam',
+          'expenses?page=$page&size=$_pageSize&sort=createdAt,desc'
+          '$categoryParam$projectParam',
       method: HttpMethod.get,
     );
 
@@ -414,6 +446,12 @@ class _ExpensesPageState extends State<ExpensesPage> {
             SliverToBoxAdapter(child: _buildSummaryCard()),
             SliverToBoxAdapter(child: const SizedBox(height: 12)),
             SliverToBoxAdapter(child: _buildFilterRow()),
+            // Filtr projektu pokazujemy tylko, gdy są jakieś projekty — inaczej
+            // byłby to pusty, mylący pasek.
+            if (_projects.isNotEmpty) ...[
+              SliverToBoxAdapter(child: const SizedBox(height: 6)),
+              SliverToBoxAdapter(child: _buildProjectFilterRow()),
+            ],
             SliverToBoxAdapter(child: const SizedBox(height: 8)),
             SliverToBoxAdapter(child: _buildSearchBar()),
             SliverToBoxAdapter(child: const SizedBox(height: 4)),
@@ -653,6 +691,68 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
+  /// Filtr projektu — „Wszystkie projekty" + jeden chip na projekt.
+  Widget _buildProjectFilterRow() {
+    final texts = AppTexts.of(context);
+
+    Widget chip(String label, String? projectId) {
+      final active = _selectedProjectId == projectId;
+      final accent = AppColors.actionProjectIcon(isDark);
+      return Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: GestureDetector(
+          onTap: () => _selectProject(projectId),
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: active
+                  ? AppColors.actionProjectIconBg(isDark)
+                  : AppColors.pinnedEmptyBg(isDark),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: active
+                    ? accent.withValues(alpha: 0.4)
+                    : AppColors.cardBorder(isDark),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.groups_2_outlined,
+                  size: 11,
+                  color: active ? accent : AppColors.cardSubtitle(isDark),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: active ? accent : AppColors.cardSubtitle(isDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          chip(texts.expensesAllProjects, null),
+          for (final p in _projects) chip(p.name, p.id),
+        ],
+      ),
+    );
+  }
+
   // ── Wyszukiwarka ───────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
     final texts = AppTexts.of(context);
@@ -720,6 +820,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           isDark: isDark,
           onChanged: _refreshExpenses,
           onSetSettled: _setSettled,
+          projectNames: _projectNames,
         );
       }, childCount: groups.length),
     );
@@ -825,6 +926,7 @@ class _ExpenseDateGroup extends StatelessWidget {
   final bool isDark;
   final VoidCallback onChanged;
   final Future<void> Function(SingleExpense item, bool settled) onSetSettled;
+  final Map<String, String> projectNames;
 
   const _ExpenseDateGroup({
     required this.label,
@@ -832,6 +934,7 @@ class _ExpenseDateGroup extends StatelessWidget {
     required this.isDark,
     required this.onChanged,
     required this.onSetSettled,
+    required this.projectNames,
   });
 
   @override
@@ -875,6 +978,9 @@ class _ExpenseDateGroup extends StatelessWidget {
                   item: item,
                   isDark: isDark,
                   onChanged: onChanged,
+                  projectName: item.projectId == null
+                      ? null
+                      : projectNames[item.projectId],
                 ),
               ),
             ),
@@ -890,10 +996,14 @@ class _ExpenseRow extends StatelessWidget {
   final bool isDark;
   final VoidCallback onChanged;
 
+  /// Nazwa projektu, do którego należy wydatek (null = poza projektem).
+  final String? projectName;
+
   const _ExpenseRow({
     required this.item,
     required this.isDark,
     required this.onChanged,
+    this.projectName,
   });
 
   @override
@@ -948,9 +1058,18 @@ class _ExpenseRow extends StatelessWidget {
                         color: AppColors.cardSubtitle(isDark),
                       ),
                     ),
-                  if (item.isShared) ...[
+                  if (item.isShared || projectName != null) ...[
                     const SizedBox(height: 3),
-                    SettledBadge(item: item, isDark: isDark),
+                    Row(
+                      children: [
+                        if (projectName != null) ...[
+                          _ProjectBadge(name: projectName!, isDark: isDark),
+                          if (item.isShared) const SizedBox(width: 6),
+                        ],
+                        if (item.isShared)
+                          SettledBadge(item: item, isDark: isDark),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -1022,4 +1141,41 @@ class _BucketInfo {
   final String label;
 
   const _BucketInfo(this.key, this.rank, this.label);
+}
+
+
+/// Plakietka projektu na kafelku wydatku — dzięki niej widać na liście wydatków,
+/// co należy do wyjazdu czy imprezy, bez wchodzenia w projekt.
+class _ProjectBadge extends StatelessWidget {
+  final String name;
+  final bool isDark;
+
+  const _ProjectBadge({required this.name, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppColors.actionProjectIcon(isDark);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.groups_2_outlined, size: 9, color: accent),
+          const SizedBox(width: 3),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

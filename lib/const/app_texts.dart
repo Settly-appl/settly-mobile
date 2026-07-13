@@ -520,6 +520,27 @@ class AppTexts {
       ? "Couldn't undo the settlement."
       : 'Nie udało się cofnąć rozliczenia.';
 
+  // ── Projekty: wydatki, podsumowanie, filtr ─────────────────────────────────
+  String get projectExpensesSection => _isEnglish ? 'Expenses' : 'Wydatki';
+  String get projectNoExpensesLabel => _isEnglish
+      ? 'No expenses in this project yet. Add the first one.'
+      : 'Brak wydatków w tym projekcie. Dodaj pierwszy.';
+  String get projectTotalSpent => _isEnglish ? 'Total spent' : 'Wydano łącznie';
+
+  /// np. „3 uczestników" — po liczbie idzie dopełniacz, więc mnoga to zawsze
+  /// „uczestników"; odmienia się tylko liczba pojedyncza.
+  String projectMembersCount(int count) {
+    if (_isEnglish) {
+      return count == 1 ? '1 member' : '$count members';
+    }
+    return count == 1 ? '1 uczestnik' : '$count uczestników';
+  }
+
+  /// Filtr projektu na liście wydatków.
+  String get expensesAllProjects =>
+      _isEnglish ? 'All projects' : 'Wszystkie projekty';
+  String get expensesNoProject => _isEnglish ? 'No project' : 'Bez projektu';
+
   // ── Włączanie powiadomień (gdy push nie działa) ────────────────────────────
   String get notifEnableButton =>
       _isEnglish ? 'Enable notifications' : 'Włącz powiadomienia';
