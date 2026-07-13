@@ -10,6 +10,7 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/utils/category_label.dart';
+import 'package:settly_mobile/utils/money_input.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
@@ -351,7 +352,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     final amount = item['amount'] ?? item['price'] ?? item['totalPrice'];
     final value = amount?.toString();
     if (value == null || value.isEmpty) return '0.00';
-    return value;
+    // Dopełnij do 2 miejsc ("5.1" -> "5.10").
+    return normalizeMoney(value);
   }
 
   String? _readUserId(Map<String, dynamic> user) {

@@ -1,3 +1,5 @@
+import 'package:settly_mobile/utils/money_input.dart';
+
 class ExpenseMemberItem {
   final String name;
   final String amount;
@@ -11,11 +13,13 @@ class ExpenseMemberItem {
           json['itemName']?.toString() ??
           json['productName']?.toString() ??
           'Produkt',
-      amount:
-          json['amount']?.toString() ??
-          json['price']?.toString() ??
-          json['totalPrice']?.toString() ??
-          '0.00',
+      // Zawsze 2 miejsca po przecinku ("5.1" -> "5.10"), spójnie z formularzem.
+      amount: normalizeMoney(
+        json['amount']?.toString() ??
+            json['price']?.toString() ??
+            json['totalPrice']?.toString() ??
+            '0.00',
+      ),
     );
   }
 

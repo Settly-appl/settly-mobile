@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
+import 'package:settly_mobile/utils/money_input.dart';
 
 class ExpenseRepository {
   final _api = ApiServiceRequest();
@@ -16,7 +17,8 @@ class ExpenseRepository {
 
       if (response != null && response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final amount = data['amount']?.toString() ?? '';
+        // Dopełnij do 2 miejsc ("5.1" -> "5.10"), tak jak w formularzu.
+        final amount = normalizeMoney(data['amount']?.toString() ?? '');
         final currency = data['currency']?.toString() ?? 'PLN';
 
         if (amount.isNotEmpty) {

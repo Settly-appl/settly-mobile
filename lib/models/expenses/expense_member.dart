@@ -1,3 +1,5 @@
+import 'package:settly_mobile/utils/money_input.dart';
+
 import 'expense_member_item.dart';
 
 class ExpenseMember {
@@ -26,7 +28,7 @@ class ExpenseMember {
     return ExpenseMember(
       userId: (json['userId'] as String?) ?? '',
       splitId: json['id']?.toString(),
-      amount: (json['amount']?.toString()) ?? '0.00',
+      amount: normalizeMoney(json['amount']?.toString() ?? '0.00'),
       splitType: json['splitType']?.toString() ?? '',
       displayName: '',
       settled: json['settled'] == true,

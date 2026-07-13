@@ -1,3 +1,5 @@
+import 'package:settly_mobile/utils/money_input.dart';
+
 import 'expens_style.dart';
 
 class SingleExpense {
@@ -54,7 +56,10 @@ class SingleExpense {
       id: json['id']?.toString(),
       name: json['shop'] ?? 'Wydatek',
       note: json['note'] ?? '',
-      totalAmount: json['totalAmount']?.toString() ?? '0.00',
+      // Kwoty z API bywają nieprzycięte ("5.1"). Normalizujemy raz, przy
+      // wejściu, żeby każdy widok (lista, główna, szczegóły, piny) pokazywał
+      // spójne 2 miejsca po przecinku — tak jak wymusza to formularz.
+      totalAmount: normalizeMoney(json['totalAmount']?.toString() ?? '0.00'),
       category: json['category']?.toString() ?? 'Wydatek',
       currency: json['currency']?.toString() ?? 'PLN',
       scanned: json['isScanned'] ?? false,
