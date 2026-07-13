@@ -520,6 +520,53 @@ class AppTexts {
       ? "Couldn't undo the settlement."
       : 'Nie udało się cofnąć rozliczenia.';
 
+  // ── Włączanie powiadomień (gdy push nie działa) ────────────────────────────
+  String get notifEnableButton =>
+      _isEnglish ? 'Enable notifications' : 'Włącz powiadomienia';
+  String get notifDisabledHint => _isEnglish
+      ? "Notifications are off — you won't hear about new expenses."
+      : 'Powiadomienia są wyłączone — nie dowiesz się o nowych wydatkach.';
+  String get notifEnabledOk =>
+      _isEnglish ? 'Notifications enabled.' : 'Powiadomienia włączone.';
+  String get notifEnableFailed => _isEnglish
+      ? "Couldn't enable notifications."
+      : 'Nie udało się włączyć powiadomień.';
+
+  String get notifBlockedTitle =>
+      _isEnglish ? 'Notifications are blocked' : 'Powiadomienia są zablokowane';
+  String get notifBlockedBody => _isEnglish
+      ? 'You blocked notifications for this site, so the app cannot ask again. '
+            'Allow them in your browser: tap the padlock next to the address → '
+            'Notifications → Allow, then reload.'
+      : 'Powiadomienia dla tej strony zostały zablokowane, więc aplikacja nie '
+            'może zapytać ponownie. Zezwól na nie w przeglądarce: kłódka obok '
+            'adresu → Powiadomienia → Zezwalaj, a potem odśwież stronę.';
+
+  /// Zgoda jest, ale przeglądarka nie rejestruje tokenu. Najczęstszy winowajca:
+  /// Brave z domyślnie wyłączonym Google push messaging.
+  String get notifNoPushServiceTitle => _isEnglish
+      ? "Your browser isn't delivering push"
+      : 'Przeglądarka nie dostarcza powiadomień';
+  String get notifNoPushServiceBody => _isEnglish
+      ? 'Notifications are allowed, but the browser will not register for push.\n\n'
+            '• Brave: open brave://settings/privacy, turn on "Use Google services '
+            'for push messaging", then RESTART the browser. Allowing the site is '
+            'not enough — Brave has this off by default.\n\n'
+            '• iPhone: install Settly to the Home Screen first (Share → Add to '
+            'Home Screen). Safari only delivers push to an installed app.'
+      : 'Zgoda jest udzielona, ale przeglądarka nie rejestruje się po '
+            'powiadomienia.\n\n'
+            '• Brave: wejdź w brave://settings/privacy, włącz „Use Google services '
+            'for push messaging" i ZRESTARTUJ przeglądarkę. Sama zgoda dla strony '
+            'nie wystarczy — Brave ma to domyślnie wyłączone.\n\n'
+            '• iPhone: najpierw zainstaluj Settly na ekranie głównym (Udostępnij → '
+            'Do ekranu początkowego). Safari dostarcza powiadomienia tylko do '
+            'zainstalowanej aplikacji.';
+
+  String get notifUnsupportedBody => _isEnglish
+      ? 'This browser does not support push notifications.'
+      : 'Ta przeglądarka nie obsługuje powiadomień push.';
+
   // ── Admin: ręczne wywołanie przypomnienia o rozliczeniach ──────────────────
   String get adminSettlementReminderButton => _isEnglish
       ? 'Send settle-up reminders'

@@ -12,6 +12,7 @@ import 'package:settly_mobile/models/pinned_items/pinned_item.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/widgets/enable_notifications_button.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
@@ -781,6 +782,36 @@ class _NotificationsSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Kto otwiera dzwonek z wyłączonymi powiadomieniami, dostaje tu
+                // jedyną ścieżkę naprawy — inaczej nie ma jak się dowiedzieć,
+                // że push w ogóle nie działa.
+                FutureBuilder<bool>(
+                  future: NotificationService().isEnabled(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data != false) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            texts.notifDisabledHint,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.cardSubtitle(
+                                Theme.of(context).brightness ==
+                                    Brightness.dark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const EnableNotificationsButton(),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
                   child: Row(

@@ -32,6 +32,10 @@ Future<void> main() async {
     initializeDateFormatting('pl_PL', null),
     initializeDateFormatting('en_US', null),
   ]);
+  // Wczytaj zapisane powiadomienia, żeby dzwonek pokazywał też te, których
+  // użytkownik nie otworzył przed odświeżeniem aplikacji.
+  unawaited(NotificationsStore().load());
+
   runApp(const MyApp());
 
   // Web push (opt-in): set up AFTER the first frame so nothing — Firebase init,

@@ -7,7 +7,9 @@ import 'package:settly_mobile/main.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/services/notification_service.dart';
 import 'package:settly_mobile/services/pwa_install.dart';
+import 'package:settly_mobile/widgets/enable_notifications_button.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -103,6 +105,18 @@ class ProfilePage extends StatelessWidget {
                         child: _AdminReminderButton(),
                       ),
                     ],
+                  );
+                },
+              ),
+              // Widoczne tylko, gdy push naprawdę nie działa (brak zgody albo
+              // brak tokenu) — inaczej byłby to martwy przycisk.
+              FutureBuilder<bool>(
+                future: NotificationService().isEnabled(),
+                builder: (context, snapshot) {
+                  if (snapshot.data != false) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: EnableNotificationsButton(),
                   );
                 },
               ),

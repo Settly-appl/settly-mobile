@@ -165,6 +165,60 @@ class NotificationService {
     if (token != null) await _sendToken(token);
   }
 
+  /// Czy push faktycznie działa na tym urządzeniu: zgoda udzielona **i** token
+  /// da się pobrać. Sama zgoda nie wystarcza — np. Brave domyślnie wyłącza
+  /// usługę Google push messaging, więc zgoda jest, a tokenu nie ma.
+  Future<bool> isEnabled() async {
+    if (kIsWeb && !kFirebaseWebConfigured) return false;
+    try {
+      final settings = await _messaging.getNotificationSettings();
+      final granted =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      if (!granted) return false;
+      return await _currentToken() != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Włącza powiadomienia na żądanie użytkownika (przycisk w profilu/dzwonku).
+  ///
+  /// `init()` pyta o zgodę tylko wtedy, gdy nie została jeszcze podjęta —
+  /// dlatego ktoś, kto raz odmówił, nigdy więcej nie zobaczy pytania i bez tej
+  /// ścieżki nie miałby jak tego odkręcić.
+  Future<NotificationEnableResult> enableNotifications() async {
+    if (kIsWeb && !kFirebaseWebConfigured) {
+      return NotificationEnableResult.unsupported;
+    }
+    try {
+      var settings = await _messaging.getNotificationSettings();
+
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        settings = await _messaging.requestPermission();
+      }
+
+      // Zgody zablokowanej nie da się cofnąć z poziomu strony — użytkownik musi
+      // ją zmienić w ustawieniach przeglądarki.
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        return NotificationEnableResult.blocked;
+      }
+
+      final token = await _currentToken();
+      if (token == null) {
+        // Zgoda jest, a tokenu nie ma: typowo Brave z wyłączonym „Use Google
+        // services for push messaging", albo iOS Safari bez zainstalowanej PWA.
+        return NotificationEnableResult.noPushService;
+      }
+
+      await _sendToken(token);
+      return NotificationEnableResult.enabled;
+    } catch (e) {
+      debugPrint('enableNotifications failed: $e');
+      return NotificationEnableResult.failed;
+    }
+  }
+
   Future<void> _sendToken(String token) async {
     await _api.request(
       endpoint: 'notifications/device-tokens',
@@ -214,3 +268,13 @@ class _NotificationRoute extends StatelessWidget {
     );
   }
 }
+
+/// Wynik próby włączenia powiadomień.
+///
+/// [noPushService] to ważny przypadek: zgoda jest udzielona, ale przeglądarka i
+/// tak nie potrafi zarejestrować tokenu. Najczęściej Brave, który domyślnie ma
+/// wyłączone „Use Google services for push messaging" (trzeba je włączyć w
+/// brave://settings/privacy i zrestartować przeglądarkę), albo iOS Safari bez
+/// zainstalowanej PWA. Bez rozróżnienia tego od [blocked] podpowiedź „zmień
+/// zgodę w ustawieniach strony" wysyłałaby użytkownika w ślepy zaułek.
+enum NotificationEnableResult { enabled, blocked, noPushService, unsupported, failed }
