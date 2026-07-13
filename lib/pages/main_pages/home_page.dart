@@ -78,9 +78,15 @@ class HomePageState extends State<HomePage> {
     super.initState();
     _fetchRecentExpenses();
 
-    // Refresh recent expenses when added to a shared expense.
+    // Refresh when added to a shared expense, or when someone settles/unsettles
+    // one — the tiles' settled markers and the balances card would be stale.
     _notifSub = NotificationsStore().stream.listen((n) {
-      if (mounted && n.type == 'EXPENSE_SPLIT') _fetchRecentExpenses();
+      if (!mounted) return;
+      if (n.type == 'EXPENSE_SPLIT') {
+        _fetchRecentExpenses();
+      } else if (n.type == 'EXPENSE_SETTLEMENT') {
+        _refreshHome();
+      }
     });
 
     // Handle a notification tapped while the app was terminated, now that the

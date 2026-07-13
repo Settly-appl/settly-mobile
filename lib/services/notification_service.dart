@@ -8,6 +8,7 @@ import 'package:settly_mobile/app_navigator.dart';
 import 'package:settly_mobile/firebase_web_config.dart';
 import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
+import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/main_pages/friends_page.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
@@ -79,12 +80,20 @@ class NotificationService {
 
   Future<void> navigateForData(Map<String, dynamic> data) async {
     final type = data['type']?.toString();
-    if (type == 'EXPENSE_SPLIT') {
+
+    // Powiadomienia o wydatku (dodano Cię do podziału / ktoś zmienił rozliczenie)
+    // prowadzą do samego wydatku.
+    if (type == 'EXPENSE_SPLIT' || type == 'EXPENSE_SETTLEMENT') {
       final id = data['expenseId']?.toString();
       if (id != null && id.isNotEmpty) await _openExpense(id);
     } else if (type == 'FRIEND_REQUEST' || type == 'FRIEND_REQUEST_ACCEPTED') {
       navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => const FriendsPage()),
+      );
+    } else if (type == 'SETTLEMENT_REMINDER') {
+      // Codzienne przypomnienie nie dotyczy jednego wydatku — otwórz salda.
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const BalancesPage()),
       );
     }
   }
