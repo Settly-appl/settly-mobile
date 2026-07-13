@@ -827,7 +827,10 @@ class _NotificationsSheet extends StatelessWidget {
                       ),
                       if (items.isNotEmpty)
                         TextButton(
-                          onPressed: store.clear,
+                          // Musi oznaczyć jako przeczytane na backendzie —
+                          // samo wyczyszczenie listy lokalnie nic nie daje,
+                          // bo przy następnym odświeżeniu wrócą ze skrzynki.
+                          onPressed: store.markAllRead,
                           child: Text(texts.clearAction),
                         ),
                     ],
