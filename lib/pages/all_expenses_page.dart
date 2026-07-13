@@ -8,6 +8,7 @@ import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
+import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
