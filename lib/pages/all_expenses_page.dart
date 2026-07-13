@@ -8,7 +8,6 @@ import 'package:settly_mobile/models/app_notification.dart';
 import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
-import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
@@ -449,7 +448,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
   }
 
   // ── Przyciski akcji (dodaj wydatek / skanuj paragon) ───────────────────────
-  // Te same arkusze co na stronie głównej (QuickAddMenu / QuickScanMenu).
+  // Dodawanie prowadzi wprost do formularza; skanowanie nadal ma arkusz
+  // wyboru (pojedynczy / grupowy / projekt) — tam opcje faktycznie się różnią.
   Widget _buildFabs() {
     final texts = AppTexts.of(context);
     return Column(
@@ -479,12 +479,14 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
+  /// Dodawanie wydatku prowadzi wprost do formularza — arkusz wyboru nie miał
+  /// sensu, bo o tym, czy wydatek jest wspólny, decyduje wybór znajomych już
+  /// w samym formularzu.
   Future<void> _openAddMenu() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => QuickAddMenu(isDark: isDark, onSaved: _refreshExpenses),
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ExpenseFormPage(isDark: isDark)),
     );
+    if (saved == true) await _refreshExpenses();
   }
 
   Future<void> _openScanMenu() async {

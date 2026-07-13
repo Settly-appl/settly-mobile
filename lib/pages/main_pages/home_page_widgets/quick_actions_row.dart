@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:settly_mobile/models/expenses/recent_expense.dart';
+import 'package:settly_mobile/pages/expense_form_page.dart';
 import 'package:settly_mobile/pages/balances_page.dart';
 import 'package:settly_mobile/pages/projects_page.dart';
-import 'package:settly_mobile/pages/quick_add_menu.dart';
 import 'package:settly_mobile/pages/quick_scan_menu.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
@@ -33,13 +32,15 @@ class QuickActionsRow extends StatelessWidget {
               iconColor: AppColors.actionAddIcon(isDark),
               iconBg: AppColors.actionAddIconBg(isDark),
               isDark: isDark,
+              // Wprost do formularza — bez arkusza wyboru. To, czy wydatek jest
+              // wspólny, wynika z wybrania znajomych w formularzu.
               onTap: () async {
-                await showModalBottomSheet<RecentExpense>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (context) =>
-                      QuickAddMenu(isDark: isDark, onSaved: onExpenseAdded),
+                final saved = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => ExpenseFormPage(isDark: isDark),
+                  ),
                 );
+                if (saved == true) await onExpenseAdded();
               },
             ),
           ),
