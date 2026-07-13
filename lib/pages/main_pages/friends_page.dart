@@ -733,6 +733,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
   final _emailController = TextEditingController();
   bool _searching = false;
   bool _sending = false;
+  bool _sent = false;
   UserSearchResult? _result;
   String? _error;
 
@@ -752,6 +753,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
       _searching = true;
       _error = null;
       _result = null;
+      _sent = false; // inaczej „ptaszek" zostałby przy kolejnej wyszukanej osobie
     });
     final response = await widget.api.request(
       endpoint: 'users/search',
@@ -786,7 +788,11 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
     if (!mounted) return;
     setState(() => _sending = false);
     if (response != null && response.statusCode == 200) {
-      Navigator.pop(context, true);
+      setState(() => _sent = true);
+      // Pokaż „ptaszka" przez chwilę — gdybyśmy zamknęli arkusz od razu,
+      // potwierdzenie mignęłoby i użytkownik by go nie zobaczył.
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (mounted) Navigator.pop(context, true);
     } else {
       setState(() {
         _error = response != null
@@ -794,6 +800,53 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
             : texts.networkError;
       });
     }
+  }
+
+  /// Zaproszenie: kółko z plusem obok nazwiska, które po wysłaniu zamienia się
+  /// w wypełnione kółko z ptaszkiem.
+  Widget _inviteAction() {
+    final texts = AppTexts.of(context);
+
+    if (_sent) {
+      return Container(
+        width: 36,
+        height: 36,
+        decoration: const BoxDecoration(
+          color: AppColors.amountPositive,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.check_rounded, size: 20, color: Colors.white),
+      );
+    }
+
+    if (_sending) {
+      return const SizedBox(
+        width: 36,
+        height: 36,
+        child: Padding(
+          padding: EdgeInsets.all(8),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final accent = AppColors.amountCurrency(isDark);
+    return Tooltip(
+      message: texts.friendsSendRequestButton,
+      child: InkWell(
+        onTap: _sendRequest,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: accent, width: 1.5),
+          ),
+          child: Icon(Icons.add_rounded, size: 20, color: accent),
+        ),
+      ),
+    );
   }
 
   @override
@@ -905,25 +958,10 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  _inviteAction(),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _sending ? null : _sendRequest,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _sending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(texts.friendsSendRequestButton),
             ),
           ],
         ],
