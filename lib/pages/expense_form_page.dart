@@ -2654,7 +2654,24 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                 ),
                 SizedBox(
                   width: 90,
-                  child: _MoneyField(
+                  // Przy cenach własnych cena produktu jest wyliczana z sumy
+                  // udziałów, więc pokazujemy ją tylko do odczytu — edytowalne
+                  // pole i tak nie odświeżyłoby się po zmianie programowej.
+                  child: item.hasCustomShares
+                      ? Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '${item.price.toStringAsFixed(2)} '
+                            '${_currencySymbol(_selectedCurrency)}',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              color: AppColors.cardTitle(widget.isDark),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : _MoneyField(
                     key: ValueKey('price_${item.id}'),
                     initialValue: item.price > 0
                         ? item.price.toStringAsFixed(2)
@@ -2731,16 +2748,23 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             if (custom) {
               item.customShares.clear(); // wróć do podziału po równo
             } else {
-              // Wypełnij równymi kwotami — użytkownik edytuje stąd.
-              final equal = item.equalShare;
+              // Wypełnij równymi kwotami — użytkownik edytuje stąd. Reszta z
+              // dzielenia trafia do pierwszej osoby, żeby suma zgadzała się co
+              // do grosza (10 / 3 to 3.34 + 3.33 + 3.33, nie 3×3.33 = 9.99).
+              final ids = item.assigneeIds.toList();
+              final cents = (item.price * 100).round();
+              final base = cents ~/ ids.length;
+              final remainder = cents - base * ids.length;
+
               item.customShares
                 ..clear()
-                ..addEntries(
-                  item.assigneeIds.map(
-                    (uid) =>
-                        MapEntry(uid, double.parse(equal.toStringAsFixed(2))),
-                  ),
-                );
+                ..addEntries([
+                  for (var i = 0; i < ids.length; i++)
+                    MapEntry(
+                      ids[i],
+                      (base + (i == 0 ? remainder : 0)) / 100.0,
+                    ),
+                ]);
             }
           }),
           child: Row(
@@ -2792,6 +2816,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                       onChanged: (v) => setState(() {
                         item.customShares[uid] =
                             double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                        // Przy cenach własnych cena produktu wynika z sumy
+                        // udziałów — uzupełnia się sama, więc nic nie może się
+                        // rozjechać.
+                        item.price = item.customSharesTotal;
+                        if (_splitType == SplitType.byItems) {
+                          _syncAmountFromItems();
+                        }
                       }),
                       style: TextStyle(
                         color: AppColors.cardTitle(widget.isDark),
@@ -3198,7 +3229,15 @@ class _MoneyFieldState extends State<_MoneyField> {
     if (_focusNode.hasFocus) {
       // Po wejściu w pole: obetnij zbędne końcowe zera, aby łatwo było
       // zmienić wartość (`5.00` → `5`, `5.10` → `5.1`). Kursor na końcu.
-      final stripped = stripTrailingZeros(_controller.text);
+      //
+      // Zero czyścimy do końca: zostawienie „0" sprawiało, że wpisana kwota
+      // dopisywała się do niego („0" + „16" → „016"), zamiast je zastąpić.
+      // Puste pole i tak pokazuje podpowiedź „0.00".
+      final value = double.tryParse(_controller.text.replaceAll(',', '.'));
+      final stripped = (value == null || value == 0)
+          ? ''
+          : stripTrailingZeros(_controller.text);
+
       if (stripped != _controller.text) {
         _controller.value = TextEditingValue(
           text: stripped,
