@@ -280,7 +280,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         final drafts = <ItemDraft>[];
         for (final it in jsonDecode(itemsResp.body) as List<dynamic>) {
           final itemId = it['id']?.toString();
+          final price = (it['price'] as num?)?.toDouble() ?? 0.0;
           final assignees = <String>{};
+          final shares = <String, double>{};
+
           if (itemId != null) {
             final usersResp = await _api.request(
               endpoint: 'expenses/items/$itemId/users',
@@ -289,16 +292,29 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             if (usersResp != null && usersResp.statusCode == 200) {
               for (final u in jsonDecode(usersResp.body) as List<dynamic>) {
                 final uid = (u['userId'] ?? u['id'])?.toString();
-                if (uid != null) assignees.add(uid);
+                if (uid == null) continue;
+                assignees.add(uid);
+                final amount = (u['amount'] as num?)?.toDouble();
+                if (amount != null) shares[uid] = amount;
               }
             }
           }
+
+          // Zachowaj ceny własne tylko wtedy, gdy naprawdę są nierówne — inaczej
+          // zwykły podział po równo zamieniłby się w "ceny własne" po każdej
+          // edycji (i zamroziłby kwoty przy zmianie ceny produktu).
+          final equal = assignees.isEmpty ? 0.0 : price / assignees.length;
+          final isEqualSplit =
+              shares.length == assignees.length &&
+              shares.values.every((v) => (v - equal).abs() <= 0.01);
+
           drafts.add(
             ItemDraft(
               id: 'item_${_itemAutoId++}',
               name: (it['name'] as String?) ?? '',
-              price: (it['price'] as num?)?.toDouble() ?? 0.0,
+              price: price,
               assigneeIds: assignees,
+              customShares: isEqualSplit ? null : shares,
             ),
           );
         }
@@ -702,6 +718,15 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         if (item.assigneeIds.isEmpty) {
           return texts.errorItemNoAssignee.replaceAll('{name}', item.name);
         }
+        // Ceny własne muszą sumować się do ceny produktu — inaczej suma udziałów
+        // rozjechałaby się z tym, ile ten produkt kosztuje.
+        if (item.hasCustomShares &&
+            (item.customSharesTotal - item.price).abs() > 0.001) {
+          return texts.errorItemSharesMismatch
+              .replaceAll('{name}', item.name)
+              .replaceAll('{sum}', item.customSharesTotal.toStringAsFixed(2))
+              .replaceAll('{price}', item.price.toStringAsFixed(2));
+        }
       }
       final assigned = <String>{for (final i in _items) ...i.assigneeIds};
       for (final friendId in _selectedFriendIds) {
@@ -814,10 +839,18 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       final assignments = _splitType == SplitType.byItems
           ? [
               for (final draft in _items)
-                ItemSplitAssignment(
-                  expenseItemId: itemIds[draft.id]!,
-                  userIds: draft.assigneeIds.toList(),
-                ),
+                if (draft.hasCustomShares)
+                  // Podział nierówny — wysyłamy kwotę per osoba.
+                  ItemSplitAssignment(
+                    expenseItemId: itemIds[draft.id]!,
+                    shares: Map<String, double>.from(draft.customShares),
+                  )
+                else
+                  // Po równo — niech backend policzy i zaokrągli.
+                  ItemSplitAssignment(
+                    expenseItemId: itemIds[draft.id]!,
+                    userIds: draft.assigneeIds.toList(),
+                  ),
             ]
           : null;
 
@@ -2674,9 +2707,131 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                   _itemAssigneeChip(item, uid),
               ],
             ),
+            if (item.assigneeIds.length > 1) _itemSharesEditor(item, texts),
           ],
         ),
       ),
+    );
+  }
+
+  /// Przełącznik „po równo / ceny własne" dla produktu + pola kwot na osobę.
+  /// Pokazujemy tylko, gdy produkt dzieli więcej niż jedna osoba — przy jednej
+  /// nie ma czego dzielić.
+  Widget _itemSharesEditor(ItemDraft item, AppTexts texts) {
+    final custom = item.hasCustomShares;
+    final mismatch =
+        custom && (item.customSharesTotal - item.price).abs() > 0.001;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => setState(() {
+            if (custom) {
+              item.customShares.clear(); // wróć do podziału po równo
+            } else {
+              // Wypełnij równymi kwotami — użytkownik edytuje stąd.
+              final equal = item.equalShare;
+              item.customShares
+                ..clear()
+                ..addEntries(
+                  item.assigneeIds.map(
+                    (uid) =>
+                        MapEntry(uid, double.parse(equal.toStringAsFixed(2))),
+                  ),
+                );
+            }
+          }),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                custom ? Icons.tune_rounded : Icons.drag_handle_rounded,
+                size: 13,
+                color: AppColors.amountCurrency(widget.isDark),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                custom ? texts.itemSharesCustom : texts.itemSharesEqual,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.amountCurrency(widget.isDark),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (custom) ...[
+          const SizedBox(height: 4),
+          for (final uid in item.assigneeIds)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      uid == _currentUserId
+                          ? _currentUserDisplayName
+                          : _nameFor(uid),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.cardSubtitle(widget.isDark),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 90,
+                    child: _MoneyField(
+                      key: ValueKey('share_${item.id}_$uid'),
+                      initialValue: (item.customShares[uid] ?? 0).toStringAsFixed(
+                        2,
+                      ),
+                      textAlign: TextAlign.right,
+                      onChanged: (v) => setState(() {
+                        item.customShares[uid] =
+                            double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                      }),
+                      style: TextStyle(
+                        color: AppColors.cardTitle(widget.isDark),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: '0.00',
+                        suffixText: ' ${_currencySymbol(_selectedCurrency)}',
+                        suffixStyle: TextStyle(
+                          color: AppColors.cardSubtitle(widget.isDark),
+                          fontSize: 11,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.only(bottom: 4),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (mismatch)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                texts.itemSharesMismatchHint
+                    .replaceAll(
+                      '{sum}',
+                      item.customSharesTotal.toStringAsFixed(2),
+                    )
+                    .replaceAll('{price}', item.price.toStringAsFixed(2)),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.amountNegative,
+                ),
+              ),
+            ),
+        ],
+      ],
     );
   }
 
@@ -2690,9 +2845,15 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       onTap: () => setState(() {
         if (active) {
           item.assigneeIds.remove(userId);
+          item.customShares.remove(userId);
         } else {
           item.assigneeIds.add(userId);
+          // Przy cenach własnych nowa osoba startuje z 0 — użytkownik wpisuje
+          // kwotę, a walidacja pilnuje, żeby suma zgadzała się z ceną produktu.
+          if (item.hasCustomShares) item.customShares[userId] = 0.0;
         }
+        // Ceny własne mają sens tylko przy >1 osobie.
+        if (item.assigneeIds.length <= 1) item.customShares.clear();
       }),
       borderRadius: BorderRadius.circular(20),
       child: Container(

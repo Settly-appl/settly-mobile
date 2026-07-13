@@ -87,18 +87,32 @@ class SplitParticipantRequest {
   };
 }
 
+/// Kto jest przypisany do produktu i (opcjonalnie) za ile każdy.
+///
+/// Wysyłamy dokładnie jedno z dwóch:
+///  * [userIds] — dzielimy produkt po równo; zaokrąglenie robi backend, więc
+///    części zawsze sumują się dokładnie do ceny produktu;
+///  * [shares] — kwota per osoba, gdy podział jest nierówny. Muszą sumować się
+///    do ceny produktu (backend to waliduje).
 class ItemSplitAssignment {
   final String expenseItemId;
-  final List<String> userIds;
+  final List<String>? userIds;
+  final Map<String, double>? shares;
 
   const ItemSplitAssignment({
     required this.expenseItemId,
-    required this.userIds,
+    this.userIds,
+    this.shares,
   });
 
   Map<String, dynamic> toJson() => {
     'expenseItemId': expenseItemId,
-    'userIds': userIds,
+    if (shares != null && shares!.isNotEmpty)
+      'shares': [
+        for (final e in shares!.entries) {'userId': e.key, 'amount': e.value},
+      ]
+    else
+      'userIds': userIds ?? const <String>[],
   };
 }
 

@@ -420,8 +420,22 @@ class AppTexts {
       ? 'Add items manually or scan a receipt to fill them automatically.'
       : 'Dodaj pozycje ręcznie albo zeskanuj paragon, aby je wypełnić automatycznie.';
   String get untitledItem => _isEnglish ? 'Untitled' : 'Bez nazwy';
-  String get formItemNameHint =>
-      _isEnglish ? 'Item name' : 'Nazwa produktu';
+  String get formItemNameHint => _isEnglish ? 'Item name' : 'Nazwa produktu';
+
+  // ── Ceny własne za produkt (nierówny podział jednego produktu) ─────────────
+  String get itemSharesEqual =>
+      _isEnglish ? 'Split equally — tap to set prices' : 'Po równo — kliknij, by ustawić ceny';
+  String get itemSharesCustom =>
+      _isEnglish ? 'Custom prices — tap for equal' : 'Ceny własne — kliknij, by po równo';
+
+  /// Ostrzeżenie pod polami: sumy nie zgadzają się z ceną produktu.
+  String get itemSharesMismatchHint => _isEnglish
+      ? 'Shares add up to {sum}, item costs {price}'
+      : 'Kwoty sumują się do {sum}, produkt kosztuje {price}';
+
+  String get errorItemSharesMismatch => _isEnglish
+      ? 'Shares for "{name}" add up to {sum} but it costs {price}.'
+      : 'Kwoty za „{name}" sumują się do {sum}, a produkt kosztuje {price}.';
   String get noProjectsYet => _isEnglish
       ? 'You do not have any projects yet.'
       : 'Nie masz jeszcze projektów.';
