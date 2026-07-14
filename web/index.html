@@ -32,6 +32,29 @@
   <title>Settly</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Klawiatura ekranowa: od Chrome 108 Android domyślnie NAKŁADA klawiaturę
+       na stronę zamiast zmniejszać viewport, więc Flutter nie widzi jej wcale
+       (viewInsets.bottom == 0) i pola tekstowe zostają zasłonięte. Naprawia to
+       interactive-widget=resizes-content — ale silnik Fluttera przy starcie
+       podmienia meta viewport na własny (bez tej właściwości), więc statyczny
+       tag by przepadł. Dopisujemy właściwość PO wstrzyknięciu przez silnik. -->
+  <script>
+    (function () {
+      function patchViewport() {
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (meta && meta.content.indexOf('interactive-widget') === -1) {
+          meta.content += ', interactive-widget=resizes-content';
+        }
+      }
+      // Silnik wstawia meta do <head> podczas bootstrapu; obserwator łapie to
+      // niezależnie od momentu (także po hot-restarcie). Zmiana atrybutu
+      // content nie jest mutacją childList, więc nie ma pętli.
+      new MutationObserver(patchViewport)
+        .observe(document.head, { childList: true });
+      window.addEventListener('flutter-first-frame', patchViewport);
+    })();
+  </script>
+
   <!-- PWA install: capture the (Chromium) install prompt so Flutter can trigger
        it on demand. Fires only on Chrome/Edge/Android; iOS never fires it. -->
   <script>
