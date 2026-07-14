@@ -18,6 +18,8 @@ String localizedCategoryLabel(String rawCategory, AppTexts texts) {
       return texts.categoryEntertainmentLabel;
     case 'health':
       return texts.categoryHealthLabel;
+    case 'subscriptions':
+      return texts.categorySubscriptionsLabel;
     case 'others':
     case 'other':
       return texts.expensesLabelOther;

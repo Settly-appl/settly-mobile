@@ -63,6 +63,14 @@ class ExpenseStyle {
           badgeBg: Colors.greenAccent,
           badgeFg: Colors.white,
         );
+      case 'subscriptions':
+        return ExpenseStyle(
+          icon: Icons.autorenew_rounded,
+          iconBg: isDark ? Colors.teal.withOpacity(0.2) : Colors.teal.shade50,
+          iconColor: Colors.teal,
+          badgeBg: Colors.tealAccent,
+          badgeFg: Colors.white,
+        );
       case 'others':
       default:
         return ExpenseStyle(

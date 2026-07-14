@@ -31,6 +31,14 @@ class SingleExpense {
   /// pokazujemy gestu rozliczenia.
   bool canSettle;
 
+  /// Ilu nierozliczonych uczestników ZGŁOSIŁO zapłatę (sugestia dla
+  /// właściciela, nie fakt — patrz backend `declaredCount`).
+  int declaredCount;
+
+  /// Własny udział tego użytkownika ma zgłoszoną zapłatę (czeka na
+  /// potwierdzenie właściciela). Zawsze `false` dla właściciela.
+  bool declared;
+
   bool get isShared => splitCount > 0;
 
   /// Some but not all participants have settled (only meaningful to the owner).
@@ -54,6 +62,8 @@ class SingleExpense {
     this.settledCount = 0,
     this.settled = false,
     this.canSettle = false,
+    this.declaredCount = 0,
+    this.declared = false,
   });
 
   // ── GETTER STYLI ───────────────────────────────────────────────────────────
@@ -83,6 +93,8 @@ class SingleExpense {
       settledCount: (json['settledCount'] as num?)?.toInt() ?? 0,
       settled: json['settled'] as bool? ?? false,
       canSettle: json['canSettle'] as bool? ?? false,
+      declaredCount: (json['declaredCount'] as num?)?.toInt() ?? 0,
+      declared: json['declared'] as bool? ?? false,
     );
   }
 

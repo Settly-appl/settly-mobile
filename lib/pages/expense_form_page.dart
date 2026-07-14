@@ -71,6 +71,8 @@ class _CategoryOption {
         return texts.categoryEntertainmentLabel;
       case 'health':
         return texts.categoryHealthLabel;
+      case 'subscriptions':
+        return texts.categorySubscriptionsLabel;
       default:
         return texts.expensesLabelOther;
     }
@@ -83,6 +85,7 @@ const List<_CategoryOption> _kCategories = [
   _CategoryOption('transport', Icons.directions_car, Colors.blue),
   _CategoryOption('entertainment', Icons.movie, Colors.purple),
   _CategoryOption('health', Icons.medical_services, Colors.green),
+  _CategoryOption('subscriptions', Icons.autorenew_rounded, Colors.teal),
   _CategoryOption('others', Icons.more_horiz, Colors.grey),
 ];
 

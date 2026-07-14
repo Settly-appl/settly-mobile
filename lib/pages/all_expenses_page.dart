@@ -15,6 +15,7 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
+import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
@@ -22,7 +23,7 @@ import 'package:settly_mobile/widgets/settlement.dart';
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
 // UWAGA: wartości `apiValue` muszą się zgadzać z identyfikatorami kategorii
 // zapisywanymi przez formularz wydatku (_kCategories w expense_form_page.dart):
-// shopping / food / transport / entertainment / health / others.
+// shopping / food / transport / entertainment / health / subscriptions / others.
 enum AllExpensesPage {
   all,
   food,
@@ -30,6 +31,7 @@ enum AllExpensesPage {
   shopping,
   entertainment,
   health,
+  subscriptions,
   others,
 }
 
@@ -48,6 +50,8 @@ extension ExpenseCategoryLabel on AllExpensesPage {
         return texts.categoryEntertainmentLabel;
       case AllExpensesPage.health:
         return texts.categoryHealthLabel;
+      case AllExpensesPage.subscriptions:
+        return texts.categorySubscriptionsLabel;
       case AllExpensesPage.others:
         return texts.expensesLabelOther;
     }
@@ -68,6 +72,8 @@ extension ExpenseCategoryLabel on AllExpensesPage {
         return 'entertainment';
       case AllExpensesPage.health:
         return 'health';
+      case AllExpensesPage.subscriptions:
+        return 'subscriptions';
       case AllExpensesPage.others:
         return 'others';
     }
@@ -102,6 +108,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
   StreamSubscription<AppNotification>? _notifSub;
+  String? _currentUserId;
 
   static const int _pageSize = 20;
 
@@ -161,6 +168,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadProjects();
     _refreshExpenses();
     _scrollController.addListener(_onScroll);
@@ -209,9 +217,20 @@ class _ExpensesPageState extends State<ExpensesPage> {
   // użytkownik doscrolluje do końca. `userShare` pobieramy tylko dla świeżo
   // wczytanej strony, żeby nie zasypywać backendu żądaniami na starcie.
 
+  /// Id zalogowanego użytkownika — rozstrzyga, czy swipe naprawdę rozlicza
+  /// (właściciel), czy tylko zgłasza zapłatę (uczestnik).
+  Future<void> _loadCurrentUser() async {
+    final info = await AuthService().getUserInfo();
+    if (mounted) setState(() => _currentUserId = info?['sub'] as String?);
+  }
+
+  bool _isOwnerOf(SingleExpense item) =>
+      _currentUserId != null && item.ownerId == _currentUserId;
+
   // Odświeżenie od zera (start, zmiana kategorii, powrót na zakładkę, refresh).
-  /// Rozlicza / cofa rozliczenie wydatku (swipe). Aktualizuje kafelek w miejscu,
-  /// żeby nie przewijać listy od nowa; przy błędzie pokazuje komunikat.
+  /// Swipe rozliczenia: właściciel rozlicza / cofa wszystkich, uczestnik
+  /// zgłasza / wycofuje zapłatę (sugestię — patrz backend). Aktualizuje kafelek
+  /// w miejscu, żeby nie przewijać listy od nowa; przy błędzie pokazuje komunikat.
   Future<void> _setSettled(SingleExpense item, bool settled) async {
     final id = item.id;
     if (id == null) return;
@@ -239,10 +258,14 @@ class _ExpensesPageState extends State<ExpensesPage> {
     }
 
     setState(() {
-      item.settled = settled;
-      // Właściciel rozlicza wszystkich naraz; uczestnik tylko siebie — w obu
-      // przypadkach z perspektywy tego użytkownika wydatek jest (nie)rozliczony.
-      item.settledCount = settled ? item.splitCount : 0;
+      if (_isOwnerOf(item)) {
+        item.settled = settled;
+        item.settledCount = settled ? item.splitCount : 0;
+        if (settled) item.declaredCount = 0; // potwierdzenie zeruje zgłoszenia
+      } else if (!item.settled) {
+        // Uczestnik jedynie zgłosił / wycofał zapłatę — nic nie jest rozliczone.
+        item.declared = settled;
+      }
     });
   }
 
@@ -820,6 +843,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           isDark: isDark,
           onChanged: _refreshExpenses,
           onSetSettled: _setSettled,
+          isOwnerOf: _isOwnerOf,
           projectNames: _projectNames,
         );
       }, childCount: groups.length),
@@ -926,6 +950,7 @@ class _ExpenseDateGroup extends StatelessWidget {
   final bool isDark;
   final VoidCallback onChanged;
   final Future<void> Function(SingleExpense item, bool settled) onSetSettled;
+  final bool Function(SingleExpense item) isOwnerOf;
   final Map<String, String> projectNames;
 
   const _ExpenseDateGroup({
@@ -934,6 +959,7 @@ class _ExpenseDateGroup extends StatelessWidget {
     required this.isDark,
     required this.onChanged,
     required this.onSetSettled,
+    required this.isOwnerOf,
     required this.projectNames,
   });
 
@@ -973,6 +999,7 @@ class _ExpenseDateGroup extends StatelessWidget {
               child: SettleSwipe(
                 item: item,
                 isDark: isDark,
+                isOwner: isOwnerOf(item),
                 onSetSettled: (settled) => onSetSettled(item, settled),
                 child: _ExpenseRow(
                   item: item,

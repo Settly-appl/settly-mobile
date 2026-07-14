@@ -509,6 +509,40 @@ class AppTexts {
       ? 'This was settled as part of a settle-up. Undo that settlement in Balances.'
       : 'To zostało rozliczone zbiorczo. Cofnij całe rozliczenie w „Rozliczeniach”.';
 
+  // ── Zgłoszenie zapłaty ─────────────────────────────────────────────────────
+  // Uczestnik nie rozlicza już sam siebie: może jedynie ZGŁOSIĆ, że zapłacił.
+  // To sugestia dla właściciela wydatku (ma sprawdzić i potwierdzić), nie fakt.
+  String get declarePaidAction => _isEnglish ? 'Declare paid' : 'Zgłoś zapłatę';
+  String get retractDeclareAction => _isEnglish ? 'Retract' : 'Wycofaj';
+
+  /// Plakietka na własnym udziale: zgłoszono, czeka na potwierdzenie właściciela.
+  String get expenseDeclaredBadge =>
+      _isEnglish ? 'Payment declared' : 'Zgłoszono zapłatę';
+
+  /// Chip na cudzym udziale widziany przez właściciela: ta osoba twierdzi,
+  /// że zapłaciła.
+  String get expenseDetailsDeclaresPaid =>
+      _isEnglish ? 'Declares paid' : 'Zgłasza zapłatę';
+
+  /// Chip na własnym udziale uczestnika po zgłoszeniu.
+  String get expenseDetailsDeclared => _isEnglish ? 'Declared' : 'Zgłoszono';
+
+  /// np. „2 zgłoszenia" na kafelku właściciela — ilu uczestników twierdzi,
+  /// że już zapłaciło. Polskie formy: 1 zgłoszenie / 2-4 zgłoszenia /
+  /// 5+ zgłoszeń (z wyjątkiem 12-14).
+  String declaredCountBadge(int count) {
+    if (_isEnglish) {
+      return count == 1 ? '1 declared' : '$count declared';
+    }
+    if (count == 1) return '1 zgłoszenie';
+    final lastTwo = count % 100;
+    final last = count % 10;
+    if (last >= 2 && last <= 4 && !(lastTwo >= 12 && lastTwo <= 14)) {
+      return '$count zgłoszenia';
+    }
+    return '$count zgłoszeń';
+  }
+
   String get undoSettlementAction =>
       _isEnglish ? 'Undo settlement' : 'Cofnij rozliczenie';
   String get undoSettlementTitle =>
@@ -785,6 +819,8 @@ class AppTexts {
   String get categoryEntertainmentLabel =>
       _isEnglish ? 'Entertainment' : 'Rozrywka';
   String get categoryHealthLabel => _isEnglish ? 'Health' : 'Zdrowie';
+  String get categorySubscriptionsLabel =>
+      _isEnglish ? 'Subscriptions' : 'Subskrypcje';
   String get friendsSentRequest =>
       _isEnglish ? 'Friend request sent.' : 'Wysłano zaproszenie.';
   String get friendsReceivedPrefix => _isEnglish ? 'Received' : 'Otrzymano';

@@ -18,6 +18,7 @@ import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../repository/pinned_item_repository.dart';
 import '../../services/api_service/api_service_request.dart';
+import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/notifications_store.dart';
 import '../all_expenses_page.dart';
@@ -74,9 +75,22 @@ class HomePageState extends State<HomePage> {
   List<PinnedItem> pinnedItems = [];
   final _pinnedRepo = PinnedRepository();
 
+  /// Id zalogowanego użytkownika — rozstrzyga, czy swipe naprawdę rozlicza
+  /// (właściciel), czy tylko zgłasza zapłatę (uczestnik).
+  String? _currentUserId;
+
+  bool _isOwnerOf(SingleExpense item) =>
+      _currentUserId != null && item.ownerId == _currentUserId;
+
+  Future<void> _loadCurrentUser() async {
+    final info = await AuthService().getUserInfo();
+    if (mounted) setState(() => _currentUserId = info?['sub'] as String?);
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _fetchRecentExpenses();
 
     // Refresh when added to a shared expense, or when someone settles/unsettles
@@ -162,8 +176,9 @@ class HomePageState extends State<HomePage> {
     await Future.wait([_fetchRecentExpenses(), _fetchPinnedItems()]);
   }
 
-  /// Settle / unsettle an expense from the home list (swipe). Refreshes the
-  /// summary card too, since the balance changes.
+  /// Swipe on a home-list tile: the owner really settles / unsettles, a
+  /// participant only declares (or retracts) "I paid" — a suggestion for the
+  /// owner, not a fact. Refreshes the summary card too when balances change.
   Future<void> _setSettled(SingleExpense item, bool settled) async {
     final id = item.id;
     if (id == null) return;
@@ -191,9 +206,15 @@ class HomePageState extends State<HomePage> {
     }
 
     setState(() {
-      item.settled = settled;
-      item.settledCount = settled ? item.splitCount : 0;
-      _summaryKey = UniqueKey(); // balances changed
+      if (_isOwnerOf(item)) {
+        item.settled = settled;
+        item.settledCount = settled ? item.splitCount : 0;
+        if (settled) item.declaredCount = 0;
+        _summaryKey = UniqueKey(); // balances changed
+      } else if (!item.settled) {
+        // Only a declaration — balances are untouched until the owner confirms.
+        item.declared = settled;
+      }
     });
   }
 
@@ -682,6 +703,7 @@ class _HomeBody extends StatelessWidget {
                       child: SettleSwipe(
                         item: state.recentItems[index],
                         isDark: state.isDark,
+                        isOwner: state._isOwnerOf(state.recentItems[index]),
                         onSetSettled: (settled) =>
                             state._setSettled(state.recentItems[index], settled),
                         child: RecentExpenseCard(

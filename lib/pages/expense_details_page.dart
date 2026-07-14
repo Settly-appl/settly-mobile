@@ -592,25 +592,65 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     );
   }
 
-  /// Chip rozliczenia. Klikalny, gdy wolno zmienić stan tej osoby: właściciel
-  /// może rozliczyć każdego uczestnika, uczestnik tylko siebie. Własny udział
-  /// właściciela nie podlega rozliczeniu (jest opłacony z definicji).
+  /// Chip stanu udziału. Rozliczenie ("Rozliczone") to wyłącznie słowo
+  /// właściciela — potwierdzenie, że pieniądze dotarły. Uczestnik może jedynie
+  /// ZGŁOSIĆ zapłatę ("Zgłoszono") — sugestię, którą właściciel widzi jako
+  /// "Zgłasza zapłatę" i potwierdza tapnięciem.
+  /// Własny udział właściciela nie podlega rozliczeniu (opłacony z definicji);
+  /// potwierdzonego rozliczenia uczestnik nie może już cofnąć.
   Widget _settledChip(ExpenseMember m) {
     final texts = AppTexts.of(context);
-    final color = m.settled ? Colors.green : Colors.orange;
 
     final isOwnersShare = m.userId == widget.expense.ownerId;
-    final canToggle =
-        m.splitId != null &&
-        !isOwnersShare &&
-        (_isOwner || m.userId == _currentUserId);
+    final isOwnShare = !isOwnersShare && m.userId == _currentUserId;
+    final declared = !m.settled && m.declaredPaid;
+
+    final color = m.settled
+        ? Colors.green
+        : declared
+        ? Colors.blue
+        : Colors.orange;
+
+    final String label;
+    if (m.settled || isOwnersShare) {
+      label = texts.expenseDetailsSettled;
+    } else if (declared) {
+      label = _isOwner
+          ? texts.expenseDetailsDeclaresPaid
+          : texts.expenseDetailsDeclared;
+    } else {
+      label = texts.expenseDetailsToPay;
+    }
+
+    // Właściciel rozlicza/cofa każdego uczestnika; uczestnik zgłasza zapłatę
+    // własnego udziału lub wycofuje zgłoszenie — dopóki nie jest rozliczony.
+    final VoidCallback? onTap;
+    final IconData? icon;
+    if (m.splitId == null || isOwnersShare) {
+      onTap = null;
+      icon = null;
+    } else if (_isOwner) {
+      if (m.settled) {
+        onTap = () => _setMemberState(m, false);
+        icon = Icons.undo_rounded;
+      } else {
+        onTap = () => _setMemberState(m, true);
+        icon = Icons.check_rounded;
+      }
+    } else if (isOwnShare && !m.settled) {
+      onTap = () => _setMemberState(m, !m.declaredPaid);
+      icon = m.declaredPaid ? Icons.undo_rounded : Icons.check_rounded;
+    } else {
+      onTap = null;
+      icon = null;
+    }
 
     final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
-        border: canToggle
+        border: onTap != null
             ? Border.all(color: color.withValues(alpha: 0.5))
             : null,
       ),
@@ -618,37 +658,33 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            m.settled ? texts.expenseDetailsSettled : texts.expenseDetailsToPay,
+            label,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
-          if (canToggle) ...[
+          if (icon != null) ...[
             const SizedBox(width: 3),
-            Icon(
-              m.settled ? Icons.undo_rounded : Icons.check_rounded,
-              size: 11,
-              color: color,
-            ),
+            Icon(icon, size: 11, color: color),
           ],
         ],
       ),
     );
 
-    if (!canToggle) return chip;
-    return GestureDetector(onTap: () => _toggleMemberSettled(m), child: chip);
+    if (onTap == null) return chip;
+    return GestureDetector(onTap: onTap, child: chip);
   }
 
-  /// Rozlicza / cofa rozliczenie pojedynczej osoby w tym wydatku.
-  Future<void> _toggleMemberSettled(ExpenseMember m) async {
+  /// Jedno wywołanie API, dwa znaczenia (patrz backend): właściciel naprawdę
+  /// (nie)rozlicza udział, uczestnik jedynie zgłasza/wycofuje zapłatę.
+  Future<void> _setMemberState(ExpenseMember m, bool target) async {
     final expenseId = widget.expense.id;
     final splitId = m.splitId;
     if (expenseId == null || splitId == null) return;
 
     final texts = AppTexts.of(context);
-    final target = !m.settled;
 
     final result = await _expenseRepo.setSplitSettled(
       expenseId: expenseId,
@@ -674,7 +710,12 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
 
     setState(() {
       final i = _members.indexOf(m);
-      if (i != -1) _members[i] = m.copyWith(settled: target);
+      if (i != -1) {
+        _members[i] = _isOwner
+            // Rozliczenie zeruje zgłoszenie (tak samo robi backend).
+            ? m.copyWith(settled: target, declaredPaid: false)
+            : m.copyWith(declaredPaid: target);
+      }
       _settlementChanged = true; // lista musi się odświeżyć po powrocie
     });
   }

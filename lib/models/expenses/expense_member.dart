@@ -12,6 +12,10 @@ class ExpenseMember {
   final String splitType;
   final String displayName;
   final bool settled;
+
+  /// Uczestnik ZGŁOSIŁ, że zapłacił — sugestia dla właściciela do
+  /// potwierdzenia, nie fakt. Backend zeruje ją przy rozliczeniu.
+  final bool declaredPaid;
   final List<ExpenseMemberItem> items;
 
   ExpenseMember({
@@ -21,6 +25,7 @@ class ExpenseMember {
     required this.splitType,
     required this.displayName,
     this.settled = false,
+    this.declaredPaid = false,
     this.items = const [],
   });
 
@@ -32,6 +37,7 @@ class ExpenseMember {
       splitType: json['splitType']?.toString() ?? '',
       displayName: '',
       settled: json['settled'] == true,
+      declaredPaid: json['declaredPaid'] == true,
       items: ExpenseMemberItem.listFromJson(json['items']),
     );
   }
@@ -46,6 +52,7 @@ class ExpenseMember {
     String? displayName,
     String? amount,
     bool? settled,
+    bool? declaredPaid,
     List<ExpenseMemberItem>? items,
   }) {
     return ExpenseMember(
@@ -55,6 +62,7 @@ class ExpenseMember {
       amount: amount ?? this.amount,
       displayName: displayName ?? this.displayName,
       settled: settled ?? this.settled,
+      declaredPaid: declaredPaid ?? this.declaredPaid,
       items: items ?? this.items,
     );
   }

@@ -130,9 +130,11 @@ importing both causes an ambiguous-import error.
 
 - **Category ids are a fixed string set**, defined by `_kCategories` in
   `expense_form_page.dart`: `shopping`, `food`, `transport`, `entertainment`,
-  `health`, `others` (note: **`others`**, plural). Any filter, style, or badge
-  that keys off category must use these exact ids. The filter enum in
-  `all_expenses_page.dart` and `ExpenseStyle.getStyle` must stay in sync.
+  `health`, `subscriptions`, `others` (note: **`others`**, plural). Any filter,
+  style, or badge that keys off category must use these exact ids. Keep in sync:
+  the filter enum in `all_expenses_page.dart`, `ExpenseStyle.getStyle`,
+  `category_label.dart`, and the **backend AI prompts** (`AiGeminiService` lists
+  the ids for receipt categorization).
 - The expenses API is **paginated** (Spring `Page`) and uses **Spring's standard
   query params**: `page`, `size`, `sort=<field>,<dir>`. The non-standard
   `pageNumber`/`pageSize`/`sortBy`/`sortDirection` are **silently ignored** — a
@@ -150,6 +152,16 @@ importing both causes an ambiguous-import error.
   surfaced as an error and the split is left alone.
 - Only the **owner** may edit/delete (`SingleExpense.ownerId` vs the current
   user's `sub`).
+- **Settled is the owner's word; a participant only *declares*.** The same
+  settle gesture means two things: the expense owner really settles a share
+  (confirms money arrived), a participant merely sets `declaredPaid` — an
+  "I paid" **suggestion** shown to the owner to verify and confirm (chip
+  "Zgłasza zapłatę" → tap settles directly). Declarations are optional, do
+  not touch balances, are retractable, and a participant cannot un-settle an
+  owner-confirmed share. Viewer-relative fields: `ExpenseResponse.declared`
+  (my own claim) and `declaredCount` (pending claims, for the owner's badge);
+  `ExpenseSplitResponse.declaredPaid` per member. The swipe (`SettleSwipe`)
+  needs `isOwner` — pages resolve it from `ownerId` vs the JWT `sub`.
 - After edit/delete, `ExpenseDetailsPage` pops with `true`; every screen that
   pushes it must `await` the push and refresh on `true` (list, home recent,
   pinned) — otherwise stale rows linger.
@@ -233,6 +245,15 @@ Non-obvious and easy to break:
 - A daily 18:00 (Europe/Warsaw) job reminds **debtors only** to settle up. The
   scheduler is in-process, so it would fire once per instance if the API is ever
   scaled out.
+- **On-screen keyboard**: since Chrome 108, Android browsers *overlay* the
+  keyboard instead of resizing the viewport unless the viewport meta contains
+  `interactive-widget=resizes-content` — without it Flutter never sees the
+  keyboard (`viewInsets.bottom` stays 0), so no amount of Dart-side scroll
+  padding can uncover a focused field. The Flutter engine **replaces** any
+  static viewport meta at startup, so `web/index.html` patches the property
+  onto the engine's tag after injection (MutationObserver +
+  `flutter-first-frame`). Don't move it into a static `<meta>` — it would be
+  clobbered.
 - **Orientation lives in `web/manifest.json`, not in Dart.** `SystemChrome.
   setPreferredOrientations` is the *native* path and does nothing for the shipped
   PWA. The manifest used to say `"orientation": "any"` — that is not a neutral
@@ -292,7 +313,16 @@ Non-obvious and easy to break:
   ships with "Use Google services for push messaging" OFF, so a granted permission
   still yields no token**; that case is reported separately from "blocked".
   **Projects made end-to-end** (see the Projects section): a project's expenses were
-  previously invisible — the feature was write-only.
+  previously invisible — the feature was write-only. On-screen keyboard no longer
+  covers focused inputs (custom split prices etc.): `interactive-widget=
+  resizes-content` is patched onto the engine's viewport meta (see the PWA
+  section) — the Dart-side `viewInsets` padding alone could never work because
+  Chrome 108+ overlays the keyboard without telling Flutter.
+  **Declared-paid** (backend V8): participants no longer settle their own share;
+  they *declare* payment as a suggestion the owner confirms (see the Expenses
+  section). Reminder job skips declared shares; owner gets a dedicated push.
+  New **`subscriptions`** category (Subskrypcje) across form, filter, styles,
+  labels and the AI receipt prompts.
 
 > When you change behavior, update this file (esp. the localization, expenses,
 > projects and notifications notes, and this change log).
