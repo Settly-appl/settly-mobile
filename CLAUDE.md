@@ -148,6 +148,16 @@ importing both causes an ambiguous-import error.
   future backend work.) It 404s for personal expenses (no split row).
 - **Edit** reuses `ExpenseFormPage` via an `editExpense:` param: it PUTs the
   header, then **deletes and recreates** the split/items.
+- **Long-press (or right-click on desktop) on a tile** (expenses list + home
+  recent) opens a context sheet. The browser's native context menu is disabled
+  globally on web (`BrowserContextMenu.disableContextMenu()` in `main()`) —
+  Flutter does NOT block it by default, and without this the browser menu
+  opens on top of ours. Text fields keep Flutter's own selection toolbar.
+  The sheet (`widgets/expense_actions_sheet.dart`) offers the same actions and
+  rules as swipe + details: settle/undo for the owner, declare/retract for a
+  participant, repeat for everyone, edit/delete owner-only. It takes the same
+  `onSetSettled` callback as `SettleSwipe`, so in-place tile updates behave
+  identically to the swipe.
 - **Repeat** (`repeatExpense:` param, "Powtórz" in the details menu, visible to
   anyone who can see the expense) prefills the form from an existing expense —
   header, split, items — but saves a **new** one: date resets to today, split
@@ -331,7 +341,8 @@ Non-obvious and easy to break:
   New **`subscriptions`** category (Subskrypcje) across form, filter, styles,
   labels and the AI receipt prompts. **Repeat expense**: "Powtórz" in expense
   details creates a new expense prefilled from an existing one (see the
-  Expenses section) — no backend change needed.
+  Expenses section) — no backend change needed. **Long-press context menu** on
+  expense tiles (list + home): settle/declare, repeat, edit, delete.
 
 > When you change behavior, update this file (esp. the localization, expenses,
 > projects and notifications notes, and this change log).

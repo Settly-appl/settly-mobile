@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:settly_mobile/app_navigator.dart';
@@ -23,7 +24,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    // Prawy przycisk otwiera NASZE menu kontekstowe (kafelki wydatków), więc
+    // natywne menu przeglądarki musi zniknąć — Flutter go już domyślnie nie
+    // blokuje. Pola tekstowe nic nie tracą: mają własny toolbar Fluttera.
+    // Fire-and-forget — nie ma po co wstrzymywać startu.
+    unawaited(BrowserContextMenu.disableContextMenu());
+  } else {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     await NotificationService().init();

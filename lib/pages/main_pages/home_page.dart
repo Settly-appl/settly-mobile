@@ -13,6 +13,7 @@ import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/widgets/enable_notifications_button.dart';
+import 'package:settly_mobile/widgets/expense_actions_sheet.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
@@ -720,6 +721,18 @@ class _HomeBody extends StatelessWidget {
                             );
                             if (changed == true) state._refreshHome();
                           },
+                          onLongPress: () => showExpenseActionsSheet(
+                            context: context,
+                            item: state.recentItems[index],
+                            isDark: state.isDark,
+                            isOwner:
+                                state._isOwnerOf(state.recentItems[index]),
+                            onSetSettled: (settled) => state._setSettled(
+                              state.recentItems[index],
+                              settled,
+                            ),
+                            onChanged: state._refreshHome,
+                          ),
                         ),
                       ),
                     ),

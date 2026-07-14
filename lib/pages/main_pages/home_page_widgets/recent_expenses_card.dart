@@ -12,11 +12,15 @@ class RecentExpenseCard extends StatefulWidget {
   final bool isDark;
   final VoidCallback? onTap;
 
+  /// Long-press: menu kontekstowe (rozlicz/zgłoś, powtórz, edytuj, usuń).
+  final VoidCallback? onLongPress;
+
   const RecentExpenseCard({
     super.key,
     required this.item,
     required this.isDark,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -60,6 +64,9 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
 
     return Hoverable(
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      // Desktop: prawy przycisk otwiera to samo menu co long-press.
+      onSecondaryTap: widget.onLongPress,
       hoverScale: 1.01,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),

@@ -18,6 +18,7 @@ import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/services/notifications_store.dart';
 import 'package:settly_mobile/utils/category_label.dart';
+import 'package:settly_mobile/widgets/expense_actions_sheet.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
 
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
@@ -1005,6 +1006,14 @@ class _ExpenseDateGroup extends StatelessWidget {
                   item: item,
                   isDark: isDark,
                   onChanged: onChanged,
+                  onLongPress: () => showExpenseActionsSheet(
+                    context: context,
+                    item: item,
+                    isDark: isDark,
+                    isOwner: isOwnerOf(item),
+                    onSetSettled: (settled) => onSetSettled(item, settled),
+                    onChanged: onChanged,
+                  ),
                   projectName: item.projectId == null
                       ? null
                       : projectNames[item.projectId],
@@ -1023,6 +1032,9 @@ class _ExpenseRow extends StatelessWidget {
   final bool isDark;
   final VoidCallback onChanged;
 
+  /// Long-press: menu kontekstowe (rozlicz/zgłoś, powtórz, edytuj, usuń).
+  final VoidCallback? onLongPress;
+
   /// Nazwa projektu, do którego należy wydatek (null = poza projektem).
   final String? projectName;
 
@@ -1030,6 +1042,7 @@ class _ExpenseRow extends StatelessWidget {
     required this.item,
     required this.isDark,
     required this.onChanged,
+    this.onLongPress,
     this.projectName,
   });
 
@@ -1046,6 +1059,10 @@ class _ExpenseRow extends StatelessWidget {
         );
         if (changed == true) onChanged();
       },
+      onLongPress: onLongPress,
+      // Desktop: prawy przycisk otwiera to samo menu co long-press (natywne
+      // menu przeglądarki wyłącza globalnie main()).
+      onSecondaryTap: onLongPress,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(

@@ -515,6 +515,11 @@ class AppTexts {
   String get declarePaidAction => _isEnglish ? 'Declare paid' : 'Zgłoś zapłatę';
   String get retractDeclareAction => _isEnglish ? 'Retract' : 'Wycofaj';
 
+  /// Dłuższa wersja do menu kontekstowego (na swipe nie ma miejsca).
+  String get retractDeclareLong => _isEnglish
+      ? 'Retract payment declaration'
+      : 'Wycofaj zgłoszenie zapłaty';
+
   /// Plakietka na własnym udziale: zgłoszono, czeka na potwierdzenie właściciela.
   String get expenseDeclaredBadge =>
       _isEnglish ? 'Payment declared' : 'Zgłoszono zapłatę';
