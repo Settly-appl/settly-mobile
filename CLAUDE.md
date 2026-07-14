@@ -147,7 +147,14 @@ importing both causes an ambiguous-import error.
   for the page you just loaded. (A batch/embedded field would remove the N+1 —
   future backend work.) It 404s for personal expenses (no split row).
 - **Edit** reuses `ExpenseFormPage` via an `editExpense:` param: it PUTs the
-  header, then **deletes and recreates** the split/items. Deleting a split is
+  header, then **deletes and recreates** the split/items.
+- **Repeat** (`repeatExpense:` param, "Powtórz" in the details menu, visible to
+  anyone who can see the expense) prefills the form from an existing expense —
+  header, split, items — but saves a **new** one: date resets to today, split
+  participants / item assignees who aren't the repeater's friends are dropped
+  (the backend friendship check would refuse them), and a project the repeater
+  isn't a member of is cleared. Custom item shares fall back to an equal split
+  when an assignee was dropped (they'd no longer add up). Deleting a split is
   refused by the backend if a participant already **settled** — that case is
   surfaced as an error and the split is left alone.
 - Only the **owner** may edit/delete (`SingleExpense.ownerId` vs the current
@@ -322,7 +329,9 @@ Non-obvious and easy to break:
   they *declare* payment as a suggestion the owner confirms (see the Expenses
   section). Reminder job skips declared shares; owner gets a dedicated push.
   New **`subscriptions`** category (Subskrypcje) across form, filter, styles,
-  labels and the AI receipt prompts.
+  labels and the AI receipt prompts. **Repeat expense**: "Powtórz" in expense
+  details creates a new expense prefilled from an existing one (see the
+  Expenses section) — no backend change needed.
 
 > When you change behavior, update this file (esp. the localization, expenses,
 > projects and notifications notes, and this change log).

@@ -34,6 +34,12 @@ class ExpenseFormPage extends StatefulWidget {
   /// new one. Its splits/items are loaded and prefilled.
   final SingleExpense? editExpense;
 
+  /// When set, the form is prefilled from this expense (header, split, items)
+  /// but saves a brand-new one — for recurring expenses ("repeat"). The date
+  /// resets to today, and split participants who are not the current user's
+  /// friends are dropped (the backend would refuse them anyway).
+  final SingleExpense? repeatExpense;
+
   const ExpenseFormPage({
     super.key,
     required this.isDark,
@@ -46,6 +52,7 @@ class ExpenseFormPage extends StatefulWidget {
     this.initialReceiptImagePath,
     this.initialReceiptItems,
     this.editExpense,
+    this.repeatExpense,
   });
 
   @override
@@ -178,19 +185,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         orElse: () => _kCategories.first,
       );
     }
-    // Edit mode: prefill the header from the existing expense; splits/items are
-    // loaded asynchronously once the current user + friends are known.
-    final edit = widget.editExpense;
-    if (edit != null) {
-      _editExpenseId = edit.id;
-      _placeController.text = edit.name;
-      _noteController.text = edit.note;
-      _amountController.text = _cleanAmount(edit.totalAmount);
-      _selectedCurrency = edit.currency;
-      _selectedDate = edit.date;
-      _selectedProjectId = edit.projectId;
+    // Edit/repeat mode: prefill the header from the existing expense;
+    // splits/items are loaded asynchronously once the current user + friends
+    // are known. Repeat differs only in that it saves a NEW expense
+    // (_editExpenseId stays null) and starts with today's date.
+    final source = widget.editExpense ?? widget.repeatExpense;
+    if (source != null) {
+      _editExpenseId = widget.editExpense?.id;
+      _placeController.text = source.name;
+      _noteController.text = source.note;
+      _amountController.text = _cleanAmount(source.totalAmount);
+      _selectedCurrency = source.currency;
+      if (widget.editExpense != null) _selectedDate = source.date;
+      _selectedProjectId = source.projectId;
       _selectedCategory = _kCategories.firstWhere(
-        (c) => c.id == edit.category,
+        (c) => c.id == source.category,
         orElse: () => _kCategories.last,
       );
     }
@@ -206,12 +215,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     });
   }
 
-  // Loads the base data, then (in edit mode) prefills splits/items — which needs
-  // the current user id and friends to be resolved first.
+  // Loads the base data, then (in edit/repeat mode) prefills splits/items —
+  // which needs the current user id and friends to be resolved first.
   Future<void> _bootstrap() async {
     await Future.wait([_loadCurrentUser(), _loadFriends()]);
     _loadProjects();
-    if (widget.editExpense != null) await _prefillSplitsAndItems();
+    if (widget.editExpense != null || widget.repeatExpense != null) {
+      await _prefillSplitsAndItems();
+    }
   }
 
   static String _cleanAmount(String raw) {
@@ -231,10 +242,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   }
 
   // Loads the existing split (type, participants, custom amounts) and, for
-  // BY_ITEM, the items and their assignees, into the form for editing.
+  // BY_ITEM, the items and their assignees, into the form (edit and repeat).
   Future<void> _prefillSplitsAndItems() async {
-    final id = _editExpenseId;
+    final id = (widget.editExpense ?? widget.repeatExpense)?.id;
     if (id == null) return;
+
+    // Przy powtarzaniu cudzego wydatku w podziale mogą siedzieć osoby, które
+    // nie są znajomymi bieżącego użytkownika — nowy wydatek by ich nie przyjął
+    // (backend sprawdza znajomość), więc odpadają już na etapie prefill.
+    final Set<String>? allowedIds = widget.repeatExpense != null
+        ? _availableFriends.map((f) => f.userId).toSet()
+        : null;
 
     final splitsResp = await _api.request(
       endpoint: 'expenses/$id/splits',
@@ -249,7 +267,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       final type = _splitTypeFromApi(splits.first['splitType'] as String?);
       final friendIds = <String>[
         for (final s in splits)
-          if ((s['userId'] as String?) != null && s['userId'] != _currentUserId)
+          if ((s['userId'] as String?) != null &&
+              s['userId'] != _currentUserId &&
+              (allowedIds == null || allowedIds.contains(s['userId'])))
             s['userId'] as String,
       ];
       if (!mounted) return;
@@ -286,6 +306,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           final price = (it['price'] as num?)?.toDouble() ?? 0.0;
           final assignees = <String>{};
           final shares = <String, double>{};
+          var droppedAssignee = false;
 
           if (itemId != null) {
             final usersResp = await _api.request(
@@ -296,6 +317,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               for (final u in jsonDecode(usersResp.body) as List<dynamic>) {
                 final uid = (u['userId'] ?? u['id'])?.toString();
                 if (uid == null) continue;
+                if (allowedIds != null &&
+                    uid != _currentUserId &&
+                    !allowedIds.contains(uid)) {
+                  // Powtarzanie: przypisany nie-znajomy odpada z pozycji.
+                  droppedAssignee = true;
+                  continue;
+                }
                 assignees.add(uid);
                 final amount = (u['amount'] as num?)?.toDouble();
                 if (amount != null) shares[uid] = amount;
@@ -305,11 +333,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
 
           // Zachowaj ceny własne tylko wtedy, gdy naprawdę są nierówne — inaczej
           // zwykły podział po równo zamieniłby się w "ceny własne" po każdej
-          // edycji (i zamroziłby kwoty przy zmianie ceny produktu).
+          // edycji (i zamroziłby kwoty przy zmianie ceny produktu). Po
+          // odfiltrowaniu kogoś ceny własne i tak by się nie sumowały do ceny
+          // pozycji — wtedy wracamy do podziału po równo.
           final equal = assignees.isEmpty ? 0.0 : price / assignees.length;
           final isEqualSplit =
-              shares.length == assignees.length &&
-              shares.values.every((v) => (v - equal).abs() <= 0.01);
+              droppedAssignee ||
+              (shares.length == assignees.length &&
+                  shares.values.every((v) => (v - equal).abs() <= 0.01));
 
           drafts.add(
             ItemDraft(
@@ -335,7 +366,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   Future<void> _loadProjects() async {
     try {
       final projects = await _projectsService.getMyProjects();
-      if (mounted) setState(() => _projects = projects);
+      if (!mounted) return;
+      setState(() {
+        _projects = projects;
+        // Powtarzanie cudzego wydatku: projekt, do którego nie należę, odpada —
+        // backend odrzuciłby zapis nowego wydatku z takim projectId.
+        if (widget.repeatExpense != null &&
+            _selectedProjectId != null &&
+            !projects.any((p) => p.id == _selectedProjectId)) {
+          _selectedProjectId = null;
+        }
+      });
     } catch (_) {}
   }
 

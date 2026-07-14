@@ -68,6 +68,20 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     if (saved == true && mounted) Navigator.of(context).pop(true);
   }
 
+  /// „Powtórz": otwiera formularz nowego wydatku wstępnie wypełniony tym
+  /// wydatkiem (kwota, podział, pozycje; data = dziś). Po zapisie wracamy do
+  /// listy z `true`, żeby pokazała świeżo utworzony wydatek.
+  Future<void> _openRepeat() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            ExpenseFormPage(isDark: isDark, repeatExpense: widget.expense),
+      ),
+    );
+    if (saved == true && mounted) Navigator.of(context).pop(true);
+  }
+
   Future<void> _confirmDelete(AppTexts texts) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -392,13 +406,26 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           onPressed: () => Navigator.of(context).pop(_settlementChanged),
         ),
         actions: [
-          if (_isOwner)
-            PopupMenuButton<String>(
-              onSelected: (v) {
-                if (v == 'edit') _openEdit();
-                if (v == 'delete') _confirmDelete(texts);
-              },
-              itemBuilder: (_) => [
+          // "Powtórz" jest dla każdego, kto widzi wydatek (tworzy własny nowy);
+          // edycja/usuwanie pozostają tylko dla właściciela.
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'repeat') _openRepeat();
+              if (v == 'edit') _openEdit();
+              if (v == 'delete') _confirmDelete(texts);
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'repeat',
+                child: Row(
+                  children: [
+                    const Icon(Icons.repeat_rounded, size: 18),
+                    const SizedBox(width: 10),
+                    Text(texts.repeatAction),
+                  ],
+                ),
+              ),
+              if (_isOwner)
                 PopupMenuItem(
                   value: 'edit',
                   child: Row(
@@ -409,6 +436,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
                     ],
                   ),
                 ),
+              if (_isOwner)
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(
@@ -426,8 +454,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
                     ],
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
         ],
       ),
       body: RefreshIndicator(

@@ -543,6 +543,9 @@ class AppTexts {
     return '$count zgłoszeń';
   }
 
+  /// Utworzenie nowego wydatku na wzór istniejącego (powtarzające się wydatki).
+  String get repeatAction => _isEnglish ? 'Repeat' : 'Powtórz';
+
   String get undoSettlementAction =>
       _isEnglish ? 'Undo settlement' : 'Cofnij rozliczenie';
   String get undoSettlementTitle =>
