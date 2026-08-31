@@ -279,7 +279,13 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     final assignedUserIds = _extractAssignedUserIds(users);
     if (assignedUserIds.isEmpty) return;
 
-    final amountByUserId = _buildAmountByUserId(rows);
+    // Kwoty czytamy z /users — tylko tam jest udział per osoba. Wiersz pozycji
+    // (rows) nie ma ani userId, ani amount, więc mapa budowana z niego była
+    // zawsze pusta i każdy produkt pokazywał się podzielony po równo, nawet gdy
+    // udziały były ustawione ręcznie.
+    final amountByUserId = _buildAmountByUserId(
+      users.whereType<Map<String, dynamic>>().toList(),
+    );
     final totalAmount = _readItemAmount(rows.first);
     final totalAmountValue = _tryParseAmount(totalAmount);
     final hasCompleteUserAmounts = _hasCompleteUserAmounts(
@@ -312,12 +318,19 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     return ids;
   }
 
+  /// Udział per osoba w jednym produkcie, z /expenses/items/{id}/users.
+  ///
+  /// Wiersze bez kwoty pomijamy zamiast zapisywać 0.00 — dzięki temu stare
+  /// pozycje (sprzed kolumny `amount`) spadają na podział po równo, zamiast
+  /// pokazywać zero.
   Map<String, String> _buildAmountByUserId(List<Map<String, dynamic>> rows) {
     final result = <String, String>{};
     for (final row in rows) {
       final userId = _readUserId(row);
       if (userId == null) continue;
-      result[userId] = _readItemAmount(row);
+      final amount = row['amount']?.toString();
+      if (amount == null || amount.isEmpty) continue;
+      result[userId] = normalizeMoney(amount);
     }
     return result;
   }
