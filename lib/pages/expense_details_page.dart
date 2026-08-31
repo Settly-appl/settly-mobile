@@ -30,6 +30,10 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
   ExpenseSplitsType _splitType = ExpenseSplitsType.EQUAL;
   List<ExpenseMember> _members = [];
   String? _projectName;
+
+  /// Nazwa osoby, która wyłożyła pieniądze (właściciel wydatku). Uczestnik musi
+  /// wiedzieć, komu oddać — z samych zielonych plakietek nie da się tego poznać.
+  String? _payerName;
   final ApiServiceRequest _api = ApiServiceRequest();
   final ProjectsService _projectsService = ProjectsService();
   final ExpenseRepository _expenseRepo = ExpenseRepository();
@@ -151,6 +155,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         return;
       }
 
+      _payerName = await _resolvePayerName(membersWithNames);
+
       _splitType = ExpenseSplitsType.fromString(
         membersWithNames.first.splitType,
       );
@@ -203,6 +209,18 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         return m.copyWith(displayName: displayName);
       }),
     );
+  }
+
+  /// Właściciel prawie zawsze ma własny wiersz w podziale, więc nazwę bierzemy
+  /// stamtąd. Gdyby go tam nie było (starsze dane), pytamy o niego wprost —
+  /// lepiej jedno zapytanie więcej niż szczegóły bez informacji, komu oddać.
+  Future<String?> _resolvePayerName(List<ExpenseMember> members) async {
+    final ownerId = widget.expense.ownerId;
+    if (ownerId == null) return null;
+    for (final m in members) {
+      if (m.userId == ownerId && m.displayName.isNotEmpty) return m.displayName;
+    }
+    return _fetchUserDisplayName(ownerId);
   }
 
   Future<String> _fetchUserDisplayName(String userId) async {
@@ -492,6 +510,8 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             ),
             if (widget.expense.note.isNotEmpty)
               _infoRow(texts.expenseDetailsNote, widget.expense.note, isDark),
+            if (_payerName != null)
+              _infoRow(texts.expenseDetailsPaidByLabel, _payerName!, isDark),
             if (_projectName != null)
               _infoRow(texts.expenseDetailsProject, _projectName!, isDark),
             const Divider(height: 40),
@@ -545,6 +565,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
           ),
         ),
         const SizedBox(height: 12),
+        _buildOwedCallout(),
         ..._members.map((m) => _buildMemberTile(m, isDark, isByItem)),
         if (isByItem && !hasAnyProducts)
           Padding(
@@ -555,6 +576,67 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Pasek „komu oddać" dla uczestnika, który jeszcze nie ma potwierdzonego
+  /// udziału. Same plakietki tego nie mówią: udział właściciela i udział
+  /// uczestnika, który już oddał, wyglądają identycznie, więc trzeci uczestnik
+  /// nie wiedział, do kogo się zwrócić.
+  Widget _buildOwedCallout() {
+    final texts = AppTexts.of(context);
+    final payer = _payerName;
+    final myId = _currentUserId;
+    if (payer == null || myId == null || _isOwner) {
+      return const SizedBox.shrink();
+    }
+
+    ExpenseMember? mine;
+    for (final m in _members) {
+      if (m.userId == myId && m.userId != widget.expense.ownerId) {
+        mine = m;
+        break;
+      }
+    }
+    // Rozliczony udział (albo brak udziału — np. członek projektu oglądający
+    // cudzy wydatek) nie potrzebuje wskazówki, komu płacić.
+    if (mine == null || mine.settled) return const SizedBox.shrink();
+
+    final amount = '${mine.amount} ${widget.expense.currency}';
+    final declared = mine.declaredPaid;
+    final color = declared ? Colors.blue : AppColors.amountNegative;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            declared ? Icons.hourglass_top_rounded : Icons.arrow_forward_rounded,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              declared
+                  ? texts.expenseDetailsAwaitingConfirm(payer)
+                  : texts.expenseDetailsPayTo(amount, payer),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -646,14 +728,23 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     final isOwnShare = !isOwnersShare && m.userId == _currentUserId;
     final declared = !m.settled && m.declaredPaid;
 
-    final color = m.settled
+    // Wiersz właściciela dostaje własny kolor i etykietę. Wcześniej nosił to
+    // samo zielone „Rozliczone" co uczestnik, który już oddał — więc z listy
+    // nie dało się wyczytać, kto wyłożył pieniądze i komu się należy.
+    final color = isOwnersShare
+        ? AppColors.amountCurrency(
+            Theme.of(context).brightness == Brightness.dark,
+          )
+        : m.settled
         ? Colors.green
         : declared
         ? Colors.blue
         : Colors.orange;
 
     final String label;
-    if (m.settled || isOwnersShare) {
+    if (isOwnersShare) {
+      label = texts.expenseDetailsPayerChip;
+    } else if (m.settled) {
       label = texts.expenseDetailsSettled;
     } else if (declared) {
       label = _isOwner

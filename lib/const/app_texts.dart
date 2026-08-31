@@ -495,6 +495,26 @@ class AppTexts {
       : 'Brak danych o produktach dla tego podzialu.';
   String get expenseDetailsSettled => _isEnglish ? 'Settled' : 'Rozliczone';
 
+  /// Kto wyłożył pieniądze za ten wydatek — komu uczestnicy mają oddać.
+  /// Bez odmiany przez rodzaj, więc pasuje do każdego imienia.
+  String get expenseDetailsPaidByLabel =>
+      _isEnglish ? 'Paid by' : 'Zapłacone przez';
+
+  /// Chip na wierszu właściciela. Osobny od „Rozliczone", bo dla właściciela
+  /// zielone „Rozliczone" wyglądało tak samo jak u uczestnika, który już oddał
+  /// — i nie dało się poznać, kto komu jest winien.
+  String get expenseDetailsPayerChip => _isEnglish ? 'Payer' : 'Płatnik';
+
+  /// Wskazówka dla uczestnika, który jeszcze nie oddał: ile i komu.
+  String expenseDetailsPayTo(String amount, String name) => _isEnglish
+      ? 'Pay $amount to $name'
+      : 'Oddaj $amount → $name';
+
+  /// To samo, gdy uczestnik już zgłosił zapłatę i czeka na potwierdzenie.
+  String expenseDetailsAwaitingConfirm(String name) => _isEnglish
+      ? 'Waiting for $name to confirm'
+      : 'Czeka na potwierdzenie: $name';
+
   // ── Rozliczanie wydatków (swipe / oznaczenia) ──────────────────────────────
   // `settleAction` ("Rozlicz") jest już zdefiniowane wyżej — używamy go tutaj.
   String get unsettleAction => _isEnglish ? 'Unsettle' : 'Cofnij';
