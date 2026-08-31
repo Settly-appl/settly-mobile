@@ -36,6 +36,31 @@ enum AllExpensesPage {
   others,
 }
 
+/// Filtr zgłoszeń zapłaty. Dotyczy tylko wydatków dzielonych i jeszcze
+/// nierozliczonych — wydatek własny nie ma komu zgłaszać, a rozliczony ma to
+/// już za sobą, więc oba wypadają z `declared`/`undeclared`.
+enum DeclaredFilter {
+  all,
+  declared,
+  undeclared;
+
+  String localizedLabel(AppTexts texts) => switch (this) {
+    DeclaredFilter.all => texts.declaredFilterAll,
+    DeclaredFilter.declared => texts.declaredFilterDeclared,
+    DeclaredFilter.undeclared => texts.declaredFilterUndeclared,
+  };
+
+  /// `declaredCount` liczy wszystkich uczestników ze zgłoszeniem, więc pokrywa
+  /// też własny udział; `declared` zostawiamy dla pewności, gdyby backend
+  /// kiedyś zawęził licznik do perspektywy właściciela.
+  bool matches(SingleExpense e) => switch (this) {
+    DeclaredFilter.all => true,
+    DeclaredFilter.declared => e.declaredCount > 0 || e.declared,
+    DeclaredFilter.undeclared =>
+      e.isShared && !e.settled && e.declaredCount == 0 && !e.declared,
+  };
+}
+
 extension ExpenseCategoryLabel on AllExpensesPage {
   String localizedLabel(AppTexts texts) {
     switch (this) {
@@ -105,6 +130,11 @@ class _ExpensesPageState extends State<ExpensesPage> {
   int _totalElements = 0; // łączna liczba wydatków (z Page.totalElements)
   int _generation = 0; // unieważnia wyniki po zmianie filtra/odświeżeniu
   AllExpensesPage _selectedCategory = AllExpensesPage.all;
+
+  // Filtr zgłoszeń. W przeciwieństwie do kategorii i projektu odsiewamy
+  // lokalnie — backend nie zna tego kryterium, więc działa (jak wyszukiwarka)
+  // tylko na już wczytanych stronach.
+  DeclaredFilter _declaredFilter = DeclaredFilter.all;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
@@ -368,10 +398,13 @@ class _ExpensesPageState extends State<ExpensesPage> {
     });
   }
 
-  // ── Filtrowanie lokalne po wyszukiwarce ───────────────────────────────────
+  // ── Filtrowanie lokalne (wyszukiwarka + zgłoszenia) ───────────────────────
   List<SingleExpense> get _filteredExpenses {
-    if (_searchQuery.isEmpty) return _expenses;
-    return _expenses
+    final filtered = _declaredFilter == DeclaredFilter.all
+        ? _expenses
+        : _expenses.where(_declaredFilter.matches).toList();
+    if (_searchQuery.isEmpty) return filtered;
+    return filtered
         .where(
           (e) =>
               e.name.toLowerCase().contains(_searchQuery) ||
@@ -379,6 +412,11 @@ class _ExpensesPageState extends State<ExpensesPage> {
         )
         .toList();
   }
+
+  /// Czy cokolwiek odsiewamy lokalnie. Doładowywanie kolejnych stron nie ma
+  /// wtedy sensu wizualnie — pokazujemy tylko kawałek, który już mamy.
+  bool get _isFilteringLocally =>
+      _searchQuery.isNotEmpty || _declaredFilter != DeclaredFilter.all;
 
   // ── Grupowanie po dacie ────────────────────────────────────────────────────
   // Klucz techniczny (`bucketKey`) służy TYLKO do grupowania i sortowania.
@@ -476,6 +514,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
               SliverToBoxAdapter(child: const SizedBox(height: 6)),
               SliverToBoxAdapter(child: _buildProjectFilterRow()),
             ],
+            SliverToBoxAdapter(child: const SizedBox(height: 6)),
+            SliverToBoxAdapter(child: _buildDeclaredFilterRow()),
             SliverToBoxAdapter(child: const SizedBox(height: 8)),
             SliverToBoxAdapter(child: _buildSearchBar()),
             SliverToBoxAdapter(child: const SizedBox(height: 4)),
@@ -489,7 +529,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
               _buildGroupedList(),
             // Spinner doładowywania kolejnych stron (tylko gdy nie filtrujemy
             // lokalnie — wyszukiwarka działa na już wczytanych danych).
-            if (_isLoadingMore && _searchQuery.isEmpty)
+            if (_isLoadingMore && !_isFilteringLocally)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -715,6 +755,79 @@ class _ExpensesPageState extends State<ExpensesPage> {
     );
   }
 
+  /// Filtr zgłoszeń zapłaty: Wszystkie / Zgłoszone / Niezgłoszone.
+  ///
+  /// Odsiewa lokalnie (backend nie zna tego kryterium), więc działa na już
+  /// wczytanych stronach — tak samo jak wyszukiwarka obok.
+  Widget _buildDeclaredFilterRow() {
+    final texts = AppTexts.of(context);
+    final accent = AppColors.amountCurrency(isDark);
+
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: DeclaredFilter.values.map((filter) {
+          final active = _declaredFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 7),
+            child: GestureDetector(
+              onTap: () {
+                if (_declaredFilter == filter) return;
+                // Czysto lokalne — nie ruszamy backendu ani stronicowania.
+                setState(() => _declaredFilter = filter);
+              },
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: active
+                      ? accent.withValues(alpha: 0.15)
+                      : AppColors.pinnedEmptyBg(isDark),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: active
+                        ? accent.withValues(alpha: 0.4)
+                        : AppColors.cardBorder(isDark),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (filter != DeclaredFilter.all) ...[
+                      Icon(
+                        filter == DeclaredFilter.declared
+                            ? Icons.how_to_reg_rounded
+                            : Icons.hourglass_empty_rounded,
+                        size: 11,
+                        color: active ? accent : AppColors.cardSubtitle(isDark),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      filter.localizedLabel(texts),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: active
+                            ? accent
+                            : AppColors.cardSubtitle(isDark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   /// Filtr projektu — „Wszystkie projekty" + jeden chip na projekt.
   Widget _buildProjectFilterRow() {
     final texts = AppTexts.of(context);
@@ -876,6 +989,8 @@ class _ExpensesPageState extends State<ExpensesPage> {
           Text(
             _searchQuery.isNotEmpty
                 ? texts.expensesNoResults.replaceAll('{query}', _searchQuery)
+                : _declaredFilter != DeclaredFilter.all
+                ? texts.declaredFilterEmpty
                 : texts.expensesNoCategory,
             style: TextStyle(
               fontSize: 12,

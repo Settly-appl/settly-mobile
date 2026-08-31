@@ -515,6 +515,20 @@ class AppTexts {
       ? 'Waiting for $name to confirm'
       : 'Czeka na potwierdzenie: $name';
 
+  // ── Filtr zgłoszeń na liście wydatków ──────────────────────────────────────
+  // Dotyczy wyłącznie wydatków dzielonych i nierozliczonych — tylko tam
+  // zgłoszenie zapłaty ma sens.
+  String get declaredFilterAll => _isEnglish ? 'All' : 'Wszystkie';
+  String get declaredFilterDeclared => _isEnglish ? 'Declared' : 'Zgłoszone';
+  String get declaredFilterUndeclared =>
+      _isEnglish ? 'Undeclared' : 'Niezgłoszone';
+
+  /// Pusty wynik filtra zgłoszeń — inny komunikat niż „brak wydatków", bo tu
+  /// wydatki są, tylko żaden nie pasuje do filtra.
+  String get declaredFilterEmpty => _isEnglish
+      ? 'No expenses match this filter.'
+      : 'Żaden wydatek nie pasuje do tego filtra.';
+
   // ── Rozliczanie wydatków (swipe / oznaczenia) ──────────────────────────────
   // `settleAction` ("Rozlicz") jest już zdefiniowane wyżej — używamy go tutaj.
   String get unsettleAction => _isEnglish ? 'Unsettle' : 'Cofnij';
