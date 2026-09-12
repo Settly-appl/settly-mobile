@@ -8,8 +8,25 @@ class SingleExpense {
   final String note;
   final String totalAmount;
   String userShare; // Mutable - zaktualizować po pobraniu z API
+
+  /// Ten sam udział w walucie bazowej. `userShare` jest łańcuchem do
+  /// wyświetlenia ("12.50 £") i nie nadaje się do sumowania: dodanie funtów do
+  /// złotówek daje liczbę, która nie jest żadną kwotą. Każde podsumowanie na
+  /// liście wydatków liczy tę wartość.
+  double? userShareBase;
   final String category;
   final String currency;
+
+  /// Waluta bazowa właściciela, kurs, po którym kupił [currency], oraz kwota po
+  /// przeliczeniu. Dla wydatku już w walucie bazowej kurs wynosi 1, a
+  /// [baseAmount] równa się [totalAmount].
+  final String baseCurrency;
+  final double rateToBase;
+  final String baseAmount;
+
+  /// Wydatek w obcej walucie — wtedy warto pokazać obie kwoty.
+  bool get isForeign => currency != baseCurrency;
+
   final bool scanned;
   final DateTime date;
   final DateTime createdAt;
@@ -51,8 +68,12 @@ class SingleExpense {
     this.note = '',
     required this.totalAmount,
     this.userShare = '',
+    this.userShareBase,
     this.category = 'Wydatek',
     this.currency = 'PLN',
+    this.baseCurrency = 'PLN',
+    this.rateToBase = 1,
+    this.baseAmount = '',
     required this.scanned,
     required this.date,
     required this.createdAt,
@@ -80,6 +101,13 @@ class SingleExpense {
       totalAmount: normalizeMoney(json['totalAmount']?.toString() ?? '0.00'),
       category: json['category']?.toString() ?? 'Wydatek',
       currency: json['currency']?.toString() ?? 'PLN',
+      baseCurrency: json['baseCurrency']?.toString() ?? 'PLN',
+      rateToBase: (json['rateToBase'] as num?)?.toDouble() ?? 1,
+      // Starsze wydatki (sprzed przeliczania) nie mają kwoty bazowej — wtedy
+      // pokazujemy tylko kwotę własną wydatku, zamiast udawać przeliczenie.
+      baseAmount: json['baseAmount'] == null
+          ? normalizeMoney(json['totalAmount']?.toString() ?? '0.00')
+          : normalizeMoney(json['baseAmount'].toString()),
       scanned: json['isScanned'] ?? false,
       date: json['date'] != null
           ? DateTime.parse(json['date'])

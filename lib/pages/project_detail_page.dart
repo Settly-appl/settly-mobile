@@ -17,6 +17,7 @@ import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final String projectId;
@@ -104,7 +105,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         texts.balancePaidOut
             .replaceAll(
               '{amount}',
-              '${balance.absAmount.toStringAsFixed(2)} zł',
+              formatMoney(balance.absAmount, balance.currency),
             )
             .replaceAll('{name}', balance.label),
         color: AppColors.amountPositive,
@@ -513,6 +514,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   /// wspólnym wyjeździe.
   Widget _summaryCard(AppTexts texts) {
     final total = _project?.totalAmount ?? 0;
+    // Suma wyjazdu jest w walucie bazowej oglądającego — wyjazd opłacony
+    // częściowo w funtach nie ma jednej waluty własnej.
+    final totalCurrency = _project?.totalCurrency;
     final count = _expenses.isNotEmpty
         ? _expenses.length
         : (_project?.expenseCount ?? 0);
@@ -545,7 +549,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${total.toStringAsFixed(2)} zł',
+                  formatMoney(total, totalCurrency),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -652,7 +656,7 @@ class _BalanceRow extends StatelessWidget {
             ),
           ),
           Text(
-            '$sign${balance.absAmount.toStringAsFixed(2)} zł',
+            '$sign${formatMoney(balance.absAmount, balance.currency)}',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,

@@ -50,7 +50,8 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
 
     if (userShare != null && mounted) {
       setState(() {
-        widget.item.userShare = userShare;
+        widget.item.userShare = userShare.display;
+        widget.item.userShareBase = userShare.baseAmount;
         _loadingUserShare = false;
       });
     } else if (mounted) {

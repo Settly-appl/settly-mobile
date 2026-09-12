@@ -26,14 +26,24 @@ class ProjectsService {
     throw Exception('Nie udało się pobrać projektu');
   }
 
+  /// [defaultCurrency] / [defaultRateToBase] to waluta wyjazdu i kurs, po
+  /// którym uczestnicy ją kupili — wydatki dodane do projektu dziedziczą oba,
+  /// więc kurs wpisuje się raz na wyjazd, a nie przy każdym wydatku.
   Future<Project> createProject({
     required String name,
     String? description,
+    String? defaultCurrency,
+    double? defaultRateToBase,
   }) async {
     final res = await _api.request(
       endpoint: 'projects',
       method: HttpMethod.post,
-      body: {'name': name, 'description': ?description},
+      body: {
+        'name': name,
+        'description': ?description,
+        'defaultCurrency': ?defaultCurrency,
+        'defaultRateToBase': ?defaultRateToBase,
+      },
     );
     if (res != null && (res.statusCode == 200 || res.statusCode == 201)) {
       return Project.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
@@ -46,11 +56,19 @@ class ProjectsService {
     String? name,
     String? description,
     String? status,
+    String? defaultCurrency,
+    double? defaultRateToBase,
   }) async {
     final res = await _api.request(
       endpoint: 'projects/$projectId',
       method: HttpMethod.patch,
-      body: {'name': ?name, 'description': ?description, 'status': ?status},
+      body: {
+        'name': ?name,
+        'description': ?description,
+        'status': ?status,
+        'defaultCurrency': ?defaultCurrency,
+        'defaultRateToBase': ?defaultRateToBase,
+      },
     );
     if (res != null && res.statusCode == 200) {
       return Project.fromJson(jsonDecode(res.body) as Map<String, dynamic>);

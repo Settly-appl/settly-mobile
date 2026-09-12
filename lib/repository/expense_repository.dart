@@ -6,7 +6,7 @@ import 'package:settly_mobile/utils/money_input.dart';
 class ExpenseRepository {
   final _api = ApiServiceRequest();
 
-  Future<String?> fetchUserShareForExpense({
+  Future<UserShare?> fetchUserShareForExpense({
     required String expenseId,
     required String currency,
   }) async {
@@ -20,10 +20,17 @@ class ExpenseRepository {
         final data = jsonDecode(response.body);
         // Dopełnij do 2 miejsc ("5.1" -> "5.10"), tak jak w formularzu.
         final amount = normalizeMoney(data['amount']?.toString() ?? '');
-        final currency = data['currency']?.toString() ?? 'PLN';
+        final shareCurrency = data['currency']?.toString() ?? 'PLN';
+        final baseAmount = (data['baseAmount'] as num?)?.toDouble();
 
         if (amount.isNotEmpty) {
-          return '$amount $currency';
+          return UserShare(
+            display: '$amount $shareCurrency',
+            // Starsze wydatki nie mają kwoty bazowej; wtedy udział jest już w
+            // walucie bazowej i można go sumować bez przeliczania.
+            baseAmount: baseAmount ?? double.tryParse(amount) ?? 0,
+            baseCurrency: data['baseCurrency']?.toString() ?? shareCurrency,
+          );
         }
       }
     } catch (_) {
@@ -114,3 +121,18 @@ class ExpenseRepository {
 /// tylko tego jednego udziału wskrzesiłoby saldo za zapłacone pieniądze —
 /// backend (409) tego zabrania. Trzeba cofnąć całe rozliczenie.
 enum SettleResult { ok, lockedBySettleUp, failed }
+
+/// Udział użytkownika w wydatku: [display] do pokazania w walucie wydatku,
+/// [baseAmount] do sumowania. Rozdzielone celowo — podsumowania liczone na
+/// łańcuchu wyświetlanym dodawały funty do złotówek.
+class UserShare {
+  final String display;
+  final double baseAmount;
+  final String baseCurrency;
+
+  const UserShare({
+    required this.display,
+    required this.baseAmount,
+    required this.baseCurrency,
+  });
+}

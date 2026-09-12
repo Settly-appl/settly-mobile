@@ -183,6 +183,33 @@ importing both causes an ambiguous-import error.
   pushes it must `await` the push and refresh on `true` (list, home recent,
   pinned) — otherwise stale rows linger.
 
+## Waluty — domain notes
+
+- **Never format money by hand.** `lib/utils/money_format.dart` (`formatMoney`,
+  `formatMoneyRounded`, `formatMoneyWithBase`) takes the currency explicitly.
+  Every aggregate view used to hardcode `zł`; that was invisible while
+  everything was in złoty and starts lying the moment one expense is in
+  pounds. `kCurrencies` there is the single source of truth for the picker,
+  the profile setting and the backend whitelist — the three must not drift.
+- **Two denominations, two jobs.** `totalAmount`/`currency` is what was spent;
+  `baseAmount`/`baseCurrency` is the same sum converted at `rateToBase`, and it
+  is the *only* one that may be summed. Same for a share: `userShare` is a
+  display string ("12.50 £"), `userShareBase` is the summable number. Adding
+  display strings across currencies is exactly the bug this replaced.
+- **The rate is the user's own**, entered in the form when the expense currency
+  differs from their base, and prefilled from the project's `defaultRateToBase`
+  when there is one. `rateToBase` = how many base units **one** unit of the
+  expense currency costs (1 GBP = 4.85 PLN → 4.85).
+- **The live preview under the rate field is load-bearing.** An inverted rate is
+  the easiest mistake in the feature and looks perfectly normal once saved;
+  showing `12.50 £ x 4.85 = 60.63 zł` as you type is what makes it visible.
+- **Base currency** lives in the profile (`UserSettingsService`, cached
+  statically so `build` can format synchronously). Changing it is **not**
+  retroactive — each expense keeps the base currency and rate it was saved
+  with.
+- A project (wyjazd) carries `defaultCurrency`/`defaultRateToBase`: you buy the
+  pounds once, not once per expense. Expenses inherit both and may override.
+
 ## Projects — domain notes
 
 A project groups expenses (a trip, a party). Any **member** — not just the owner —

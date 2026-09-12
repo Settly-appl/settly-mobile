@@ -15,6 +15,7 @@ import 'package:settly_mobile/widgets/user_avatar.dart';
 import '../models/expenses/expense_member.dart';
 import '../services/api_service/api_service_request.dart';
 import '../services/api_service/projects_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
 
 class ExpenseDetailsPage extends StatefulWidget {
   final SingleExpense expense;
@@ -532,7 +533,12 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
       ),
       const SizedBox(height: 16),
       Text(
-        '${widget.expense.totalAmount} ${widget.expense.currency}',
+        formatMoneyWithBase(
+          double.tryParse(widget.expense.totalAmount) ?? 0,
+          widget.expense.currency,
+          double.tryParse(widget.expense.baseAmount),
+          widget.expense.baseCurrency,
+        ),
         style: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.bold,
