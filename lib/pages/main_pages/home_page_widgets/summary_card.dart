@@ -5,6 +5,8 @@ import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:intl/intl.dart';
 
 import '../../../const/app_texts.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 
 class SummaryCard extends StatefulWidget {
   const SummaryCard({super.key});
@@ -43,7 +45,7 @@ class _SummaryCardState extends State<SummaryCard> {
     }
   }
 
-  String _money(double v) => '${v.toStringAsFixed(2)} zł';
+  String _money(double v) => formatMoney(v, UserSettingsService.baseCurrency);
 
   @override
   Widget build(BuildContext context) {

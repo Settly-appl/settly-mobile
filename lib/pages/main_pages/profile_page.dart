@@ -11,6 +11,8 @@ import 'package:settly_mobile/services/notification_service.dart';
 import 'package:settly_mobile/services/pwa_install.dart';
 import 'package:settly_mobile/widgets/enable_notifications_button.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
 
 class ProfilePage extends StatelessWidget {
   final String userName;
@@ -153,6 +155,10 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ),
                 ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _BaseCurrencyButton(),
+              ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: OutlinedButton.icon(
@@ -270,6 +276,116 @@ class _AdminReminderButtonState extends State<_AdminReminderButton> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+    );
+  }
+}
+
+/// Waluta bazowa: w niej raportowane są salda i sumy.
+///
+/// Zmiana nie działa wstecz — każdy wydatek trzyma walutę bazową i kurs z
+/// chwili zapisu. Ile kosztował wyjazd, to fakt o dniu, w którym się odbył;
+/// przeliczanie go dzisiejszym kursem byłoby zgadywaniem podanym jako historia.
+class _BaseCurrencyButton extends StatefulWidget {
+  const _BaseCurrencyButton();
+
+  @override
+  State<_BaseCurrencyButton> createState() => _BaseCurrencyButtonState();
+}
+
+class _BaseCurrencyButtonState extends State<_BaseCurrencyButton> {
+  final _service = UserSettingsService();
+  String _current = UserSettingsService.baseCurrency;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final settings = await _service.fetch();
+      if (mounted) setState(() => _current = settings.baseCurrency);
+    } catch (_) {
+      // Zostaje ostatnia znana waluta.
+    }
+  }
+
+  Future<void> _pick() async {
+    final texts = AppTexts.of(context);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                texts.baseCurrencySubtitle,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            for (final c in kCurrencies)
+              ListTile(
+                leading: Text(
+                  c['symbol']!,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                title: Text('${c['code']} — ${c['name']}'),
+                trailing: c['code'] == _current
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.of(context).pop(c['code']),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (picked == null || picked == _current || !mounted) return;
+
+    setState(() => _saving = true);
+    try {
+      final settings = await _service.updateBaseCurrency(picked);
+      if (!mounted) return;
+      setState(() {
+        _current = settings.baseCurrency;
+        _saving = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.baseCurrencySaved)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.baseCurrencyFailed)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+    return OutlinedButton.icon(
+      onPressed: _saving ? null : _pick,
+      icon: _saving
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.currency_exchange_rounded),
+      label: Text('${texts.baseCurrencyTitle}: $_current'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

@@ -803,6 +803,44 @@ class AppTexts {
       : 'Wprowadź kwotę większą niż 0.';
   String get errorNoCategory =>
       _isEnglish ? 'Choose an expense category.' : 'Wybierz kategorię wydatku.';
+
+  // ── Waluty i kurs wymiany ────────────────────────────────────────────────
+  String get errorNoRate => _isEnglish
+      ? 'Enter the exchange rate you bought this currency at.'
+      : 'Podaj kurs, po którym kupiłeś tę walutę.';
+
+  /// Np. „Kurs (1 GBP w PLN)" — kierunek wprost w etykiecie, bo odwrócony kurs
+  /// to najłatwiejsza pomyłka w całym formularzu.
+  String formRateLabel(String currency, String base) => _isEnglish
+      ? 'Rate (1 $currency in $base)'
+      : 'Kurs (1 $currency w $base)';
+
+  String formRateHint(String currency) => _isEnglish
+      ? 'How much you paid for one $currency'
+      : 'Ile zapłaciłeś za jeden $currency';
+
+  String get baseCurrencyTitle =>
+      _isEnglish ? 'Base currency' : 'Waluta bazowa';
+
+  String get baseCurrencySubtitle => _isEnglish
+      ? 'Balances and totals are reported in this currency. Past expenses keep the rate they were saved with.'
+      : 'W tej walucie raportowane są salda i sumy. Dotychczasowe wydatki zachowują kurs, z którym zostały zapisane.';
+
+  String get baseCurrencySaved =>
+      _isEnglish ? 'Base currency saved' : 'Zapisano walutę bazową';
+
+  String get baseCurrencyFailed => _isEnglish
+      ? 'Could not save the base currency.'
+      : 'Nie udało się zapisać waluty bazowej.';
+
+  String get projectCurrencyLabel =>
+      _isEnglish ? 'Trip currency' : 'Waluta wyjazdu';
+
+  String get projectCurrencyHint => _isEnglish
+      ? 'Expenses added to this project start in this currency, at this rate. You can still change either one per expense.'
+      : 'Wydatki dodane do tego projektu zaczynają w tej walucie i po tym kursie. Przy pojedynczym wydatku nadal możesz zmienić jedno i drugie.';
+
+  String get projectCurrencyNone => _isEnglish ? 'None' : 'Brak';
   String get errorFriendsExceedTotal => _isEnglish
       ? 'Shares must add up to the total.'
       : 'Udziały muszą sumować się do całości.';

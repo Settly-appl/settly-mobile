@@ -4,6 +4,9 @@ import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/project_detail_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
+import 'package:settly_mobile/utils/money_input.dart';
 
 /// Lists the projects (groups) the current user belongs to and lets them
 /// create a new one.
@@ -255,7 +258,7 @@ class _ProjectCard extends StatelessWidget {
             // Ile projekt kosztował — bez tego trzeba było wejść i policzyć.
             if (project.expenseCount > 0) ...[
               Text(
-                '${project.totalAmount.toStringAsFixed(2)} zł',
+                formatMoney(project.totalAmount, project.totalCurrency),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -313,12 +316,27 @@ class _CreateProjectSheet extends StatefulWidget {
 class _CreateProjectSheetState extends State<_CreateProjectSheet> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _rateController = TextEditingController();
+
+  /// Waluta wyjazdu. `null` znaczy „ta sama co bazowa" — wtedy nie ma czego
+  /// przeliczać i pole kursu się nie pokazuje.
+  String? _tripCurrency;
   bool _saving = false;
+
+  String get _baseCurrency => UserSettingsService.baseCurrency;
+
+  double? get _tripRate {
+    final raw = _rateController.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) return null;
+    final value = double.tryParse(raw);
+    return (value == null || value <= 0) ? null : value;
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _rateController.dispose();
     super.dispose();
   }
 
@@ -332,6 +350,8 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
         description: _descController.text.trim().isEmpty
             ? null
             : _descController.text.trim(),
+        defaultCurrency: _tripCurrency,
+        defaultRateToBase: _tripCurrency == null ? null : _tripRate,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
@@ -381,6 +401,45 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
               border: const OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _tripCurrency,
+            decoration: InputDecoration(
+              labelText: texts.projectCurrencyLabel,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem<String>(
+                value: null,
+                child: Text(texts.projectCurrencyNone),
+              ),
+              for (final c in kCurrencies)
+                if (c['code'] != _baseCurrency)
+                  DropdownMenuItem<String>(
+                    value: c['code'],
+                    child: Text('${c['code']} — ${c['name']}'),
+                  ),
+            ],
+            onChanged: (value) => setState(() => _tripCurrency = value),
+          ),
+          if (_tripCurrency != null) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _rateController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [MoneyInputFormatter(decimalRange: 4)],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: texts.formRateLabel(_tripCurrency!, _baseCurrency),
+                hintText: '0.0000',
+                helperText: texts.projectCurrencyHint,
+                helperMaxLines: 3,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _save,

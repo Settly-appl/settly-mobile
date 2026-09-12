@@ -1,3 +1,5 @@
+import '../utils/money_format.dart';
+
 class FriendBalance {
   final String userId;
   final String? displayName;
@@ -7,12 +9,18 @@ class FriendBalance {
   /// Positive: this friend owes the current user. Negative: the user owes them.
   final double netAmount;
 
+  /// Waluta, w której backend zsumował saldo — waluta bazowa użytkownika.
+  /// Udziały z wydatków w innych walutach są przeliczane po kursie zapisanym
+  /// na wydatku, więc saldo jest jedną liczbą, a nie jedną na walutę.
+  final String currency;
+
   const FriendBalance({
     required this.userId,
     this.displayName,
     this.username,
     this.avatarUrl,
     required this.netAmount,
+    this.currency = kDefaultCurrency,
   });
 
   factory FriendBalance.fromJson(Map<String, dynamic> json) {
@@ -22,6 +30,7 @@ class FriendBalance {
       username: json['username'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       netAmount: (json['netAmount'] as num?)?.toDouble() ?? 0,
+      currency: json['currency']?.toString() ?? kDefaultCurrency,
     );
   }
 

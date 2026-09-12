@@ -6,6 +6,7 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
 
 /// Read-only list of past settlements (where the user was debtor or creditor).
 class SettlementHistoryPage extends StatefulWidget {
@@ -279,7 +280,7 @@ class _RecordCard extends StatelessWidget {
             ),
           ),
           Text(
-            '$sign${record.amount.toStringAsFixed(2)} zł',
+            '$sign${formatMoney(record.amount, record.currency)}',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,

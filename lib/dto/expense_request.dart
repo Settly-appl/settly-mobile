@@ -33,6 +33,13 @@ class CreateExpenseRequest {
   final DateTime date;
   final String? projectId;
 
+  /// Ile złotówek (waluty bazowej) kosztuje jedna jednostka [currency] — kurs,
+  /// po którym użytkownik faktycznie kupił walutę, a nie kurs rynkowy.
+  /// Wymagany, gdy [currency] różni się od waluty bazowej, chyba że projekt
+  /// wydatku ma ustawiony kurs domyślny. Backend odmawia zapisu bez kursu,
+  /// zamiast po cichu przyjąć 1.
+  final double? rateToBase;
+
   const CreateExpenseRequest({
     required this.shop,
     required this.currency,
@@ -41,6 +48,7 @@ class CreateExpenseRequest {
     required this.date,
     this.note,
     this.projectId,
+    this.rateToBase,
   });
 
   Map<String, dynamic> toJson() => {
@@ -51,6 +59,7 @@ class CreateExpenseRequest {
     'totalAmount': _round2(totalAmount),
     'date': _formatLocalDate(date),
     'projectId': projectId,
+    if (rateToBase != null) 'rateToBase': rateToBase,
   };
 }
 

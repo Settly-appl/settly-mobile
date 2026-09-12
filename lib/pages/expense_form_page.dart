@@ -18,6 +18,8 @@ import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/utils/money_input.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 
 class ExpenseFormPage extends StatefulWidget {
   final bool isDark;
@@ -98,12 +100,7 @@ const List<_CategoryOption> _kCategories = [
 
 const String _kNoProject = '__none__';
 
-const List<Map<String, String>> _kCurrencies = [
-  {'code': 'PLN', 'symbol': 'zł', 'name': 'Złoty polski'},
-  {'code': 'EUR', 'symbol': '€', 'name': 'Euro'},
-  {'code': 'USD', 'symbol': '\$', 'name': 'Dolar amerykański'},
-  {'code': 'GBP', 'symbol': '£', 'name': 'Funt brytyjski'},
-];
+const List<Map<String, String>> _kCurrencies = kCurrencies;
 
 class _ExpenseFormPageState extends State<ExpenseFormPage>
     with WidgetsBindingObserver {
@@ -120,6 +117,22 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   DateTime _selectedDate = DateTime.now();
   _CategoryOption? _selectedCategory;
   String _selectedCurrency = 'PLN';
+
+  /// Waluta bazowa użytkownika i kurs, po którym kupił walutę wydatku.
+  /// Kurs pokazujemy tylko wtedy, gdy waluty się różnią — przy wydatku w
+  /// złotówkach kurs wynosi 1 i pole byłoby tylko okazją do pomyłki.
+  String _baseCurrency = UserSettingsService.baseCurrency;
+  final TextEditingController _rateController = TextEditingController();
+
+  bool get _needsRate => _selectedCurrency != _baseCurrency;
+
+  double? get _rateToBase {
+    final raw = _rateController.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) return null;
+    final value = double.tryParse(raw);
+    if (value == null || value <= 0) return null;
+    return value;
+  }
 
   final _projectsService = ProjectsService();
   List<Project> _projects = [];
@@ -196,6 +209,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       _noteController.text = source.note;
       _amountController.text = _cleanAmount(source.totalAmount);
       _selectedCurrency = source.currency;
+      _baseCurrency = source.baseCurrency;
+      if (source.isForeign) {
+        _rateController.text = stripTrailingZeros(
+          source.rateToBase.toStringAsFixed(4),
+        );
+      }
       if (widget.editExpense != null) _selectedDate = source.date;
       _selectedProjectId = source.projectId;
       _selectedCategory = _kCategories.firstWhere(
@@ -218,11 +237,48 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   // Loads the base data, then (in edit/repeat mode) prefills splits/items —
   // which needs the current user id and friends to be resolved first.
   Future<void> _bootstrap() async {
-    await Future.wait([_loadCurrentUser(), _loadFriends()]);
+    await Future.wait([_loadCurrentUser(), _loadFriends(), _loadBaseCurrency()]);
     _loadProjects();
     if (widget.editExpense != null || widget.repeatExpense != null) {
       await _prefillSplitsAndItems();
     }
+  }
+
+  Future<void> _loadBaseCurrency() async {
+    try {
+      final settings = await UserSettingsService().fetch();
+      if (!mounted) return;
+      // Przy edycji wydatek niesie własną walutę bazową (zapisaną w chwili
+      // powstania) — nie nadpisujemy jej bieżącym ustawieniem, bo to
+      // przeliczyłoby historię po dzisiejszym kursie.
+      if (widget.editExpense == null) {
+        setState(() => _baseCurrency = settings.baseCurrency);
+      }
+    } catch (_) {
+      // Zostaje ostatnia znana waluta bazowa; backend i tak waliduje zapis.
+    }
+  }
+
+  /// Kurs wpisany na projekcie (wyjazdu) — walutę kupuje się raz, nie przy
+  /// każdym wydatku. Podpowiadamy go, gdy użytkownik nie wpisał własnego.
+  void _applyProjectDefaults(String? projectId) {
+    if (projectId == null) return;
+    Project? project;
+    for (final p in _projects) {
+      if (p.id == projectId) {
+        project = p;
+        break;
+      }
+    }
+    final code = project?.defaultCurrency;
+    final rate = project?.defaultRateToBase;
+    if (code == null || code.isEmpty) return;
+    setState(() {
+      _selectedCurrency = code;
+      if (rate != null && _rateController.text.trim().isEmpty) {
+        _rateController.text = stripTrailingZeros(rate.toStringAsFixed(4));
+      }
+    });
   }
 
   static String _cleanAmount(String raw) {
@@ -377,6 +433,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           _selectedProjectId = null;
         }
       });
+      // Wejście prosto z wyjazdu (projekt podany z zewnątrz): kurs wyjazdu jest
+      // znany dopiero po wczytaniu projektów, więc podpowiadamy go tutaj.
+      // Tylko na czystym formularzu — edycja i powtórzenie mają już walutę
+      // z wydatku źródłowego i podmienianie jej pod użytkownikiem byłoby
+      // zaskoczeniem, a nie podpowiedzią.
+      if (widget.editExpense == null && widget.repeatExpense == null) {
+        _applyProjectDefaults(_selectedProjectId);
+      }
     } catch (_) {}
   }
 
@@ -385,6 +449,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     WidgetsBinding.instance.removeObserver(this);
     _amountController.removeListener(_onAmountChanged);
     _amountController.dispose();
+    _rateController.dispose();
     _placeController.dispose();
     _noteController.dispose();
     for (final c in _customAmountControllers.values) {
@@ -740,6 +805,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     if (_currentUserId == null) return texts.errorNoAccount;
     if (_totalAmount <= 0) return texts.errorAmountZero;
     if (_selectedCategory == null) return texts.errorNoCategory;
+    // Bez kursu wydatek w funtach trafiłby do sald jako ta sama liczba
+    // złotówek. Backend też tego pilnuje; tutaj chodzi o to, żeby powiedzieć
+    // o tym zanim formularz zniknie.
+    if (_needsRate && _rateToBase == null) return texts.errorNoRate;
 
     if (_selectedFriendIds.isEmpty) return null;
 
@@ -814,6 +883,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
         totalAmount: _totalAmount,
         date: _selectedDate,
         projectId: _selectedProjectId,
+        rateToBase: _needsRate ? _rateToBase : null,
       );
       final String expenseId;
       if (_isEditing) {
@@ -1340,6 +1410,75 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
   }
 
+  /// Kurs wymiany wraz z podglądem wyniku.
+  ///
+  /// Podgląd („12.50 £ x 4.85 = 60.63 zł”) jest tu najważniejszy: odwrócony
+  /// kurs to najłatwiejsza pomyłka w całej tej funkcji, a zapisany wygląda
+  /// zupełnie normalnie. Pokazanie wyniku od razu sprawia, że pomyłkę widać,
+  /// zanim wydatek trafi do sald.
+  Widget _buildRateRow(AppTexts texts, Color accent) {
+    final rate = _rateToBase;
+    final amount = _totalAmount;
+    final subtitle = AppColors.cardSubtitle(widget.isDark);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  texts
+                      .formRateLabel(_selectedCurrency, _baseCurrency),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: subtitle, fontSize: 11),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IntrinsicWidth(
+                child: _MoneyField(
+                  controller: _rateController,
+                  decimals: 4,
+                  textAlign: TextAlign.center,
+                  onChanged: (_) => setState(() {}),
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '0.0000',
+                    hintStyle: TextStyle(color: accent.withValues(alpha: 0.4)),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            rate == null || amount <= 0
+                ? texts.formRateHint(_selectedCurrency)
+                : '${formatMoney(amount, _selectedCurrency)}'
+                      ' x ${stripTrailingZeros(rate.toString())}'
+                      ' = ${formatMoney(convertToBase(amount, rate), _baseCurrency)}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: rate == null && amount > 0
+                  ? AppColors.amountNegative
+                  : subtitle,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Amount card ───────────────────────────────────────────────────────────
 
   Widget _buildAmountCard(AppTexts texts) {
@@ -1416,6 +1555,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               ),
             ],
           ),
+          if (_needsRate) ...[
+            const SizedBox(height: 14),
+            _buildRateRow(texts, accent),
+          ],
           if (locked) ...[
             const SizedBox(height: 6),
             Text(
@@ -1907,6 +2050,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
     if (picked == null) return;
     setState(() => _selectedProjectId = picked == _kNoProject ? null : picked);
+    _applyProjectDefaults(_selectedProjectId);
   }
 
   // ── Friends picker ────────────────────────────────────────────────────────
@@ -3212,9 +3356,13 @@ class _ReceiptItemParsed {
   const _ReceiptItemParsed({required this.name, required this.price});
 }
 
-/// Pole kwoty/ceny: wymusza maks. 2 cyfry po separatorze (przez
+/// Pole kwoty/ceny: wymusza maks. [decimals] cyfr po separatorze (przez
 /// [MoneyInputFormatter]) i po utracie fokusu uzupełnia końcowe zera
 /// (`5` → `5.00`, `5,1` → `5.10`).
+///
+/// Kwoty mają dwa miejsca po przecinku, ale kurs wymiany potrzebuje ich
+/// więcej — 4.85 to kurs zaokrąglony, a przy większych sumach zaokrąglenie
+/// kursu widać na wyniku.
 ///
 /// Może korzystać z zewnętrznego [controller] (np. wspólnego dla logiki form
 /// rodzica) albo — gdy go nie podano — z własnego, zainicjowanego [initialValue].
@@ -3228,6 +3376,7 @@ class _MoneyField extends StatefulWidget {
   final TextStyle? style;
   final InputDecoration? decoration;
   final ValueChanged<String>? onChanged;
+  final int decimals;
 
   const _MoneyField({
     super.key,
@@ -3240,6 +3389,7 @@ class _MoneyField extends StatefulWidget {
     this.style,
     this.decoration,
     this.onChanged,
+    this.decimals = 2,
   });
 
   @override
@@ -3292,7 +3442,7 @@ class _MoneyFieldState extends State<_MoneyField> {
     }
 
     // Po utracie fokusu: uzupełnij do dwóch miejsc po przecinku.
-    final normalized = normalizeMoney(_controller.text);
+    final normalized = normalizeMoney(_controller.text, decimals: widget.decimals);
     if (normalized != _controller.text) {
       _controller.value = TextEditingValue(
         text: normalized,
@@ -3319,7 +3469,7 @@ class _MoneyFieldState extends State<_MoneyField> {
       showCursor: widget.showCursor,
       enableInteractiveSelection: widget.enableInteractiveSelection,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [MoneyInputFormatter()],
+      inputFormatters: [MoneyInputFormatter(decimalRange: widget.decimals)],
       textAlign: widget.textAlign,
       style: widget.style,
       decoration: widget.decoration,

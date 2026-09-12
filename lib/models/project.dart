@@ -1,3 +1,5 @@
+import '../utils/money_format.dart';
+
 class Project {
   final String id;
   final String name;
@@ -11,6 +13,17 @@ class Project {
   final int expenseCount;
   final double totalAmount;
 
+  /// Waluta, w której podana jest [totalAmount] — waluta bazowa oglądającego.
+  /// Wyjazd opłacony częściowo w funtach, a częściowo w złotówkach nie ma
+  /// jednej waluty własnej, więc suma musi nieść swoją walutę ze sobą.
+  final String totalCurrency;
+
+  /// Waluta wyjazdu i kurs, po którym uczestnicy ją kupili. Nowe wydatki w
+  /// projekcie dziedziczą oba, więc kurs wpisuje się raz na wyjazd, a nie raz
+  /// na wydatek.
+  final String? defaultCurrency;
+  final double? defaultRateToBase;
+
   final DateTime? createdAt;
 
   const Project({
@@ -22,6 +35,9 @@ class Project {
     required this.memberCount,
     this.expenseCount = 0,
     this.totalAmount = 0,
+    this.totalCurrency = kDefaultCurrency,
+    this.defaultCurrency,
+    this.defaultRateToBase,
     this.createdAt,
   });
 
@@ -35,6 +51,9 @@ class Project {
       memberCount: (json['memberCount'] as num?)?.toInt() ?? 0,
       expenseCount: (json['expenseCount'] as num?)?.toInt() ?? 0,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0,
+      totalCurrency: json['totalCurrency']?.toString() ?? kDefaultCurrency,
+      defaultCurrency: json['defaultCurrency'] as String?,
+      defaultRateToBase: (json['defaultRateToBase'] as num?)?.toDouble(),
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.tryParse(json['createdAt'].toString())?.toLocal(),

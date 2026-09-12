@@ -20,6 +20,8 @@ import 'package:settly_mobile/services/notifications_store.dart';
 import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/widgets/expense_actions_sheet.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 
 // ── Kategorie filtrów ─────────────────────────────────────────────────────────
 // UWAGA: wartości `apiValue` muszą się zgadzać z identyfikatorami kategorii
@@ -163,16 +165,23 @@ class _ExpensesPageState extends State<ExpensesPage> {
     return AppTexts.of(context).monthYear(now.month, now.year);
   }
 
+  /// Ile ten użytkownik wydał na dany wydatek, w walucie bazowej.
+  ///
+  /// Nigdy nie liczone z `userShare` ani `totalAmount` — te są w walucie
+  /// wydatku, a lista miesza waluty, więc sumowanie ich dawało liczbę, która
+  /// nie jest żadną kwotą.
   double _userPaid(SingleExpense e) {
-    final source = e.userShare.isNotEmpty ? e.userShare : e.totalAmount;
-    final cleaned = source.replaceAll(RegExp(r'[^0-9.]'), '');
+    final share = e.userShareBase;
+    if (share != null) return share;
+    final cleaned = e.baseAmount.replaceAll(RegExp(r'[^0-9.]'), '');
     return double.tryParse(cleaned) ?? 0.0;
   }
 
   double get _userPaidSum =>
       _expenses.fold<double>(0.0, (acc, e) => acc + _userPaid(e));
 
-  String get _totalSpent => '${_userPaidSum.toStringAsFixed(0)} zł';
+  String get _totalSpent =>
+      formatMoneyRounded(_userPaidSum, UserSettingsService.baseCurrency);
 
   String get _totalCount => AppTexts.of(context).transactionsCount(
     _totalElements > 0 ? _totalElements : _expenses.length,
@@ -181,11 +190,16 @@ class _ExpensesPageState extends State<ExpensesPage> {
   String get _dailyAverage {
     final now = DateTime.now();
     final days = now.day;
-    if (days == 0) return '0 zł';
+    if (days == 0) {
+      return formatMoneyRounded(0, UserSettingsService.baseCurrency);
+    }
     final monthSum = _expenses
         .where((e) => e.date.year == now.year && e.date.month == now.month)
         .fold<double>(0.0, (acc, e) => acc + _userPaid(e));
-    return '${(monthSum / days).toStringAsFixed(0)} zł';
+    return formatMoneyRounded(
+      monthSum / days,
+      UserSettingsService.baseCurrency,
+    );
   }
 
   String get _daysInMonth {
@@ -378,7 +392,10 @@ class _ExpensesPageState extends State<ExpensesPage> {
           expenseId: expense.id!,
           currency: expense.currency,
         );
-        if (userShare != null) expense.userShare = userShare;
+        if (userShare != null) {
+          expense.userShare = userShare.display;
+          expense.userShareBase = userShare.baseAmount;
+        }
       }
       if (gen != _generation) return; // nowsze ładowanie przejęło stan
     }

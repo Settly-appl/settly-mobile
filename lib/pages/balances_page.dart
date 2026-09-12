@@ -5,6 +5,8 @@ import 'package:settly_mobile/pages/settlement_history_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 
 /// Lists net balances between the current user and each friend, and lets the
 /// user mark money they're owed as received ("Rozlicz").
@@ -25,7 +27,10 @@ class _BalancesPageState extends State<BalancesPage> {
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
-  static String _money(double v) => '${v.toStringAsFixed(2)} zł';
+  /// Salda przychodzą już przeliczone na walutę bazową użytkownika, więc to
+  /// ona jest domyślną etykietą; konkretne saldo niesie swoją walutę ze sobą.
+  static String _money(double v, [String? currency]) =>
+      formatMoney(v, currency ?? UserSettingsService.baseCurrency);
 
   @override
   void initState() {
@@ -345,7 +350,7 @@ class _BalanceCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '$sign${balance.absAmount.toStringAsFixed(2)} zł',
+                '$sign${formatMoney(balance.absAmount, balance.currency)}',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
