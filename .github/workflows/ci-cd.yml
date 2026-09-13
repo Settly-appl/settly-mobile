@@ -47,6 +47,7 @@ jobs:
           push: true
           build-args: |
             SETTLY_HOST=${{ env.SETTLY_HOST }}
+            SETTLY_BUILD=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.image }}:sha-${{ github.sha }}
             ${{ steps.meta.outputs.image }}:develop

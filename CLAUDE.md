@@ -309,8 +309,42 @@ Non-obvious and easy to break:
   **Maskable** icons need a generous safe-zone margin or Android's adaptive mask
   clips them. An installed PWA caches its launcher icon at install time — it only
   updates on **uninstall + reinstall**.
-- `nginx/web.conf` sends `no-cache` for the service workers so a deploy is picked
-  up on the next load.
+- **Forcing a new build on clients — read before touching caching.** nginx
+  `Cache-Control` alone does **not** control which build runs. `flutter build
+  web` defaults to `--pwa-strategy=offline-first`, so the generated
+  `flutter_service_worker.js` keeps the app shell — `index.html` included — in
+  Cache Storage and answers navigations *before the request reaches nginx*. An
+  installed PWA therefore happily ran an old frontend against a freshly
+  deployed backend until someone reloaded twice. Two layers now fix it, in
+  `web/index.html`:
+  1. `controllerchange` → one forced reload. Flutter's worker calls
+     `skipWaiting()`/`clients.claim()`, so it takes over as soon as it
+     installs; reloading there finishes the swap instead of waiting for a
+     future visit. Guarded by `hadController` so a *first* install doesn't
+     reload a page that is already fresh.
+  2. `build-id.json` — the commit SHA, baked into the image. It is written
+     **after** `flutter build web`, deliberately outside the worker's resource
+     map, so it always comes from the network; `__SETTLY_BUILD__` in
+     `index.html` is substituted **before** the build so it is inside that map.
+     A mismatch means the page is stale no matter how the worker behaved.
+  Both run on `load` and on `visibilitychange` — an installed PWA is resumed
+  far more often than it is reloaded. Reloading purges Cache Storage first,
+  or the worker would just re-serve the same stale assets, and a
+  sessionStorage budget caps automatic reloads at 2 per session so a bug can
+  never loop the app.
+  The reload is **forced, not offered**: the expense form keeps no draft, and
+  a stale frontend against the new API fails at save time anyway.
+  `SETTLY_BUILD` is passed as a Docker build-arg from CI (`github.sha`);
+  locally the placeholder survives and the whole mechanism is off.
+- `nginx/web.conf` no-caches everything that decides *which* build runs —
+  `index.html`, `flutter_bootstrap.js`, **`main.dart.js`** (Flutter emits it
+  under a stable name versioned only by a `?v=` query, so a heuristically
+  cached copy is a stale app), `build-id.json`, `version.json`,
+  `manifest.json` and both service workers — and hard-caches only the
+  content-addressed `/assets/` and `/canvaskit/`. An earlier version merely
+  *claimed* in a comment to long-cache hashed assets and set no rule at all
+  for `main.dart.js`, which could serve a stale bundle even with the worker
+  out of the picture.
 
 ## Conventions
 
@@ -373,3 +407,16 @@ Non-obvious and easy to break:
 
 > When you change behavior, update this file (esp. the localization, expenses,
 > projects and notifications notes, and this change log).
+
+- **2026-09-13** — **Multi-currency expenses** (see the Waluty section): the app
+  already had a currency picker, but every aggregate hardcoded `zł` and the
+  expense list summed `userShare` off a display string, so one expense in
+  pounds made the totals lie. Money now always carries its currency
+  (`money_format.dart`), the native and base amounts have separate jobs, the
+  form takes the rate you bought the currency at with a live conversion
+  preview, a project carries the trip's rate, and the profile gains a base
+  currency. Backend: V9 adds `base_currency`/`rate_to_base`/`base_amount` and
+  every aggregate sums the converted column.
+  **Deploy freshness**: forcing a new build onto installed PWAs (see the
+  notifications/PWA section) — nginx headers never applied to installed clients
+  because the Flutter service worker answered first.

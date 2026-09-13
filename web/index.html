@@ -55,6 +55,106 @@
     })();
   </script>
 
+  <!-- Wymuszenie świeżej wersji po deployu.
+       Reguły Cache-Control z nginx NIE wystarczają: przy strategii offline-first
+       Flutter rejestruje service workera, który trzyma powłokę aplikacji (łącznie
+       z index.html) w Cache Storage i odpowiada na nawigacje ZANIM żądanie
+       dotrze do nginx. Zainstalowane PWA potrafiło więc chodzić na starym
+       froncie przeciwko nowemu backendowi aż do przypadkowego podwójnego
+       odświeżenia.
+
+       Dwie warstwy, bo żadna sama nie wystarcza:
+        1. controllerchange — nowy worker Fluttera woła skipWaiting()/claim(),
+           więc przejmuje stronę od razu po instalacji; przeładowanie w tym
+           momencie kończy podmianę bez czekania na kolejne wejście.
+        2. build-id.json — stempel builda wgrany do obrazu, serwowany bez cache
+           i spoza mapy zasobów workera, więc zawsze pochodzi z sieci.
+           Porównanie z wartością wkompilowaną w tę stronę wykrywa nieaktualny
+           front nawet wtedy, gdy worker zachowa się inaczej, niż zakładamy.
+
+       Kompromis: przeładowanie jest wymuszone (bez pytania), także przy powrocie
+       do aplikacji. Formularz wydatku i tak nie zapisuje wersji roboczej, a
+       stary front rozmawiający z nowym API kończy się błędem przy zapisie —
+       utrata wpisywanej kwoty jest mniej kosztowna niż to. -->
+  <script>
+    (function () {
+      // Podmieniane w obrazie na SHA commita; przy lokalnym `flutter run`
+      // zostaje placeholder i cały mechanizm jest wyłączony.
+      var BUILD_ID = '__SETTLY_BUILD__';
+      var hasBuildId = BUILD_ID.indexOf('__SETTLY') !== 0;
+      var reloading = false;
+
+      // Bezpiecznik przed pętlą: wyczyszczenie Cache Storage sprawia, że worker
+      // instaluje się od nowa i sam potrafi wywołać controllerchange już po
+      // przeładowaniu. Zbieżność następuje po jednym, czasem dwóch obiegach;
+      // twardy limit na sesję gwarantuje, że błąd nigdy nie zapętli aplikacji.
+      function budgetLeft() {
+        try {
+          var used = parseInt(sessionStorage.getItem('settlyReloads') || '0', 10);
+          if (used >= 2) return false;
+          sessionStorage.setItem('settlyReloads', String(used + 1));
+          return true;
+        } catch (e) {
+          return true; // brak sessionStorage (tryb prywatny) — nie blokujemy
+        }
+      }
+
+      function reloadOnce(reason) {
+        if (reloading || !budgetLeft()) return;
+        reloading = true;
+        console.info('[settly] nowa wersja (' + reason + '), przeładowuję');
+        // Czyścimy Cache Storage, bo inaczej worker poda te same stare zasoby
+        // także po przeładowaniu.
+        var purge = (window.caches && caches.keys)
+          ? caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            })
+          : Promise.resolve();
+        purge.catch(function () {}).then(function () { window.location.reload(); });
+      }
+
+      if ('serviceWorker' in navigator) {
+        // Pierwsza instalacja workera też odpala controllerchange — wtedy nie ma
+        // czego przeładowywać, bo strona już jest świeża.
+        var hadController = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (hadController) reloadOnce('service worker');
+        });
+      }
+
+      function checkBuildId() {
+        if (!hasBuildId || reloading) return;
+        fetch('build-id.json', { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (data && data.buildId && data.buildId !== BUILD_ID) {
+              reloadOnce('build-id');
+            }
+          })
+          .catch(function () {
+            // Brak sieci albo starszy deploy bez stempla — zostajemy na tym,
+            // co działa; warstwa 1 nadal obowiązuje.
+          });
+      }
+
+      function refresh() {
+        checkBuildId();
+        if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
+          navigator.serviceWorker.getRegistration()
+            .then(function (reg) { if (reg) reg.update(); })
+            .catch(function () {});
+        }
+      }
+
+      window.addEventListener('load', refresh);
+      // Zainstalowane PWA rzadko bywa przeładowywane — wznowienie z launchera
+      // jest w praktyce jedynym momentem, w którym można złapać nowy deploy.
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) refresh();
+      });
+    })();
+  </script>
+
   <!-- PWA install: capture the (Chromium) install prompt so Flutter can trigger
        it on demand. Fires only on Chrome/Edge/Android; iOS never fires it. -->
   <script>
