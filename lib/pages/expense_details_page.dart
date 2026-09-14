@@ -608,7 +608,14 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
     // cudzy wydatek) nie potrzebuje wskazówki, komu płacić.
     if (mine == null || mine.settled) return const SizedBox.shrink();
 
-    final amount = '${mine.amount} ${widget.expense.currency}';
+    // To jest kwota DO ZAPŁATY, a płacimy sobie w walucie bazowej — więc ona
+    // prowadzi, a kwota w walucie wydatku idzie w nawias.
+    final amount = formatSettlement(
+      double.tryParse(mine.baseAmount),
+      mine.baseCurrency,
+      double.tryParse(mine.amount) ?? 0,
+      mine.currency.isEmpty ? widget.expense.currency : mine.currency,
+    );
     final declared = mine.declaredPaid;
     final color = declared ? Colors.blue : AppColors.amountNegative;
 
@@ -676,7 +683,12 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${displayAmount.toStringAsFixed(2)} ${widget.expense.currency}',
+                formatSettlement(
+                  double.tryParse(m.baseAmount),
+                  m.baseCurrency,
+                  displayAmount,
+                  m.currency.isEmpty ? widget.expense.currency : m.currency,
+                ),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),

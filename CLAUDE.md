@@ -191,6 +191,13 @@ importing both causes an ambiguous-import error.
   everything was in złoty and starts lying the moment one expense is in
   pounds. `kCurrencies` there is the single source of truth for the picker,
   the profile setting and the backend whitelist — the three must not drift.
+- **A share is shown in the base currency first.** `formatSettlement` puts the
+  base amount ahead of the native one (`7.28 zł (1.50 £)`) everywhere the number
+  is a *debt* — your share in expense details, each member's row, the amount on
+  an expense tile. `formatMoneyWithBase` keeps the opposite order for the
+  *expense amount*, which is a fact about the transaction. The distinction is
+  the point: people settle up in their base currency, so "1.50 £" alone tells a
+  Polish payer nothing actionable.
 - **Two denominations, two jobs.** `totalAmount`/`currency` is what was spent;
   `baseAmount`/`baseCurrency` is the same sum converted at `rateToBase`, and it
   is the *only* one that may be summed. Same for a share: `userShare` is a
