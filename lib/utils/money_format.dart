@@ -59,6 +59,28 @@ String formatMoneyWithBase(
   return '$native (~${formatMoney(baseAmount, baseCurrency)})';
 }
 
+/// Kwota do ZAPŁATY: waluta bazowa na pierwszym miejscu, waluta wydatku w
+/// nawiasie — `7.28 zł (1.50 £)`.
+///
+/// Odwrotna kolejność niż [formatMoneyWithBase] i to jest cała różnica: tam
+/// pokazujemy, ile wydatek kosztował (fakt o wydatku, więc prowadzi waluta
+/// transakcji), tutaj — ile komuś oddać. Rozliczamy się w złotówkach, więc
+/// „1.50 £" jako jedyna liczba nie mówi nic użytecznego.
+String formatSettlement(
+  num? baseAmount,
+  String? baseCurrency,
+  num nativeAmount,
+  String? nativeCurrency,
+) {
+  if (baseAmount == null ||
+      baseCurrency == null ||
+      baseCurrency == nativeCurrency) {
+    return formatMoney(nativeAmount, nativeCurrency);
+  }
+  return '${formatMoney(baseAmount, baseCurrency)}'
+      ' (${formatMoney(nativeAmount, nativeCurrency)})';
+}
+
 /// Przelicza kwotę po kursie, którym użytkownik kupił walutę. Kierunek jest tu
 /// jedyną rzeczą, którą łatwo pomylić: [rateToBase] to ile jednostek waluty
 /// bazowej kosztuje **jedna** jednostka waluty wydatku (1 GBP = 4.85 PLN → 4.85).

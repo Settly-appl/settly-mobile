@@ -1159,6 +1159,17 @@ class _ExpenseDateGroup extends StatelessWidget {
   }
 }
 
+/// Kwota, którą użytkownik ma faktycznie zapłacić, w walucie bazowej: własny
+/// udział, a przy wydatku osobistym (brak podziału) cała kwota.
+String _tileBaseAmount(SingleExpense item) {
+  final share = item.userShareBase;
+  if (share != null) return formatMoney(share, item.baseCurrency);
+  return formatMoney(
+    double.tryParse(item.baseAmount) ?? double.tryParse(item.totalAmount) ?? 0,
+    item.baseCurrency,
+  );
+}
+
 class _ExpenseRow extends StatelessWidget {
   final SingleExpense item;
   final bool isDark;
@@ -1253,14 +1264,32 @@ class _ExpenseRow extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Kwota w walucie bazowej prowadzi, bo to ona jest do zapłaty;
+                // kwota w walucie wydatku ląduje pod spodem, żeby wciąż było
+                // widać, ile kosztowało na miejscu.
                 Text(
-                  item.userShare.isNotEmpty ? item.userShare : item.totalAmount,
+                  _tileBaseAmount(item),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.cardAmount(isDark),
                   ),
                 ),
+                if (item.isForeign) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    item.userShare.isNotEmpty
+                        ? item.userShare
+                        : formatMoney(
+                            double.tryParse(item.totalAmount) ?? 0,
+                            item.currency,
+                          ),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.cardSubtitle(isDark),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Container(
                   padding: const EdgeInsets.symmetric(

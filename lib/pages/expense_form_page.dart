@@ -209,7 +209,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       _noteController.text = source.note;
       _amountController.text = _cleanAmount(source.totalAmount);
       _selectedCurrency = source.currency;
-      _baseCurrency = source.baseCurrency;
+      // Świadomie NIE bierzemy tu source.baseCurrency: wydatki sprzed
+      // przeliczania mają tam własną walutę (backfill V9), więc pole kursu by
+      // się nie pokazało, a backend i tak rozlicza zapis względem aktualnej
+      // waluty bazowej użytkownika i odrzuciłby go bez kursu.
       if (source.isForeign) {
         _rateController.text = stripTrailingZeros(
           source.rateToBase.toStringAsFixed(4),
@@ -248,12 +251,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     try {
       final settings = await UserSettingsService().fetch();
       if (!mounted) return;
-      // Przy edycji wydatek niesie własną walutę bazową (zapisaną w chwili
-      // powstania) — nie nadpisujemy jej bieżącym ustawieniem, bo to
-      // przeliczyłoby historię po dzisiejszym kursie.
-      if (widget.editExpense == null) {
-        setState(() => _baseCurrency = settings.baseCurrency);
-      }
+      // Zawsze bierzemy AKTUALNĄ walutę bazową, także przy edycji: zapis i tak
+      // przechodzi przez CurrencyConversionService, który rozlicza go względem
+      // niej. Waluta bazowa zapisana na wydatku jest historią do wyświetlenia,
+      // nie regułą dla kolejnego zapisu — a dla wydatków sprzed przeliczania
+      // (backfill V9) bywa po prostu błędna.
+      setState(() => _baseCurrency = settings.baseCurrency);
     } catch (_) {
       // Zostaje ostatnia znana waluta bazowa; backend i tak waliduje zapis.
     }
