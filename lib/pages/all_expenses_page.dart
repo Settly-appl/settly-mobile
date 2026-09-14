@@ -173,6 +173,9 @@ class _ExpensesPageState extends State<ExpensesPage> {
   double _userPaid(SingleExpense e) {
     final share = e.userShareBase;
     if (share != null) return share;
+    // Wydatek bez kursu nie ma kwoty w walucie bazowej — wypada z sumy, zamiast
+    // wchodzić do niej kwotą w obcej walucie. Kafelki takich wydatków noszą
+    // plakietkę „brak kursu", więc niedoszacowanie sumy jest widoczne.
     final cleaned = e.baseAmount.replaceAll(RegExp(r'[^0-9.]'), '');
     return double.tryParse(cleaned) ?? 0.0;
   }
@@ -1162,6 +1165,11 @@ class _ExpenseDateGroup extends StatelessWidget {
 /// Kwota, którą użytkownik ma faktycznie zapłacić, w walucie bazowej: własny
 /// udział, a przy wydatku osobistym (brak podziału) cała kwota.
 String _tileBaseAmount(SingleExpense item) {
+  // Bez kursu nie ma czego pokazać w walucie bazowej — zostaje kwota, która
+  // naprawdę została zapłacona na miejscu.
+  if (item.needsRate) {
+    return formatMoney(double.tryParse(item.totalAmount) ?? 0, item.currency);
+  }
   final share = item.userShareBase;
   if (share != null) return formatMoney(share, item.baseCurrency);
   return formatMoney(
@@ -1245,12 +1253,17 @@ class _ExpenseRow extends StatelessWidget {
                         color: AppColors.cardSubtitle(isDark),
                       ),
                     ),
-                  if (item.isShared || projectName != null) ...[
+                  if (item.isShared || projectName != null || item.needsRate) ...[
                     const SizedBox(height: 3),
                     Row(
                       children: [
                         if (projectName != null) ...[
                           _ProjectBadge(name: projectName!, isDark: isDark),
+                          if (item.isShared || item.needsRate)
+                            const SizedBox(width: 6),
+                        ],
+                        if (item.needsRate) ...[
+                          _NeedsRateBadge(isDark: isDark),
                           if (item.isShared) const SizedBox(width: 6),
                         ],
                         if (item.isShared)
@@ -1275,7 +1288,7 @@ class _ExpenseRow extends StatelessWidget {
                     color: AppColors.cardAmount(isDark),
                   ),
                 ),
-                if (item.isForeign) ...[
+                if (item.isForeign && !item.needsRate) ...[
                   const SizedBox(height: 1),
                   Text(
                     item.userShare.isNotEmpty
@@ -1351,6 +1364,33 @@ class _BucketInfo {
 
 /// Plakietka projektu na kafelku wydatku — dzięki niej widać na liście wydatków,
 /// co należy do wyjazdu czy imprezy, bez wchodzenia w projekt.
+/// Wydatek bez kursu: nie wchodzi do sald, dopóki ktoś go nie poda. Plakietka
+/// jest po to, żeby niedoszacowana suma na górze listy miała widoczny powód.
+class _NeedsRateBadge extends StatelessWidget {
+  final bool isDark;
+
+  const _NeedsRateBadge({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.amountNegative.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        AppTexts.of(context).needsRateBadge,
+        style: const TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w700,
+          color: AppColors.amountNegative,
+        ),
+      ),
+    );
+  }
+}
+
 class _ProjectBadge extends StatelessWidget {
   final String name;
   final bool isDark;

@@ -7,6 +7,8 @@ import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/utils/money_format.dart';
 import 'package:settly_mobile/services/api_service/user_settings_service.dart';
+import 'package:settly_mobile/repository/expense_repository.dart';
+import 'package:settly_mobile/pages/unconverted_expenses_page.dart';
 
 /// Lists net balances between the current user and each friend, and lets the
 /// user mark money they're owed as received ("Rozlicz").
@@ -23,6 +25,12 @@ class _BalancesPageState extends State<BalancesPage> {
   bool _loading = true;
   String? _error;
   List<FriendBalance> _balances = [];
+
+  /// Ile wydatków czeka na kurs. Dopóki go nie mają, backend pomija je w
+  /// saldach — saldo jest wtedy niepełne i trzeba to powiedzieć wprost,
+  /// zamiast pokazywać liczbę, która wygląda na kompletną.
+  final _expenseRepository = ExpenseRepository();
+  int _needsRateCount = 0;
   final Set<String> _settling = {};
 
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
@@ -45,9 +53,11 @@ class _BalancesPageState extends State<BalancesPage> {
     });
     try {
       final data = await _service.getBalances();
+      final unconverted = await _expenseRepository.fetchUnconvertedExpenses();
       if (!mounted) return;
       setState(() {
         _balances = data;
+        _needsRateCount = unconverted.length;
         _loading = false;
       });
     } catch (_) {
@@ -159,6 +169,21 @@ class _BalancesPageState extends State<BalancesPage> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
+        if (_needsRateCount > 0) ...[
+          _NeedsRateBanner(
+            count: _needsRateCount,
+            isDark: isDark,
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => UnconvertedExpensesPage(isDark: isDark),
+                ),
+              );
+              await _load();
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
         _SummaryHeader(
           owedToYou: _money(_totalOwedToYou),
           youOwe: _money(_totalYouOwe),
@@ -513,6 +538,85 @@ class _MessageState extends StatelessWidget {
             OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Saldo jest niepełne, bo część wydatków nie ma kursu.
+///
+/// Celowo widoczne nad samymi kwotami: bez tego liczby wyglądają na kompletne,
+/// a to właśnie brakujące przeliczenia potrafią odwrócić wynik „kto komu".
+class _NeedsRateBanner extends StatelessWidget {
+  final int count;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _NeedsRateBanner({
+    required this.count,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.amountNegative.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.amountNegative.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.currency_exchange_rounded,
+              color: AppColors.amountNegative,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    texts.needsRateTitle,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.amountNegative,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    texts.needsRateSubtitle(count),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.cardSubtitle(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    texts.needsRateAction,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.amountNegative,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.amountNegative,
+            ),
+          ],
+        ),
       ),
     );
   }

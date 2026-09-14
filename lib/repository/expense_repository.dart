@@ -26,9 +26,10 @@ class ExpenseRepository {
         if (amount.isNotEmpty) {
           return UserShare(
             display: '$amount $shareCurrency',
-            // Starsze wydatki nie mają kwoty bazowej; wtedy udział jest już w
-            // walucie bazowej i można go sumować bez przeliczania.
-            baseAmount: baseAmount ?? double.tryParse(amount) ?? 0,
+            // Brak kwoty bazowej zostaje brakiem (null): wydatek czeka na kurs,
+            // więc jego udziału nie wolno wliczać do żadnej sumy. Podstawienie
+            // tu kwoty w walucie wydatku dodałoby funty do złotówek.
+            baseAmount: baseAmount,
             baseCurrency: data['baseCurrency']?.toString() ?? shareCurrency,
           );
         }
@@ -38,6 +39,24 @@ class ExpenseRepository {
     }
 
     return null;
+  }
+
+  /// Wydatki bez kursu wymiany — powstały przed przeliczaniem walut, więc ich
+  /// kurs jest nieznany i backend celowo pomija je w saldach (migracja V10).
+  /// Jedynym źródłem tego kursu jest użytkownik, więc trzeba je umieć pokazać.
+  Future<List<SingleExpense>> fetchUnconvertedExpenses() async {
+    try {
+      final response = await _api.request(
+        endpoint: 'expenses/unconverted',
+        method: HttpMethod.get,
+      );
+      if (response == null || response.statusCode != 200) return const [];
+      final data = jsonDecode(response.body);
+      if (data is! List) return const [];
+      return SingleExpense.listFromJson(data);
+    } catch (_) {
+      return const [];
+    }
   }
 
   /// Wydatki należące do projektu (najnowsze pierwsze).
@@ -127,7 +146,10 @@ enum SettleResult { ok, lockedBySettleUp, failed }
 /// łańcuchu wyświetlanym dodawały funty do złotówek.
 class UserShare {
   final String display;
-  final double baseAmount;
+
+  /// `null`, gdy wydatek nie ma kursu — wtedy udziału nie da się wyrazić w
+  /// walucie bazowej i musi wypaść z sum, a nie do nich wpaść obcą kwotą.
+  final double? baseAmount;
   final String baseCurrency;
 
   const UserShare({

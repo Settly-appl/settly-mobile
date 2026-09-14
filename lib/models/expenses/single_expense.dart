@@ -21,11 +21,17 @@ class SingleExpense {
   /// przeliczeniu. Dla wydatku już w walucie bazowej kurs wynosi 1, a
   /// [baseAmount] równa się [totalAmount].
   final String baseCurrency;
-  final double rateToBase;
+  /// `null` oznacza kurs NIEZNANY, nie kurs 1 — wydatek w obcej walucie
+  /// sprzed przeliczania (migracja V10). Jego udziały są pomijane w saldach,
+  /// zamiast wpadać tam po kursie 1, czyli funt liczony jak złotówka.
+  final double? rateToBase;
+
+  /// Wydatek czeka na kurs — bez niego nie wchodzi do rozliczeń.
+  bool get needsRate => rateToBase == null;
   final String baseAmount;
 
   /// Wydatek w obcej walucie — wtedy warto pokazać obie kwoty.
-  bool get isForeign => currency != baseCurrency;
+  bool get isForeign => currency != baseCurrency || needsRate;
 
   final bool scanned;
   final DateTime date;
@@ -72,7 +78,7 @@ class SingleExpense {
     this.category = 'Wydatek',
     this.currency = 'PLN',
     this.baseCurrency = 'PLN',
-    this.rateToBase = 1,
+    this.rateToBase,
     this.baseAmount = '',
     required this.scanned,
     required this.date,
@@ -102,11 +108,12 @@ class SingleExpense {
       category: json['category']?.toString() ?? 'Wydatek',
       currency: json['currency']?.toString() ?? 'PLN',
       baseCurrency: json['baseCurrency']?.toString() ?? 'PLN',
-      rateToBase: (json['rateToBase'] as num?)?.toDouble() ?? 1,
-      // Starsze wydatki (sprzed przeliczania) nie mają kwoty bazowej — wtedy
-      // pokazujemy tylko kwotę własną wydatku, zamiast udawać przeliczenie.
+      rateToBase: (json['rateToBase'] as num?)?.toDouble(),
+      // Brak kwoty bazowej zostaje brakiem. Podstawienie tu kwoty w walucie
+      // wydatku dałoby liczbę wyglądającą na złotówki, która nią nie jest —
+      // i wróciłby dokładnie ten błąd, który usuwa migracja V10.
       baseAmount: json['baseAmount'] == null
-          ? normalizeMoney(json['totalAmount']?.toString() ?? '0.00')
+          ? ''
           : normalizeMoney(json['baseAmount'].toString()),
       scanned: json['isScanned'] ?? false,
       date: json['date'] != null
