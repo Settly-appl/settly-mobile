@@ -549,6 +549,27 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         widget.expense.name,
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
       ),
+      // Wydatek bez kursu nie liczy się do sald — mówimy to tutaj, bo to
+      // jedyne miejsce, gdzie widać pojedynczy wydatek i można go poprawić.
+      if (widget.expense.needsRate) ...[
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.amountNegative.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            AppTexts.of(context).needsRateSubtitle(1),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.amountNegative,
+            ),
+          ),
+        ),
+      ],
     ],
   );
 

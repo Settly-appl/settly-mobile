@@ -203,6 +203,18 @@ importing both causes an ambiguous-import error.
   is the *only* one that may be summed. Same for a share: `userShare` is a
   display string ("12.50 £"), `userShareBase` is the summable number. Adding
   display strings across currencies is exactly the bug this replaced.
+- **A missing rate is `null`, never 1 or a substituted native amount.**
+  `SingleExpense.rateToBase` is nullable and `needsRate` is what everything keys
+  off. These are foreign-currency expenses created before conversion existed
+  (backend V10): their rate is genuinely unknown, so the backend leaves them out
+  of balances rather than counting a pound as a zloty. In the app that means:
+  no fake base figure anywhere (`baseAmount` stays `''`, `UserShare.baseAmount`
+  stays `null`), a `brak kursu` badge on the tile, a note on the details page,
+  and a banner on Rozliczenia saying the balance is **incomplete** with a count,
+  tapping through to `UnconvertedExpensesPage` → the edit form with the rate
+  field open. Substituting the native amount when the base one is missing
+  recreates exactly the bug all of this removes — it has already happened twice
+  in this codebase, in `SingleExpense.fromJson` and in `UserShare`.
 - **The rate is the user's own**, entered in the form when the expense currency
   differs from their base, and prefilled from the project's `defaultRateToBase`
   when there is one. `rateToBase` = how many base units **one** unit of the
@@ -427,3 +439,13 @@ Non-obvious and easy to break:
   **Deploy freshness**: forcing a new build onto installed PWAs (see the
   notifications/PWA section) — nginx headers never applied to installed clients
   because the Flutter service worker answered first.
+
+- **2026-09-14** — Shares are shown in the currency they will be **paid** in
+  (`formatSettlement`: `7.28 zł (1.50 £)`), because "zapłać 1.50 GBP" is not
+  actionable for people who settle in złoty. And the V9 backfill's worst
+  consequence is undone: it had written `rate_to_base = 1` over pre-existing
+  GBP expenses, so Rozliczenia added pounds to złoty and could report the wrong
+  person as the debtor. Those rows now carry **no** rate (V10) and are excluded
+  from balances, with a banner, a badge and a dedicated screen to supply the
+  missing rates. The guessing alternative was rejected: the rate is a fact about
+  someone's bank, not about the database.

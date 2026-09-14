@@ -213,10 +213,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       // przeliczania mają tam własną walutę (backfill V9), więc pole kursu by
       // się nie pokazało, a backend i tak rozlicza zapis względem aktualnej
       // waluty bazowej użytkownika i odrzuciłby go bez kursu.
-      if (source.isForeign) {
-        _rateController.text = stripTrailingZeros(
-          source.rateToBase.toStringAsFixed(4),
-        );
+      // Wydatek bez kursu (V10) celowo zostawia pole puste — użytkownik ma je
+      // uzupełnić, a nie zobaczyć podstawioną jedynkę.
+      final sourceRate = source.rateToBase;
+      if (source.isForeign && sourceRate != null) {
+        _rateController.text = stripTrailingZeros(sourceRate.toStringAsFixed(4));
       }
       if (widget.editExpense != null) _selectedDate = source.date;
       _selectedProjectId = source.projectId;

@@ -841,6 +841,45 @@ class AppTexts {
       : 'Wydatki dodane do tego projektu zaczynają w tej walucie i po tym kursie. Przy pojedynczym wydatku nadal możesz zmienić jedno i drugie.';
 
   String get projectCurrencyNone => _isEnglish ? 'None' : 'Brak';
+
+  String get needsRateBadge => _isEnglish ? 'no rate' : 'brak kursu';
+
+  String get needsRateTitle =>
+      _isEnglish ? 'Balance is incomplete' : 'Saldo jest niepełne';
+
+  /// Liczone rzeczowniki po polsku: 1 wydatek / 2-4 wydatki / 5+ wydatków,
+  /// z wyjątkiem 12-14 (jak w SettlementReminderJob po stronie backendu).
+  String needsRateSubtitle(int count) {
+    if (_isEnglish) {
+      return count == 1
+          ? '1 expense has no exchange rate, so it is left out of your balances.'
+          : '$count expenses have no exchange rate, so they are left out of your balances.';
+    }
+    return '$count ${_expensesPlural(count)} bez kursu — nie wchodzą do sald.';
+  }
+
+  String _expensesPlural(int count) {
+    if (count == 1) return 'wydatek';
+    final rest100 = count % 100;
+    if (rest100 >= 12 && rest100 <= 14) return 'wydatków';
+    final rest10 = count % 10;
+    if (rest10 >= 2 && rest10 <= 4) return 'wydatki';
+    return 'wydatków';
+  }
+
+  String get needsRateAction =>
+      _isEnglish ? 'Add the rates' : 'Uzupełnij kursy';
+
+  String get needsRatePageTitle =>
+      _isEnglish ? 'Expenses without a rate' : 'Wydatki bez kursu';
+
+  String get needsRateExplainer => _isEnglish
+      ? 'These were added before the app converted currencies, so the rate they were bought at is unknown. Open one and enter the rate to bring it back into your balances.'
+      : 'Te wydatki powstały, zanim aplikacja przeliczała waluty, więc kurs ich zakupu nie jest znany. Otwórz wydatek i podaj kurs, żeby wrócił do sald.';
+
+  String get needsRateAllDone => _isEnglish
+      ? 'Every expense has a rate.'
+      : 'Wszystkie wydatki mają kurs.';
   String get errorFriendsExceedTotal => _isEnglish
       ? 'Shares must add up to the total.'
       : 'Udziały muszą sumować się do całości.';
