@@ -1238,7 +1238,7 @@ class _ExpenseRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.name,
+                    AppTexts.of(context).expenseName(item.name),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,

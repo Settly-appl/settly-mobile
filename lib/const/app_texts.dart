@@ -842,6 +842,22 @@ class AppTexts {
 
   String get projectCurrencyNone => _isEnglish ? 'None' : 'Brak';
 
+  /// Zastępcza nazwa wydatku — TYLKO do wyświetlenia.
+  ///
+  /// Wydatki sprzed wymagania nazwy nie mają jej w bazie i celowo tam nie
+  /// trafia żadna wartość zastępcza: zapisana „Wydatek bez nazwy" byłaby nie do
+  /// odróżnienia od nazwy wpisanej ręcznie i zamroziłaby jeden język w danych.
+  /// Podmiana następuje przy rysowaniu, więc każdy widzi ją w swoim języku,
+  /// a formularz edycji zostaje pusty i wymusza prawdziwą nazwę.
+  String expenseName(String? raw) {
+    final name = raw?.trim() ?? '';
+    if (name.isNotEmpty) return name;
+    return _isEnglish ? 'Unnamed expense' : 'Wydatek bez nazwy';
+  }
+
+  String get errorNoName =>
+      _isEnglish ? 'Give the expense a name.' : 'Podaj nazwę wydatku.';
+
   String get needsRateBadge => _isEnglish ? 'no rate' : 'brak kursu';
 
   String get needsRateTitle =>

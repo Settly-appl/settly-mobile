@@ -99,7 +99,12 @@ class SingleExpense {
   factory SingleExpense.fromJson(Map<String, dynamic> json) {
     return SingleExpense(
       id: json['id']?.toString(),
-      name: json['shop'] ?? 'Wydatek',
+      // Brak nazwy zostaje brakiem. Wstawiane tu wcześniej 'Wydatek' było
+      // twardym polskim napisem w modelu (widocznym też po angielsku) i — co
+      // gorsza — wpadało do formularza edycji, więc zapisanie takiego wydatku
+      // utrwalało zmyśloną nazwę w bazie. Podmianę robi AppTexts.expenseName
+      // przy wyświetlaniu.
+      name: json['shop']?.toString() ?? '',
       note: json['note'] ?? '',
       // Kwoty z API bywają nieprzycięte ("5.1"). Normalizujemy raz, przy
       // wejściu, żeby każdy widok (lista, główna, szczegóły, piny) pokazywał

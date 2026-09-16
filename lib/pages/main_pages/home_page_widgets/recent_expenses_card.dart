@@ -105,7 +105,7 @@ class _RecentExpenseCardState extends State<RecentExpenseCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.item.name,
+          AppTexts.of(context).expenseName(widget.item.name),
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,

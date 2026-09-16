@@ -178,6 +178,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _amountController.addListener(_onAmountChanged);
+    _placeController.addListener(_onNameChanged);
     _selectedProjectId = widget.initialProjectId;
 
     if (widget.initialSelectedFriendIds.isNotEmpty) {
@@ -452,6 +453,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _amountController.removeListener(_onAmountChanged);
+    _placeController.removeListener(_onNameChanged);
     _amountController.dispose();
     _rateController.dispose();
     _placeController.dispose();
@@ -552,6 +554,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     }
     return s;
   }
+
+  /// Nazwa jest wymagana, a przycisk zapisu wisi na _blockingError(), więc musi
+  /// się przeliczyć przy każdym znaku — inaczej po wpisaniu nazwy zostaje szary.
+  void _onNameChanged() => setState(() {});
 
   void _onAmountChanged() {
     if (_splitType == SplitType.equal) {
@@ -807,6 +813,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   String? _blockingError() {
     final texts = AppTexts.of(context);
     if (_currentUserId == null) return texts.errorNoAccount;
+    if (_placeController.text.trim().isEmpty) return texts.errorNoName;
     if (_totalAmount <= 0) return texts.errorAmountZero;
     if (_selectedCategory == null) return texts.errorNoCategory;
     // Bez kursu wydatek w funtach trafiłby do sald jako ta sama liczba
@@ -1682,6 +1689,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             label: texts.formShopLabel,
             hint: texts.formShopHint,
             controller: _placeController,
+            required: true,
           ),
           _rowDivider(),
           _rowTap(
@@ -1715,6 +1723,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     required String label,
     required String hint,
     required TextEditingController controller,
+    bool required = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1723,7 +1732,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           SizedBox(
             width: 110,
             child: Text(
-              label,
+              required ? '$label *' : label,
               style: TextStyle(
                 color: AppColors.cardSubtitle(widget.isDark),
                 fontSize: 13,
