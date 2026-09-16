@@ -13,6 +13,8 @@ import 'package:settly_mobile/widgets/enable_notifications_button.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 import 'package:settly_mobile/utils/money_format.dart';
+import 'package:settly_mobile/pages/suggestions_page.dart';
+import 'package:settly_mobile/services/api_service/suggestions_service.dart';
 
 class ProfilePage extends StatelessWidget {
   final String userName;
@@ -102,6 +104,27 @@ class ProfilePage extends StatelessWidget {
                           ),
                         ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    SuggestionsPage(isDark: isDark),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.lightbulb_outline_rounded),
+                          label: Text(texts.suggestionsAdminButton),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                       const Padding(
                         padding: EdgeInsets.only(bottom: 12),
                         child: _AdminReminderButton(),
@@ -158,6 +181,10 @@ class ProfilePage extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
                 child: _BaseCurrencyButton(),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _SuggestionButton(),
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -383,6 +410,127 @@ class _BaseCurrencyButtonState extends State<_BaseCurrencyButton> {
             )
           : const Icon(Icons.currency_exchange_rounded),
       label: Text('${texts.baseCurrencyTitle}: $_current'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+/// „Zgłoś sugestię" — dostępne dla każdego zalogowanego.
+///
+/// Zwykły arkusz z polem tekstowym: krótka droga od „to powinno działać
+/// inaczej" do wysłania, bez zakładania konta na GitHubie ani szukania maila.
+/// Czyta to tylko admin.
+class _SuggestionButton extends StatefulWidget {
+  const _SuggestionButton();
+
+  @override
+  State<_SuggestionButton> createState() => _SuggestionButtonState();
+}
+
+class _SuggestionButtonState extends State<_SuggestionButton> {
+  bool _sending = false;
+
+  Future<void> _open() async {
+    final texts = AppTexts.of(context);
+    final controller = TextEditingController();
+
+    final text = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                texts.suggestionsSheetTitle,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                maxLines: 5,
+                maxLength: 2000,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: texts.suggestionsSheetHint,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.of(sheetContext).pop(controller.text.trim()),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(texts.suggestionsSend),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    controller.dispose();
+    if (!mounted) return;
+
+    if (text == null) return; // zamknięte bez wysyłania
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.suggestionsEmpty)));
+      return;
+    }
+
+    setState(() => _sending = true);
+    try {
+      await SuggestionsService().send(text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.suggestionsSent)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.suggestionsFailed)));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+    return OutlinedButton.icon(
+      onPressed: _sending ? null : _open,
+      icon: _sending
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.lightbulb_outline_rounded),
+      label: Text(texts.suggestionsSendButton),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
