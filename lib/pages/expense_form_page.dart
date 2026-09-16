@@ -170,6 +170,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   bool _itemSelectionMode = false;
 
   bool _saving = false;
+  /// Czy pokazywać błędy przy polach.
+  ///
+  /// Dopiero po pierwszej próbie zapisu — świeżo otwarty formularz nie ma
+  /// świecić na czerwono, zanim ktokolwiek czegokolwiek nie zrobił.
+  bool _showFieldErrors = false;
+
   bool _scanningReceipt = false;
   bool _initialReceiptScanStarted = false;
 
@@ -872,13 +878,37 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     return null;
   }
 
-  bool get _canSave => _blockingError() == null && !_saving;
+  /// Błąd konkretnego pola — do podświetlenia go na miejscu, zamiast zostawiać
+  /// użytkownika z jednym zdaniem na dole ekranu i domysłami, czego dotyczy.
+  /// Reguły są te same co w [_blockingError], tylko zaadresowane do pola.
+  String? _fieldError(String field) {
+    if (!_showFieldErrors) return null;
+    final texts = AppTexts.of(context);
+    switch (field) {
+      case 'name':
+        return _placeController.text.trim().isEmpty ? texts.errorNoName : null;
+      case 'amount':
+        return _totalAmount <= 0 ? texts.errorAmountZero : null;
+      case 'category':
+        return _selectedCategory == null ? texts.errorNoCategory : null;
+      default:
+        return null;
+    }
+  }
+
+  /// Przycisk zostaje aktywny także wtedy, gdy czegoś brakuje.
+  ///
+  /// Wyszarzony przycisk nie mówi, CZEGO brakuje — użytkownik zostaje z
+  /// martwym ekranem. Naciśnięcie pokazuje wszystkie braki przy polach i zwraca
+  /// komunikat, więc jest dokąd pójść.
+  bool get _canSave => !_saving;
 
   Future<void> _save() async {
     final texts = AppTexts.of(context);
     final err = _blockingError();
     if (err != null) {
-      _snack(err);
+      setState(() => _showFieldErrors = true);
+      _snack(err, error: true);
       return;
     }
 
@@ -1344,11 +1374,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     Navigator.of(context).pop(true);
   }
 
-  void _snack(String msg) {
+  void _snack(String msg, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppColors.amountNegative : null,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -1690,6 +1726,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             hint: texts.formShopHint,
             controller: _placeController,
             required: true,
+            errorText: _fieldError('name'),
           ),
           _rowDivider(),
           _rowTap(
@@ -1704,6 +1741,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             value: _selectedCategory?.label(texts) ?? texts.formCategoryHint,
             valueIcon: _selectedCategory?.icon,
             valueColor: _selectedCategory?.color,
+            errorText: _fieldError('category'),
             placeholder: _selectedCategory == null,
             icon: Icons.local_offer_outlined,
             onTap: () => _pickCategory(texts),
@@ -1724,10 +1762,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     required String hint,
     required TextEditingController controller,
     bool required = false,
+    String? errorText,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
         children: [
           SizedBox(
             width: 110,
@@ -1761,6 +1803,37 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
             ),
           ),
         ],
+          ),
+          if (errorText != null) _inlineError(errorText),
+        ],
+      ),
+    );
+  }
+
+  /// Jednolity komunikat błędu pod polem — czerwony i z ikoną, żeby dało się go
+  /// zauważyć bez czytania całego ekranu.
+  Widget _inlineError(String message) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 110),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 13,
+            color: AppColors.amountNegative,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.amountNegative,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1772,13 +1845,17 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     IconData? valueIcon,
     Color? valueColor,
     bool placeholder = false,
+    String? errorText,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
           children: [
             SizedBox(
               width: 110,
@@ -1810,6 +1887,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
               Icons.chevron_right,
               color: AppColors.cardSubtitle(widget.isDark),
             ),
+          ],
+            ),
+            if (errorText != null) _inlineError(errorText),
           ],
         ),
       ),
@@ -3152,22 +3232,34 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (err != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.amountNegative.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.amountNegative.withValues(alpha: 0.35),
+                  ),
+                ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 14,
-                      color: AppColors.cardSubtitle(widget.isDark),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 16,
+                      color: AppColors.amountNegative,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         err,
-                        style: TextStyle(
-                          color: AppColors.cardSubtitle(widget.isDark),
-                          fontSize: 12,
+                        style: const TextStyle(
+                          color: AppColors.amountNegative,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),

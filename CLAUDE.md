@@ -158,6 +158,14 @@ importing both causes an ambiguous-import error.
   per expense. This is why eager full-list loading is bad. Only fetch `userShare`
   for the page you just loaded. (A batch/embedded field would remove the N+1 —
   future backend work.) It 404s for personal expenses (no split row).
+- **Validation is shown, not implied.** The save button stays **enabled** even
+  when something is missing: a greyed-out button says *no* without saying
+  *why*, leaving a dead screen. Pressing it flips `_showFieldErrors`, which
+  puts a red message under each offending field (`_fieldError`, rendered by
+  `_inlineError` in `_rowInput`/`_rowTap`), shows the blocking reason in a red
+  bordered box above the button, and surfaces it again as a red snackbar.
+  `_blockingError()` remains the single source of truth for *whether* saving is
+  allowed; `_fieldError` only re-addresses the same rules to a field.
 - **Edit** reuses `ExpenseFormPage` via an `editExpense:` param: it PUTs the
   header, then **deletes and recreates** the split/items.
 - **Long-press (or right-click on desktop) on a tile** (expenses list + home
@@ -240,6 +248,17 @@ importing both causes an ambiguous-import error.
   with.
 - A project (wyjazd) carries `defaultCurrency`/`defaultRateToBase`: you buy the
   pounds once, not once per expense. Expenses inherit both and may override.
+
+## Sugestie
+
+- **Any signed-in user can send one** from the profile (`_SuggestionButton` —
+  a sheet with a text field); **only admins can read them**
+  (`SuggestionsPage`, gated in the UI by `AuthService().isAdmin()` and on the
+  backend by `@PreAuthorize("hasRole('admin')")`). The hidden button is a
+  courtesy, the endpoint is the control — a non-admin who reaches the page
+  gets the error state, not somebody else's feedback.
+- An author whose account was deleted renders as `suggestionsDeletedAuthor`;
+  the suggestion itself survives (`user_id` is `ON DELETE SET NULL`).
 
 ## Projects — domain notes
 
@@ -467,3 +486,8 @@ Non-obvious and easy to break:
   nameless expenses are left null rather than backfilled with a placeholder —
   see the Expenses section for why, and note `AppTexts.expenseName()` is the
   render-time substitute.
+
+- **2026-09-16 (2)** — Expense form validation made visible (see the Expenses
+  section): errors now land under the field that caused them instead of one
+  grey line under a dead button. **Suggestions** added: anyone can send one
+  from the profile, only admins can read them (see the Sugestie section).

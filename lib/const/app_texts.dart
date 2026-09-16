@@ -855,6 +855,46 @@ class AppTexts {
     return _isEnglish ? 'Unnamed expense' : 'Wydatek bez nazwy';
   }
 
+  // ── Sugestie ─────────────────────────────────────────────────────────────
+  String get suggestionsSendButton =>
+      _isEnglish ? 'Suggest a change' : 'Zgłoś sugestię';
+
+  String get suggestionsSheetTitle =>
+      _isEnglish ? 'Suggest a change' : 'Zgłoś sugestię';
+
+  String get suggestionsSheetHint => _isEnglish
+      ? 'What should work differently?'
+      : 'Co powinno działać inaczej?';
+
+  String get suggestionsSend => _isEnglish ? 'Send' : 'Wyślij';
+
+  String get suggestionsSent =>
+      _isEnglish ? 'Thanks — suggestion sent.' : 'Dzięki — sugestia wysłana.';
+
+  String get suggestionsFailed => _isEnglish
+      ? 'Could not send the suggestion.'
+      : 'Nie udało się wysłać sugestii.';
+
+  String get suggestionsEmpty =>
+      _isEnglish ? 'Write something first.' : 'Napisz najpierw treść.';
+
+  String get suggestionsAdminButton =>
+      _isEnglish ? 'Suggestions' : 'Sugestie';
+
+  String get suggestionsAdminTitle =>
+      _isEnglish ? 'Suggestions' : 'Sugestie';
+
+  String get suggestionsAdminEmpty =>
+      _isEnglish ? 'No suggestions yet.' : 'Brak sugestii.';
+
+  String get suggestionsAdminFailed => _isEnglish
+      ? 'Could not load suggestions.'
+      : 'Nie udało się pobrać sugestii.';
+
+  /// Autor usuniętego konta — sugestia zostaje, podpis znika.
+  String get suggestionsDeletedAuthor =>
+      _isEnglish ? 'Deleted account' : 'Usunięte konto';
+
   String get errorNoName =>
       _isEnglish ? 'Give the expense a name.' : 'Podaj nazwę wydatku.';
 
