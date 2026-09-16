@@ -43,7 +43,7 @@ Future<void> showExpenseActionsSheet({
               children: [
                 Expanded(
                   child: Text(
-                    item.name,
+                    AppTexts.of(context).expenseName(item.name),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

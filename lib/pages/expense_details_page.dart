@@ -546,7 +546,7 @@ class _ExpenseDetailsPageState extends State<ExpenseDetailsPage> {
         ),
       ),
       Text(
-        widget.expense.name,
+        AppTexts.of(context).expenseName(widget.expense.name),
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
       ),
       // Wydatek bez kursu nie liczy się do sald — mówimy to tutaj, bo to

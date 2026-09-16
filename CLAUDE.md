@@ -135,6 +135,18 @@ importing both causes an ambiguous-import error.
   the filter enum in `all_expenses_page.dart`, `ExpenseStyle.getStyle`,
   `category_label.dart`, and the **backend AI prompts** (`AiGeminiService` lists
   the ids for receipt categorization).
+- **An expense name is required, and missing old names are NOT backfilled.**
+  `shop` is `@NotBlank` on the backend and the form blocks saving without it
+  (the field is marked `*`). Expenses created before the rule keep a **null**
+  name: a stored "Wydatek bez nazwy" could not be told apart from one somebody
+  typed, and would freeze one language into the data. `AppTexts.expenseName()`
+  substitutes a localized label **at render time** — every display site goes
+  through it. Crucially the *form* does not: it prefills the raw value, so
+  editing an old expense leaves the field empty and forces a real name. That is
+  the cleanup path, and it is why `SingleExpense.fromJson` must never fall back
+  to a literal again — it used to return `'Wydatek'`, which was both a hardcoded
+  Polish string in a model and a fake name that the edit form would have written
+  straight back into the database.
 - The expenses API is **paginated** (Spring `Page`) and uses **Spring's standard
   query params**: `page`, `size`, `sort=<field>,<dir>`. The non-standard
   `pageNumber`/`pageSize`/`sortBy`/`sortDirection` are **silently ignored** — a
@@ -449,3 +461,9 @@ Non-obvious and easy to break:
   from balances, with a banner, a badge and a dedicated screen to supply the
   missing rates. The guessing alternative was rejected: the rate is a fact about
   someone's bank, not about the database.
+
+- **2026-09-16** — Expense **name is mandatory** (backend `@NotBlank` on `shop`,
+  form validation + `*` marker, save button rebuilds on keystroke). Existing
+  nameless expenses are left null rather than backfilled with a placeholder —
+  see the Expenses section for why, and note `AppTexts.expenseName()` is the
+  render-time substitute.

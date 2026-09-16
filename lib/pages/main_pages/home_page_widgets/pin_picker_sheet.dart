@@ -346,7 +346,7 @@ class _ExpensePickerRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  expense.name,
+                  AppTexts.of(context).expenseName(expense.name),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,

@@ -228,7 +228,7 @@ class _PinnedTile extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              item.title,
+              AppTexts.of(context).expenseName(item.title),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
