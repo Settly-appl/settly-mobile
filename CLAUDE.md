@@ -302,6 +302,22 @@ may add expenses to it.
 - **`ExpenseResponse.canSettle`** says whether *this viewer* may settle it. A
   member seeing someone else's project expense has no share in it, so the backend
   refuses — the UI must not offer the gesture (`SettleSwipe` honours this).
+- **Someone else's expense says so on the tile.** `SingleExpense.isBystander(
+  viewerId)` = not the owner **and** `!canSettle`, i.e. the viewer has no share
+  and is only seeing the row because the project is a shared ledger. It renders
+  as the muted `NotParticipantBadge` ("nie uczestniczysz") in both places such a
+  row can appear — `project_detail_page.dart` and `all_expenses_page.dart`
+  filtered by project; the unscoped list never returns them. `canSettle` alone
+  would not do: the viewer's own **personal** expense also has it `false`, which
+  is why the owner comparison is part of the rule. The expense *details* page
+  already handled this case (`_buildOwedCallout` bails when the viewer has no
+  split row) — this only closes the gap on the list.
+- The amount on a project row is the **whole expense**, formatted with
+  `formatMoneyWithBase` (`_projectRowAmount`). The project list deliberately
+  does not fetch `userShare` (it would be the N+1 over a whole trip), and half
+  the rows are other people's anyway, so the tile answers "what did this cost",
+  not "what do I owe". It used to print the bare `totalAmount` string — a number
+  with no currency on it, which on a London trip reads as złoty.
 - Only an expense's **creator** may edit/delete it. The *project* owner has no
   power over other people's expenses; they can only rename/delete the project and
   manage members.
@@ -525,3 +541,8 @@ Non-obvious and easy to break:
   a trip can carry a **date span**, and a new expense dated inside a trip
   **selects that trip automatically** — see the Projects section for the
   precedence rules.
+
+- **2026-09-17 (3)** — A project expense the viewer has no share in is now
+  **marked as such on the list** (`nie uczestniczysz`), and a project row shows
+  the expense's full amount *with its currency* instead of a bare number — see
+  the Projects section.
