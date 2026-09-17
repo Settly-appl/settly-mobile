@@ -21,6 +21,18 @@ class SuggestionsService {
     }
   }
 
+  /// Usuwa sugestię na dobre — tylko admin (pilnuje tego backend).
+  Future<void> delete(String id) async {
+    final response = await _api.request(
+      endpoint: 'suggestions/$id',
+      method: HttpMethod.delete,
+    );
+    if (response == null ||
+        (response.statusCode != 200 && response.statusCode != 204)) {
+      throw Exception('Nie udało się usunąć sugestii');
+    }
+  }
+
   Future<List<Suggestion>> getAll() async {
     final response = await _api.request(
       endpoint: 'suggestions',

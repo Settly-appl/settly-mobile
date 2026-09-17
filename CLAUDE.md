@@ -257,6 +257,10 @@ importing both causes an ambiguous-import error.
   backend by `@PreAuthorize("hasRole('admin')")`). The hidden button is a
   courtesy, the endpoint is the control — a non-admin who reaches the page
   gets the error state, not somebody else's feedback.
+- **Admins can delete one** (bin icon on each card). The confirm dialog is not
+  decoration: the delete is hard on the backend and there is no copy anywhere
+  else, so the dialog says so. On success the row is removed locally rather
+  than re-fetching — the backend already confirmed it.
 - An author whose account was deleted renders as `suggestionsDeletedAuthor`;
   the suggestion itself survives (`user_id` is `ON DELETE SET NULL`).
 
@@ -491,3 +495,6 @@ Non-obvious and easy to break:
   section): errors now land under the field that caused them instead of one
   grey line under a dead button. **Suggestions** added: anyone can send one
   from the profile, only admins can read them (see the Sugestie section).
+
+- **2026-09-17** — Admins can delete a suggestion (same role gate as reading
+  them, confirm dialog, hard delete).
