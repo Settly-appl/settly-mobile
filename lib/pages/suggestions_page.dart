@@ -186,20 +186,38 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                   ],
                 ),
               ),
-              // Kolor kasowania, nie podpisu. Wcześniej ikona brała
-              // cardSubtitle — ten sam przygaszony ton co data pod treścią —
-              // przez co cienki kontur 20 px zlewał się z kartą i po prostu nie
-              // było go widać. Czerwień ma kontrast ~3.3:1 na obu tłach kart i
-              // od razu mówi, że to akcja niszcząca. Bez visualDensity.compact:
-              // pełne 48 px to i większy cel na telefonie, i wyraźniejszy
-              // element.
-              IconButton(
-                onPressed: () => _confirmDelete(suggestion),
-                tooltip: texts.suggestionsDeleteTooltip,
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 22,
-                  color: AppColors.amountNegative,
+              const SizedBox(width: 10),
+              // Wypełniony przycisk z PODPISEM, nie sama ikona.
+              //
+              // Poprzednie podejście — przemalowanie konturowej ikony na
+              // czerwono — wciąż było niewidoczne. Nie zgadujemy więc dalej,
+              // czemu 22-pikselowy kontur ginie na czyjejś karcie: kasowanie
+              // dostaje pełne czerwone tło, biały znak i słowo „Usuń". Napis
+              // jest tu najważniejszy — rysuje go zwykły font tekstu, więc
+              // przycisk zostaje widoczny nawet wtedy, gdy font ikon się nie
+              // wczyta i z glifu kosza zostanie pusty prostokąt.
+              Tooltip(
+                message: texts.suggestionsDeleteTooltip,
+                child: FilledButton.icon(
+                  onPressed: () => _confirmDelete(suggestion),
+                  icon: const Icon(Icons.delete_rounded, size: 18),
+                  label: Text(texts.suggestionsDeleteTooltip),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.amountNegative,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    minimumSize: const Size(0, 44),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ],
