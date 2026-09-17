@@ -5,6 +5,15 @@ import 'package:settly_mobile/services/api_service/api_service_request.dart';
 
 /// Wraps the /projects endpoints (CRUD + membership).
 class ProjectsService {
+  /// Backend oczekuje gołej daty (LocalDate), nie znacznika czasu — inaczej
+  /// strefa potrafi przesunąć wyjazd o dzień.
+  static String? _asApiDate(DateTime? date) {
+    if (date == null) return null;
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$m-$d';
+  }
+
   final ApiServiceRequest _api = ApiServiceRequest();
 
   Future<List<Project>> getMyProjects() async {
@@ -34,6 +43,8 @@ class ProjectsService {
     String? description,
     String? defaultCurrency,
     double? defaultRateToBase,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final res = await _api.request(
       endpoint: 'projects',
@@ -43,6 +54,8 @@ class ProjectsService {
         'description': ?description,
         'defaultCurrency': ?defaultCurrency,
         'defaultRateToBase': ?defaultRateToBase,
+        'startDate': ?_asApiDate(startDate),
+        'endDate': ?_asApiDate(endDate),
       },
     );
     if (res != null && (res.statusCode == 200 || res.statusCode == 201)) {
@@ -58,6 +71,8 @@ class ProjectsService {
     String? status,
     String? defaultCurrency,
     double? defaultRateToBase,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final res = await _api.request(
       endpoint: 'projects/$projectId',
@@ -68,6 +83,8 @@ class ProjectsService {
         'status': ?status,
         'defaultCurrency': ?defaultCurrency,
         'defaultRateToBase': ?defaultRateToBase,
+        'startDate': ?_asApiDate(startDate),
+        'endDate': ?_asApiDate(endDate),
       },
     );
     if (res != null && res.statusCode == 200) {

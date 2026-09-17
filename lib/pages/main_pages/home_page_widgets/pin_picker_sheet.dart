@@ -6,6 +6,10 @@ import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import '../../../const/app_texts.dart';
 import '../../../repository/pinned_item_repository.dart';
+import 'package:settly_mobile/models/project.dart';
+import 'package:settly_mobile/services/api_service/projects_service.dart';
+import 'package:settly_mobile/utils/money_format.dart';
+import '../../../models/pinned_items/pinned_item.dart';
 
 class PinPickerSheet extends StatefulWidget {
   final bool isDark;
@@ -32,6 +36,11 @@ class _PinPickerSheetState extends State<PinPickerSheet>
   List<SingleExpense> _expenses = [];
   bool _loadingExpenses = true;
 
+  // ── Stan zakładki Projekty ─────────────────────────────────────────────────
+  final _projectsService = ProjectsService();
+  List<Project> _projects = [];
+  bool _loadingProjects = true;
+
   // ── Śledzenie już przypiętych id ──────────────────────────────────────────
   Set<String> _pinnedIds = {};
 
@@ -40,6 +49,7 @@ class _PinPickerSheetState extends State<PinPickerSheet>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _fetchExpenses();
+    _fetchProjects();
     _loadPinnedIds();
   }
 
@@ -69,10 +79,25 @@ class _PinPickerSheetState extends State<PinPickerSheet>
     if (mounted) setState(() => _loadingExpenses = false);
   }
 
+  Future<void> _fetchProjects() async {
+    setState(() => _loadingProjects = true);
+    try {
+      final projects = await _projectsService.getMyProjects();
+      if (mounted) setState(() => _projects = projects);
+    } catch (_) {
+      // Pusta lista pokaże stan „brak projektów" — lepsze niż pusty ekran.
+    }
+    if (mounted) setState(() => _loadingProjects = false);
+  }
+
   // ── Przypinanie wydatku ────────────────────────────────────────────────────
-  Future<void> _pinExpense(String expenseId, String name) async {
+  Future<void> _pinExpense(
+    String expenseId,
+    String name, {
+    PinnedItemType type = PinnedItemType.expense,
+  }) async {
     final texts = AppTexts.of(context);
-    final success = await _repo.pin(expenseId);
+    final success = await _repo.pin(expenseId, type: type);
 
     if (!mounted) return;
 
@@ -265,37 +290,55 @@ class _PinPickerSheetState extends State<PinPickerSheet>
 
   Widget _buildProjectsTab() {
     final texts = AppTexts.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.cardBg(widget.isDark),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.cardBorder(widget.isDark)),
-            ),
-            child: Icon(
+    if (_loadingProjects) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_projects.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
               Icons.group_outlined,
-              size: 36,
+              size: 48,
               color: AppColors.cardSubtitle(
                 widget.isDark,
-              ).withValues(alpha: 0.5),
+              ).withValues(alpha: 0.4),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            texts.comingSoon,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.cardTitle(widget.isDark),
+            const SizedBox(height: 12),
+            Text(
+              texts.noProjects,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.cardSubtitle(widget.isDark),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      itemCount: _projects.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final project = _projects[index];
+        final isPinned = _pinnedIds.contains(project.id);
+
+        return _ProjectPickerRow(
+          project: project,
+          isDark: widget.isDark,
+          isPinned: isPinned,
+          onTap: () => isPinned
+              ? _unpinById(project.id)
+              : _pinExpense(
+                  project.id,
+                  project.name,
+                  type: PinnedItemType.project,
+                ),
+        );
+      },
     );
   }
 }
@@ -400,6 +443,92 @@ class _ExpensePickerRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Wiersz projektu w pickerze — ten sam układ co wiersz wydatku, żeby obie
+/// zakładki czytało się tak samo.
+class _ProjectPickerRow extends StatelessWidget {
+  final Project project;
+  final bool isDark;
+  final bool isPinned;
+  final VoidCallback onTap;
+
+  const _ProjectPickerRow({
+    required this.project,
+    required this.isDark,
+    required this.isPinned,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg(isDark),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isPinned
+                ? AppColors.actionScanIcon(isDark).withValues(alpha: 0.5)
+                : AppColors.cardBorder(isDark),
+            width: isPinned ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.avatarBg(isDark),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                Icons.group_rounded,
+                size: 18,
+                color: AppColors.avatarFg(isDark),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    project.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.cardTitle(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatMoney(project.totalAmount, project.totalCurrency),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.cardSubtitle(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+              size: 18,
+              color: isPinned
+                  ? AppColors.actionScanIcon(isDark)
+                  : AppColors.cardSubtitle(isDark),
+            ),
+          ],
+        ),
       ),
     );
   }

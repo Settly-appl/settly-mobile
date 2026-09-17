@@ -24,6 +24,33 @@ class Project {
   final String? defaultCurrency;
   final double? defaultRateToBase;
 
+  /// Kiedy trwa wyjazd. Oba końce opcjonalne — większość projektów to nie
+  /// wyjazdy i nie ma dat. W automatycznym wyborze projektu dla nowego wydatku
+  /// bierze udział tylko projekt z OBOMA datami: otwarty przedział zagarniałby
+  /// każdy przyszły wydatek.
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  /// Czy [date] mieści się w wyjeździe (włącznie z oboma końcami).
+  bool coversDate(DateTime date) {
+    final start = startDate;
+    final end = endDate;
+    if (start == null || end == null) return false;
+    final day = DateTime(date.year, date.month, date.day);
+    final from = DateTime(start.year, start.month, start.day);
+    final to = DateTime(end.year, end.month, end.day);
+    return !day.isBefore(from) && !day.isAfter(to);
+  }
+
+  /// Długość wyjazdu w dniach — przy nakładających się wyjazdach wygrywa
+  /// krótszy, bo jest bardziej konkretny.
+  int get spanInDays {
+    final start = startDate;
+    final end = endDate;
+    if (start == null || end == null) return 1 << 30;
+    return end.difference(start).inDays;
+  }
+
   final DateTime? createdAt;
 
   const Project({
@@ -38,6 +65,8 @@ class Project {
     this.totalCurrency = kDefaultCurrency,
     this.defaultCurrency,
     this.defaultRateToBase,
+    this.startDate,
+    this.endDate,
     this.createdAt,
   });
 
@@ -54,6 +83,12 @@ class Project {
       totalCurrency: json['totalCurrency']?.toString() ?? kDefaultCurrency,
       defaultCurrency: json['defaultCurrency'] as String?,
       defaultRateToBase: (json['defaultRateToBase'] as num?)?.toDouble(),
+      startDate: json['startDate'] == null
+          ? null
+          : DateTime.tryParse(json['startDate'].toString()),
+      endDate: json['endDate'] == null
+          ? null
+          : DateTime.tryParse(json['endDate'].toString()),
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.tryParse(json['createdAt'].toString())?.toLocal(),

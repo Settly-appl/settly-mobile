@@ -8,6 +8,7 @@ import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/widgets/hoverable.dart';
 import '../../../const/app_texts.dart';
 import 'pin_picker_sheet.dart';
+import 'package:settly_mobile/pages/project_detail_page.dart';
 
 class PinnedScroll extends StatelessWidget {
   final bool isDark;
@@ -69,9 +70,15 @@ class PinnedScroll extends StatelessWidget {
         }
       }
     } else {
-      ScaffoldMessenger.of(
+      // Projekt otwieramy wprost — jego ekran sam pobiera swoje dane, więc nie
+      // ma czego wstępnie ładować jak przy wydatku.
+      final changed = await Navigator.push<bool>(
         context,
-      ).showSnackBar(SnackBar(content: Text(AppTexts.of(context).comingSoon)));
+        MaterialPageRoute(
+          builder: (_) => ProjectDetailPage(projectId: item.id),
+        ),
+      );
+      if (changed == true) await onRefresh();
     }
   }
 

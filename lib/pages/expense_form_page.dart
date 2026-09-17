@@ -138,6 +138,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
   List<Project> _projects = [];
   String? _selectedProjectId;
 
+  /// Czy użytkownik sam wskazał projekt.
+  ///
+  /// Automatyczny wybór po dacie ma podpowiadać, a nie nadpisywać decyzję —
+  /// więc po ręcznym wyborze (albo po świadomym „bez projektu") przestaje
+  /// cokolwiek zmieniać, nawet gdy data się przesunie.
+  bool _projectChosenByUser = false;
+
   bool _loadingFriends = true;
   List<Friend> _availableFriends = [];
   final Set<String> _selectedFriendIds = {};
@@ -450,6 +457,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       // z wydatku źródłowego i podmienianie jej pod użytkownikiem byłoby
       // zaskoczeniem, a nie podpowiedzią.
       if (widget.editExpense == null && widget.repeatExpense == null) {
+        // Projekt podany z zewnątrz (wejście z ekranu wyjazdu) jest wyborem
+        // użytkownika tak samo jak kliknięcie w liście.
+        if (_selectedProjectId != null) _projectChosenByUser = true;
+        _autoSelectProjectForDate();
         _applyProjectDefaults(_selectedProjectId);
       }
     } catch (_) {}
@@ -1913,7 +1924,40 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
     );
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
+      _autoSelectProjectForDate();
     }
+  }
+
+  /// Wybiera wyjazd, w którego daty wpada ten wydatek.
+  ///
+  /// Po to są daty projektu: dodając wydatek w trakcie wyjazdu nie trzeba za
+  /// każdym razem wybierać go z listy. Zasady:
+  ///  * tylko czysty formularz — edycja i powtórzenie mają już swój projekt;
+  ///  * tylko dopóki użytkownik sam nie wskazał projektu;
+  ///  * przy nakładających się wyjazdach wygrywa krótszy (jest bardziej
+  ///    konkretny — tygodniowy wypad w środku miesięcznego wyjazdu), a przy
+  ///    równych późniejszy start;
+  ///  * projekt bez pełnego zakresu dat nie bierze udziału (patrz
+  ///    [Project.coversDate]).
+  void _autoSelectProjectForDate() {
+    if (_projectChosenByUser) return;
+    if (widget.editExpense != null || widget.repeatExpense != null) return;
+
+    Project? best;
+    for (final project in _projects) {
+      if (!project.coversDate(_selectedDate)) continue;
+      if (best == null ||
+          project.spanInDays < best.spanInDays ||
+          (project.spanInDays == best.spanInDays &&
+              (project.startDate?.isAfter(best.startDate ?? DateTime(0)) ??
+                  false))) {
+        best = project;
+      }
+    }
+
+    if (best == null || best.id == _selectedProjectId) return;
+    setState(() => _selectedProjectId = best!.id);
+    _applyProjectDefaults(_selectedProjectId);
   }
 
   Future<void> _pickCategory(AppTexts texts) async {
@@ -2142,7 +2186,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
       },
     );
     if (picked == null) return;
-    setState(() => _selectedProjectId = picked == _kNoProject ? null : picked);
+    setState(() {
+      _selectedProjectId = picked == _kNoProject ? null : picked;
+      _projectChosenByUser = true;
+    });
     _applyProjectDefaults(_selectedProjectId);
   }
 

@@ -321,6 +321,11 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
   /// Waluta wyjazdu. `null` znaczy „ta sama co bazowa" — wtedy nie ma czego
   /// przeliczać i pole kursu się nie pokazuje.
   String? _tripCurrency;
+
+  /// Oba końce albo żaden — otwarty przedział zagarniałby każdy przyszły
+  /// wydatek, więc do automatycznego wyboru liczy się tylko pełny zakres.
+  DateTimeRange? _tripDates;
+
   bool _saving = false;
 
   String get _baseCurrency => UserSettingsService.baseCurrency;
@@ -340,6 +345,22 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
     super.dispose();
   }
 
+  static String _formatDate(DateTime date) {
+    final d = date.day.toString().padLeft(2, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    return '$d.$m.${date.year}';
+  }
+
+  Future<void> _pickTripDates() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(DateTime.now().year - 5),
+      lastDate: DateTime(DateTime.now().year + 5),
+      initialDateRange: _tripDates,
+    );
+    if (picked != null && mounted) setState(() => _tripDates = picked);
+  }
+
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
@@ -352,6 +373,8 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
             : _descController.text.trim(),
         defaultCurrency: _tripCurrency,
         defaultRateToBase: _tripCurrency == null ? null : _tripRate,
+        startDate: _tripDates?.start,
+        endDate: _tripDates?.end,
       );
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
@@ -440,6 +463,32 @@ class _CreateProjectSheetState extends State<_CreateProjectSheet> {
               ),
             ),
           ],
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: _pickTripDates,
+            borderRadius: BorderRadius.circular(4),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: texts.projectDatesLabel,
+                helperText: texts.projectDatesHint,
+                helperMaxLines: 2,
+                border: const OutlineInputBorder(),
+                suffixIcon: _tripDates == null
+                    ? const Icon(Icons.date_range_outlined)
+                    : IconButton(
+                        tooltip: texts.projectDatesClear,
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => setState(() => _tripDates = null),
+                      ),
+              ),
+              child: Text(
+                _tripDates == null
+                    ? texts.projectDatesNotSet
+                    : '${_formatDate(_tripDates!.start)} — '
+                          '${_formatDate(_tripDates!.end)}',
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _save,

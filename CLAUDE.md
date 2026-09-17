@@ -269,6 +269,27 @@ importing both causes an ambiguous-import error.
 A project groups expenses (a trip, a party). Any **member** — not just the owner —
 may add expenses to it.
 
+- **A trip can carry a date span** (`startDate`/`endDate`, backend V12). Both
+  ends are optional — most projects are not trips — but **only a project with
+  both** takes part in automatic selection: an open-ended range would claim
+  every future expense forever.
+- **A new expense dated inside a trip selects that trip by itself**
+  (`_autoSelectProjectForDate` in `expense_form_page.dart`). It is a
+  suggestion, not a rule: it runs only on a clean form (never edit/repeat),
+  stops the moment the user picks a project themselves (`_projectChosenByUser`,
+  which a project passed in from the trip screen also sets), and re-runs when
+  the date changes. Overlapping trips resolve to the **shortest** span — a
+  weekend inside a month-long trip is the more specific answer — tie-broken by
+  the later start. Picking a project also pulls in its currency and rate, via
+  the existing `_applyProjectDefaults`.
+- **Pinning is type-aware.** `PinnedRepository` stores `expense:<id>` /
+  `project:<id>` under `pinned_v3`; the old `pinned_ids_v2` list is migrated
+  once, read as expenses. Before this, `getAll` always fetched
+  `expenses/<id>`, so `PinnedItem.fromProject` existed but nothing could reach
+  it and the picker's Projects tab said "coming soon". `getPinnedIds()` still
+  returns bare ids so the UI's "is this pinned" check is unchanged — ids are
+  UUIDs, so expenses and projects cannot collide there.
+
 - **A project is a shared ledger.** Scoped to a project, a member sees **every**
   expense in it, including expenses between other members they are not party to.
   This is a deliberate exception to the normal visibility rule (you see an expense
@@ -498,3 +519,9 @@ Non-obvious and easy to break:
 
 - **2026-09-17** — Admins can delete a suggestion (same role gate as reading
   them, confirm dialog, hard delete).
+
+- **2026-09-17 (2)** — Projects can be **pinned** to the home screen (the
+  picker's Projects tab was a placeholder; the repository was expense-only),
+  a trip can carry a **date span**, and a new expense dated inside a trip
+  **selects that trip automatically** — see the Projects section for the
+  precedence rules.

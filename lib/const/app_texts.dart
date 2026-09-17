@@ -891,6 +891,18 @@ class AppTexts {
       ? 'Could not load suggestions.'
       : 'Nie udało się pobrać sugestii.';
 
+  // ── Daty wyjazdu ─────────────────────────────────────────────────────────
+  String get projectDatesLabel =>
+      _isEnglish ? 'Trip dates' : 'Daty wyjazdu';
+
+  String get projectDatesHint => _isEnglish
+      ? 'Expenses dated inside the trip pick this project automatically.'
+      : 'Wydatki z dat wyjazdu same wybiorą ten projekt.';
+
+  String get projectDatesNotSet => _isEnglish ? 'Not set' : 'Nie ustawiono';
+
+  String get projectDatesClear => _isEnglish ? 'Clear' : 'Wyczyść';
+
   String get suggestionsDeleteTooltip => _isEnglish ? 'Delete' : 'Usuń';
 
   String get suggestionsDeleteTitle =>
