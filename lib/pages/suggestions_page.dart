@@ -186,14 +186,20 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
                   ],
                 ),
               ),
+              // Kolor kasowania, nie podpisu. Wcześniej ikona brała
+              // cardSubtitle — ten sam przygaszony ton co data pod treścią —
+              // przez co cienki kontur 20 px zlewał się z kartą i po prostu nie
+              // było go widać. Czerwień ma kontrast ~3.3:1 na obu tłach kart i
+              // od razu mówi, że to akcja niszcząca. Bez visualDensity.compact:
+              // pełne 48 px to i większy cel na telefonie, i wyraźniejszy
+              // element.
               IconButton(
                 onPressed: () => _confirmDelete(suggestion),
                 tooltip: texts.suggestionsDeleteTooltip,
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
+                icon: const Icon(
                   Icons.delete_outline_rounded,
-                  size: 20,
-                  color: AppColors.cardSubtitle(widget.isDark),
+                  size: 22,
+                  color: AppColors.amountNegative,
                 ),
               ),
             ],
