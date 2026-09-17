@@ -979,6 +979,7 @@ class _ExpensesPageState extends State<ExpensesPage> {
           onSetSettled: _setSettled,
           isOwnerOf: _isOwnerOf,
           projectNames: _projectNames,
+          viewerId: _currentUserId,
         );
       }, childCount: groups.length),
     );
@@ -1089,6 +1090,10 @@ class _ExpenseDateGroup extends StatelessWidget {
   final bool Function(SingleExpense item) isOwnerOf;
   final Map<String, String> projectNames;
 
+  /// Id zalogowanego użytkownika — rozstrzyga, czy kafelek to cudzy wydatek z
+  /// księgi projektu (patrz [SingleExpense.isBystander]).
+  final String? viewerId;
+
   const _ExpenseDateGroup({
     required this.label,
     required this.items,
@@ -1097,6 +1102,7 @@ class _ExpenseDateGroup extends StatelessWidget {
     required this.onSetSettled,
     required this.isOwnerOf,
     required this.projectNames,
+    required this.viewerId,
   });
 
   @override
@@ -1152,6 +1158,7 @@ class _ExpenseDateGroup extends StatelessWidget {
                   projectName: item.projectId == null
                       ? null
                       : projectNames[item.projectId],
+                  viewerId: viewerId,
                 ),
               ),
             ),
@@ -1189,17 +1196,29 @@ class _ExpenseRow extends StatelessWidget {
   /// Nazwa projektu, do którego należy wydatek (null = poza projektem).
   final String? projectName;
 
+  /// Id zalogowanego użytkownika (patrz [SingleExpense.isBystander]).
+  final String? viewerId;
+
   const _ExpenseRow({
     required this.item,
     required this.isDark,
     required this.onChanged,
     this.onLongPress,
     this.projectName,
+    this.viewerId,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = item.style(isDark);
+    // Plakietki układamy w Wrap, bo przy filtrze projektu potrafią wystąpić
+    // wszystkie naraz (projekt + brak kursu + cudzy wydatek + rozliczenie).
+    final badges = <Widget>[
+      if (projectName != null) _ProjectBadge(name: projectName!, isDark: isDark),
+      if (item.needsRate) _NeedsRateBadge(isDark: isDark),
+      if (item.isBystander(viewerId)) NotParticipantBadge(isDark: isDark),
+      if (item.isShared) SettledBadge(item: item, isDark: isDark),
+    ];
     return GestureDetector(
       onTap: () async {
         final changed = await Navigator.push<bool>(
@@ -1253,23 +1272,9 @@ class _ExpenseRow extends StatelessWidget {
                         color: AppColors.cardSubtitle(isDark),
                       ),
                     ),
-                  if (item.isShared || projectName != null || item.needsRate) ...[
+                  if (badges.isNotEmpty) ...[
                     const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        if (projectName != null) ...[
-                          _ProjectBadge(name: projectName!, isDark: isDark),
-                          if (item.isShared || item.needsRate)
-                            const SizedBox(width: 6),
-                        ],
-                        if (item.needsRate) ...[
-                          _NeedsRateBadge(isDark: isDark),
-                          if (item.isShared) const SizedBox(width: 6),
-                        ],
-                        if (item.isShared)
-                          SettledBadge(item: item, isDark: isDark),
-                      ],
-                    ),
+                    Wrap(spacing: 6, runSpacing: 3, children: badges),
                   ],
                 ],
               ),

@@ -67,6 +67,38 @@ class SettledBadge extends StatelessWidget {
   }
 }
 
+/// Wydatek z księgi projektu, w którym patrzący nie ma udziału.
+///
+/// W projekcie widać **wszystkie** wydatki wyjazdu, także te między innymi
+/// osobami. Bez tego znacznika taki kafelek wygląda jak każdy inny, a kwota na
+/// nim czyta się jak coś do zapłacenia — czym nie jest. Stąd ton wyciszony:
+/// to informacja o czyimś wydatku, nie ostrzeżenie.
+class NotParticipantBadge extends StatelessWidget {
+  final bool isDark;
+
+  const NotParticipantBadge({super.key, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppColors.cardSubtitle(isDark);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.visibility_outlined, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(
+          AppTexts.of(context).notParticipantBadge,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Przesuń w prawo, żeby rozliczyć; w lewo, żeby cofnąć.
 ///
 /// Znaczenie gestu zależy od tego, kim jest patrzący (patrz backend):

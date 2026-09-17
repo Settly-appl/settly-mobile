@@ -64,6 +64,19 @@ class SingleExpense {
 
   bool get isShared => splitCount > 0;
 
+  /// Wydatek, który widzę wyłącznie dlatego, że leży we wspólnej księdze
+  /// projektu — nie jestem ani jego autorem, ani uczestnikiem podziału.
+  ///
+  /// Rozstrzyga [canSettle]: backend ustawia je na `false` dokładnie wtedy, gdy
+  /// nie ma dla mnie w tym wydatku żadnego udziału. Samo w sobie nie wystarcza,
+  /// bo ma je też mój własny wydatek osobisty (nie ma w nim czego rozliczać) —
+  /// stąd porównanie właściciela obok.
+  bool isBystander(String? viewerId) =>
+      viewerId != null &&
+      ownerId != null &&
+      ownerId != viewerId &&
+      !canSettle;
+
   /// Some but not all participants have settled (only meaningful to the owner).
   bool get isPartiallySettled =>
       isShared && settledCount > 0 && settledCount < splitCount;

@@ -455,6 +455,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 item: e,
                 isDark: isDark,
                 onTap: () => _openExpense(e),
+                viewerId: _currentUserId,
               ),
             ),
           ),
@@ -825,6 +826,21 @@ class _FriendPickerSheet extends StatelessWidget {
   }
 }
 
+/// Kwota na kafelku w księdze projektu: **cały** wydatek, nie udział patrzącego.
+///
+/// Lista projektu nie dociąga `userShare` (byłoby to N+1 na cały wyjazd), a
+/// część wydatków i tak jest cudza — więc kafelek mówi, ile kosztował wydatek,
+/// a nie ile ktoś komu odda. Kolejność walut jak w [formatMoneyWithBase]: to
+/// fakt o transakcji, więc prowadzi waluta, w której zapłacono. Bez kursu
+/// (V10) nie ma czego przeliczać i zostaje sama kwota z paragonu.
+String _projectRowAmount(SingleExpense item) {
+  final total = double.tryParse(item.totalAmount) ?? 0;
+  final base = item.baseAmount.isEmpty
+      ? null
+      : double.tryParse(item.baseAmount);
+  return formatMoneyWithBase(total, item.currency, base, item.baseCurrency);
+}
+
 /// Wiersz wydatku na stronie projektu — ten sam język wizualny co lista
 /// wydatków (ikona kategorii, kwota, plakietka), żeby nie uczyć się go od nowa.
 class _ProjectExpenseRow extends StatelessWidget {
@@ -832,16 +848,22 @@ class _ProjectExpenseRow extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
 
+  /// Id zalogowanego użytkownika — księga projektu pokazuje też wydatki między
+  /// innymi osobami, więc kafelek musi umieć powiedzieć, że nie jest mój.
+  final String? viewerId;
+
   const _ProjectExpenseRow({
     required this.item,
     required this.isDark,
     required this.onTap,
+    required this.viewerId,
   });
 
   @override
   Widget build(BuildContext context) {
     final texts = AppTexts.of(context);
     final style = item.style(isDark);
+    final bystander = item.isBystander(viewerId);
 
     return GestureDetector(
       onTap: onTap,
@@ -878,9 +900,17 @@ class _ProjectExpenseRow extends StatelessWidget {
                       color: AppColors.cardTitle(isDark),
                     ),
                   ),
-                  if (item.isShared) ...[
+                  if (bystander || item.isShared) ...[
                     const SizedBox(height: 3),
-                    SettledBadge(item: item, isDark: isDark),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 3,
+                      children: [
+                        if (bystander) NotParticipantBadge(isDark: isDark),
+                        if (item.isShared)
+                          SettledBadge(item: item, isDark: isDark),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -889,7 +919,7 @@ class _ProjectExpenseRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  item.userShare.isNotEmpty ? item.userShare : item.totalAmount,
+                  _projectRowAmount(item),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
