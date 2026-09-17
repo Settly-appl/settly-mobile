@@ -51,6 +51,49 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
     }
   }
 
+  /// Kasowanie jest nieodwracalne i nie ma kopii nigdzie indziej, więc pytamy
+  /// najpierw. Listę odświeżamy lokalnie zamiast przeładowywać z sieci —
+  /// backend już potwierdził usunięcie.
+  Future<void> _confirmDelete(Suggestion suggestion) async {
+    final texts = AppTexts.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(texts.suggestionsDeleteTitle),
+        content: Text(texts.suggestionsDeleteBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(texts.suggestionsDeleteCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.amountNegative,
+            ),
+            child: Text(texts.suggestionsDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _service.delete(suggestion.id);
+      if (!mounted) return;
+      setState(() => _suggestions.removeWhere((s) => s.id == suggestion.id));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.suggestionsDeleted)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.suggestionsDeleteFailed)));
+    }
+  }
+
   String _formatDate(DateTime? date) {
     if (date == null) return '';
     final d = date.day.toString().padLeft(2, '0');
@@ -117,22 +160,39 @@ class _SuggestionsPageState extends State<SuggestionsPage> {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.cardBorder(widget.isDark)),
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                suggestion.content,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.cardTitle(widget.isDark),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      suggestion.content,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.cardTitle(widget.isDark),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${suggestion.authorName ?? texts.suggestionsDeletedAuthor}'
+                      ' · ${_formatDate(suggestion.createdAt)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.cardSubtitle(widget.isDark),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${suggestion.authorName ?? texts.suggestionsDeletedAuthor}'
-                ' · ${_formatDate(suggestion.createdAt)}',
-                style: TextStyle(
-                  fontSize: 11,
+              IconButton(
+                onPressed: () => _confirmDelete(suggestion),
+                tooltip: texts.suggestionsDeleteTooltip,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  size: 20,
                   color: AppColors.cardSubtitle(widget.isDark),
                 ),
               ),

@@ -891,6 +891,26 @@ class AppTexts {
       ? 'Could not load suggestions.'
       : 'Nie udało się pobrać sugestii.';
 
+  String get suggestionsDeleteTooltip => _isEnglish ? 'Delete' : 'Usuń';
+
+  String get suggestionsDeleteTitle =>
+      _isEnglish ? 'Delete this suggestion?' : 'Usunąć tę sugestię?';
+
+  /// Kasowanie jest nieodwracalne, więc mówimy to wprost, zanim ktoś kliknie.
+  String get suggestionsDeleteBody => _isEnglish
+      ? 'It will be gone for good — there is no copy anywhere else.'
+      : 'Zniknie na dobre — nigdzie nie ma kopii.';
+
+  String get suggestionsDeleteConfirm => _isEnglish ? 'Delete' : 'Usuń';
+
+  String get suggestionsDeleteCancel => _isEnglish ? 'Cancel' : 'Anuluj';
+
+  String get suggestionsDeleted => _isEnglish ? 'Deleted.' : 'Usunięto.';
+
+  String get suggestionsDeleteFailed => _isEnglish
+      ? 'Could not delete the suggestion.'
+      : 'Nie udało się usunąć sugestii.';
+
   /// Autor usuniętego konta — sugestia zostaje, podpis znika.
   String get suggestionsDeletedAuthor =>
       _isEnglish ? 'Deleted account' : 'Usunięte konto';
