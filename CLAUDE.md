@@ -257,8 +257,12 @@ importing both causes an ambiguous-import error.
   backend by `@PreAuthorize("hasRole('admin')")`). The hidden button is a
   courtesy, the endpoint is the control — a non-admin who reaches the page
   gets the error state, not somebody else's feedback.
-- **Admins can delete one** (bin icon on each card). The confirm dialog is not
-  decoration: the delete is hard on the backend and there is no copy anywhere
+- **Admins can delete one** — a filled red **"Usuń" button** on each card, not a
+  bare icon. Two icon-only attempts were reported invisible (first `cardSubtitle`,
+  the same muted tone as the metadata line; then a red 22 px outline glyph), so
+  the affordance stopped depending on a glyph at all: the word is drawn with the
+  normal text font and survives even a failed icon font. The confirm dialog is
+  not decoration: the delete is hard on the backend and there is no copy anywhere
   else, so the dialog says so. On success the row is removed locally rather
   than re-fetching — the backend already confirmed it.
 - An author whose account was deleted renders as `suggestionsDeletedAuthor`;
@@ -546,3 +550,6 @@ Non-obvious and easy to break:
   **marked as such on the list** (`nie uczestniczysz`), and a project row shows
   the expense's full amount *with its currency* instead of a bare number — see
   the Projects section.
+
+- **2026-09-17 (4)** — Suggestion delete is a labelled red button, after the
+  icon-only versions were twice reported invisible (see the Sugestie section).
