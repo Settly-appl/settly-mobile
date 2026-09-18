@@ -99,6 +99,34 @@
         }
       }
 
+      // Wymuszenie świeżych fontów przed przeładowaniem.
+      //
+      // Zasoby Fluttera nie mają hasha w ścieżce: assets/fonts/
+      // MaterialIcons-Regular.otf nazywa się tak samo w każdym buildzie, choć
+      // jego zawartość zmienia się co build — build przycina font ikon do
+      // glifów, których dany build używa. Klienci, którzy zdążyli zapisać go
+      // z nagłówkiem „immutable" (patrz nginx/web.conf), trzymają stary font
+      // przez rok i zwykłe przeładowanie go nie ruszy, więc każda nowo dodana
+      // ikona rysuje się jako nic. cache:'reload' to jedyny sposób, żeby
+      // nadpisać już zapisaną odpowiedź w cache HTTP.
+      function refreshFonts() {
+        if (!window.fetch) return Promise.resolve();
+        return fetch('assets/FontManifest.json', { cache: 'reload' })
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (families) {
+            var urls = [];
+            (families || []).forEach(function (family) {
+              ((family && family.fonts) || []).forEach(function (font) {
+                if (font && font.asset) urls.push('assets/' + font.asset);
+              });
+            });
+            return Promise.all(urls.map(function (url) {
+              return fetch(url, { cache: 'reload' }).catch(function () {});
+            }));
+          })
+          .catch(function () {});
+      }
+
       function reloadOnce(reason) {
         if (reloading || !budgetLeft()) return;
         reloading = true;
@@ -110,7 +138,11 @@
               return Promise.all(keys.map(function (k) { return caches.delete(k); }));
             })
           : Promise.resolve();
-        purge.catch(function () {}).then(function () { window.location.reload(); });
+        purge
+          .catch(function () {})
+          .then(refreshFonts)
+          .catch(function () {})
+          .then(function () { window.location.reload(); });
       }
 
       if ('serviceWorker' in navigator) {
