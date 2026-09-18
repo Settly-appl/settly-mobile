@@ -1,11 +1,13 @@
 import 'dart:convert';
 
+import 'package:settly_mobile/models/balance_item.dart';
 import 'package:settly_mobile/models/debt_record.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 
 /// Wraps the balances/debts endpoints:
 ///  - GET  /balances            net balance per counterparty (optionally per project)
+///  - GET  /balances/{id}/expenses  the unsettled shares one balance is made of
 ///  - POST /debts/settle        settle up everything a debtor owes the current user
 ///  - GET  /debts               settlement history
 class BalancesService {
@@ -25,6 +27,27 @@ class BalancesService {
       );
     }
     throw Exception('Nie udało się pobrać sald');
+  }
+
+  /// Nierozliczone udziały, z których składa się saldo z [counterpartyId] —
+  /// obie strony naraz, każdy z oznaczeniem kierunku (`owedToMe`).
+  ///
+  /// Backend czyta te same udziały, które sumuje do salda, więc lista i liczba
+  /// nad nią nie mogą się rozjechać.
+  Future<List<BalanceItem>> getBalanceItems(
+    String counterpartyId, {
+    String? projectId,
+  }) async {
+    final response = await _api.request(
+      endpoint: 'balances/$counterpartyId/expenses',
+      method: HttpMethod.get,
+      queryParams: projectId != null ? {'projectId': projectId} : null,
+    );
+
+    if (response != null && response.statusCode == 200) {
+      return BalanceItem.listFromJson(jsonDecode(response.body) as List<dynamic>);
+    }
+    throw Exception('Nie udało się pobrać wydatków salda');
   }
 
   /// Settle up everything [debtorUserId] owes the current user. Only the

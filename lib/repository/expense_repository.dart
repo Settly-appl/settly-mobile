@@ -41,6 +41,27 @@ class ExpenseRepository {
     return null;
   }
 
+  /// Pojedynczy wydatek po id.
+  ///
+  /// Ekran szczegółów potrzebuje całego wydatku, a listy, które prowadzą do
+  /// niego skrótem (rozwinięte saldo, piny), niosą tylko id. Zwraca `null`,
+  /// gdy wydatku nie ma albo patrzący nie ma do niego dostępu — wywołujący
+  /// pokazuje wtedy komunikat zamiast otwierać pusty ekran.
+  Future<SingleExpense?> fetchExpense(String expenseId) async {
+    try {
+      final response = await _api.request(
+        endpoint: 'expenses/$expenseId',
+        method: HttpMethod.get,
+      );
+      if (response == null || response.statusCode != 200) return null;
+      return SingleExpense.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Wydatki bez kursu wymiany — powstały przed przeliczaniem walut, więc ich
   /// kurs jest nieznany i backend celowo pomija je w saldach (migracja V10).
   /// Jedynym źródłem tego kursu jest użytkownik, więc trzeba je umieć pokazać.

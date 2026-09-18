@@ -239,6 +239,45 @@ class AppTexts {
       ? 'Wait until your friend confirms receiving the payment.'
       : 'Poczekaj, aż znajomy potwierdzi otrzymanie płatności.';
 
+  // Rozwinięcie salda: z jakich wydatków się wzięło.
+  //
+  // Etykiety kierunku są bezosobowe („Do odebrania" / „Do oddania"), bo
+  // polszczyzna kazałaby inaczej odmienić zdanie dla kobiety i mężczyzny
+  // („jest Ci winna" / „winien"), a płci znajomego aplikacja nie zna.
+  String get balanceOwedToYouLabel =>
+      _isEnglish ? 'Owed to you' : 'Do odebrania';
+  String get balanceYouOweLabel => _isEnglish ? 'You owe' : 'Do oddania';
+  String get balanceShowExpenses =>
+      _isEnglish ? 'Show expenses' : 'Pokaż wydatki';
+  String get balanceHideExpenses =>
+      _isEnglish ? 'Hide expenses' : 'Ukryj wydatki';
+  String get balanceItemsFailed => _isEnglish
+      ? 'Failed to load the expenses behind this balance.'
+      : 'Nie udało się wczytać wydatków składających się na to saldo.';
+  String get balanceItemsEmpty => _isEnglish
+      ? 'No unsettled expenses.'
+      : 'Brak nierozliczonych wydatków.';
+  /// Udział bez kursu: backend pomija go w saldzie, więc lista musi to
+  /// powiedzieć wprost — inaczej suma pozycji nie zgadzałaby się z saldem.
+  String get balanceItemNotCounted =>
+      _isEnglish ? 'not counted in the balance' : 'nie wchodzi do salda';
+
+  /// "3 expenses" / "3 wydatki" (polskie liczebniki).
+  String expensesCount(int n) {
+    if (_isEnglish) return '$n ${n == 1 ? 'expense' : 'expenses'}';
+    final mod10 = n % 10;
+    final mod100 = n % 100;
+    final String word;
+    if (n == 1) {
+      word = 'wydatek';
+    } else if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+      word = 'wydatki';
+    } else {
+      word = 'wydatków';
+    }
+    return '$n $word';
+  }
+
   // Projects
   String get projectNewProject => _isEnglish ? 'New project' : 'Nowy projekt';
   String get projectNameLabel => _isEnglish ? 'Name' : 'Nazwa';
