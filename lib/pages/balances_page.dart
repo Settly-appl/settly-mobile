@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
+import 'package:settly_mobile/models/balance_item.dart';
 import 'package:settly_mobile/models/friend_balance.dart';
+import 'package:settly_mobile/pages/expense_details_page.dart';
+import 'package:settly_mobile/utils/category_label.dart';
 import 'package:settly_mobile/pages/settlement_history_page.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
@@ -33,6 +38,16 @@ class _BalancesPageState extends State<BalancesPage> {
   int _needsRateCount = 0;
   final Set<String> _settling = {};
 
+  /// Rozwinięte salda — z czego składa się kwota przy danej osobie.
+  ///
+  /// Stan rozwinięcia trzyma strona, nie karta: dzięki temu przeżywa
+  /// odświeżenie listy i powrót z ekranu wydatku, więc po rozliczeniu czy
+  /// edycji użytkownik wraca dokładnie tam, gdzie patrzył.
+  final Set<String> _expanded = {};
+  final Map<String, List<BalanceItem>> _items = {};
+  final Set<String> _itemsLoading = {};
+  final Set<String> _itemsFailed = {};
+
   bool get isDark => Theme.of(context).brightness == Brightness.dark;
 
   /// Salda przychodzą już przeliczone na walutę bazową użytkownika, więc to
@@ -59,7 +74,19 @@ class _BalancesPageState extends State<BalancesPage> {
         _balances = data;
         _needsRateCount = unconverted.length;
         _loading = false;
+        // Salda przeliczone od nowa — rozwinięcia muszą pójść za nimi, bo
+        // lista wydatków sprzed rozliczenia opisywałaby stan, którego już nie
+        // ma. Zamknięte zostają zamknięte; rozliczone do zera znikają z listy,
+        // więc ich rozwinięcie nie ma już czego pokazywać.
+        _items.clear();
+        _itemsFailed.clear();
+        _expanded.removeWhere(
+          (id) => !_balances.any((b) => b.userId == id),
+        );
       });
+      for (final id in _expanded) {
+        unawaited(_loadItems(id));
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -113,6 +140,65 @@ class _BalancesPageState extends State<BalancesPage> {
     } finally {
       if (mounted) setState(() => _settling.remove(balance.userId));
     }
+  }
+
+  /// Rozwija/zwija saldo. Pozycje pobieramy dopiero przy rozwinięciu i tylko
+  /// raz — otwarcie każdego salda z góry to jedno zapytanie na znajomego za
+  /// każdym wejściem na ekran, a większość z nich nikt nie otworzy.
+  Future<void> _toggleExpanded(String userId) async {
+    if (_expanded.contains(userId)) {
+      setState(() => _expanded.remove(userId));
+      return;
+    }
+    setState(() => _expanded.add(userId));
+    if (_items.containsKey(userId)) return;
+    await _loadItems(userId);
+  }
+
+  Future<void> _loadItems(String userId) async {
+    setState(() {
+      _itemsLoading.add(userId);
+      _itemsFailed.remove(userId);
+    });
+    try {
+      final items = await _service.getBalanceItems(userId);
+      if (!mounted) return;
+      setState(() => _items[userId] = items);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _itemsFailed.add(userId));
+    } finally {
+      if (mounted) setState(() => _itemsLoading.remove(userId));
+    }
+  }
+
+  /// Otwiera wydatek stojący za pozycją salda.
+  ///
+  /// Zwykły `push`, więc cofnięcie wraca na Rozliczenia (a stamtąd na główną),
+  /// zamiast wyrzucać użytkownika gdzieś indziej. Ekran szczegółów potrzebuje
+  /// całego wydatku, a pozycja salda niesie samo id — stąd dociągnięcie.
+  Future<void> _openExpense(BalanceItem item) async {
+    final texts = AppTexts.of(context);
+    // Dociągnięcie wydatku to sieć, a dotknięty wiersz bez żadnej odpowiedzi
+    // wygląda jak zepsuty — stąd kółko na czas pobierania.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final expense = await _expenseRepository.fetchExpense(item.expenseId);
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    if (expense == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(texts.balanceItemsFailed)));
+      return;
+    }
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ExpenseDetailsPage(expense: expense)),
+    );
+    if (changed == true) await _load();
   }
 
   @override
@@ -205,6 +291,13 @@ class _BalancesPageState extends State<BalancesPage> {
                 isDark: isDark,
                 settling: _settling.contains(b.userId),
                 onSettle: () => _confirmSettle(b),
+                expanded: _expanded.contains(b.userId),
+                items: _items[b.userId],
+                itemsLoading: _itemsLoading.contains(b.userId),
+                itemsFailed: _itemsFailed.contains(b.userId),
+                onToggle: () => _toggleExpanded(b.userId),
+                onRetryItems: () => _loadItems(b.userId),
+                onOpenExpense: _openExpense,
               ),
             ),
           ),
@@ -316,11 +409,27 @@ class _BalanceCard extends StatelessWidget {
   final bool settling;
   final VoidCallback onSettle;
 
+  /// Czy saldo jest rozwinięte na wydatki, i co w nim jest.
+  final bool expanded;
+  final List<BalanceItem>? items;
+  final bool itemsLoading;
+  final bool itemsFailed;
+  final VoidCallback onToggle;
+  final VoidCallback onRetryItems;
+  final void Function(BalanceItem item) onOpenExpense;
+
   const _BalanceCard({
     required this.balance,
     required this.isDark,
     required this.settling,
     required this.onSettle,
+    required this.expanded,
+    required this.items,
+    required this.itemsLoading,
+    required this.itemsFailed,
+    required this.onToggle,
+    required this.onRetryItems,
+    required this.onOpenExpense,
   });
 
   @override
@@ -330,7 +439,10 @@ class _BalanceCard extends StatelessWidget {
         ? AppColors.amountPositive
         : AppColors.amountNegative;
     final sign = balance.owesYou ? '+' : '-';
-    final subtitle = balance.owesYou ? 'They owe you' : 'You owe them';
+    // Kierunek salda po polsku bezosobowo — patrz AppTexts.balanceOwedToYouLabel.
+    final subtitle = balance.owesYou
+        ? texts.balanceOwedToYouLabel
+        : texts.balanceYouOweLabel;
 
     return Container(
       decoration: BoxDecoration(
@@ -341,49 +453,74 @@ class _BalanceCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          Row(
-            children: [
-              UserAvatar(
-                radius: 22,
-                avatarUrl: balance.avatarUrl,
-                initials: balance.initials,
-                backgroundColor: AppColors.avatarBg(isDark),
-                foregroundColor: AppColors.avatarFg(isDark),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      balance.label,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.cardTitle(isDark),
-                      ),
+          // Rozwija cała górna belka, nie sama strzałka: strzałka mówi tylko,
+          // że jest co otworzyć, a celem dotyku jest wiersz.
+          //
+          // Material(transparency) nad tłem karty: bez niego fala dotyku
+          // rysuje się na Materiale Scaffolda, czyli POD kartą, i gest nie
+          // daje żadnej odpowiedzi.
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(10),
+              child: Row(
+                children: [
+                  UserAvatar(
+                    radius: 22,
+                    avatarUrl: balance.avatarUrl,
+                    initials: balance.initials,
+                    backgroundColor: AppColors.avatarBg(isDark),
+                    foregroundColor: AppColors.avatarFg(isDark),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          balance.label,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.cardTitle(isDark),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.cardSubtitle(isDark),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.cardSubtitle(isDark),
-                      ),
+                  ),
+                  Text(
+                    '$sign${formatMoney(balance.absAmount, balance.currency)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: amountColor,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 22,
+                    color: AppColors.cardSubtitle(isDark),
+                    semanticLabel: expanded
+                        ? texts.balanceHideExpenses
+                        : texts.balanceShowExpenses,
+                  ),
+                ],
               ),
-              Text(
-                '$sign${formatMoney(balance.absAmount, balance.currency)}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: amountColor,
-                ),
-              ),
-            ],
+            ),
           ),
+          if (expanded) _buildItems(texts),
           if (balance.owesYou) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -425,6 +562,254 @@ class _BalanceCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Z czego składa się saldo. Obie strony idą osobno, bo „jesteś winien 40"
+  /// i „jesteś winien 90, a masz do odebrania 50" to ta sama liczba — i tylko
+  /// tę drugą da się sprawdzić z wydatkami w ręku.
+  Widget _buildItems(AppTexts texts) {
+    if (itemsLoading && items == null) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 14),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (itemsFailed) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                texts.balanceItemsFailed,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.cardSubtitle(isDark),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onRetryItems,
+              child: Text(texts.retryAction),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final all = items ?? const <BalanceItem>[];
+    if (all.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            texts.balanceItemsEmpty,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.cardSubtitle(isDark),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final owedToMe = all.where((i) => i.owedToMe).toList();
+    final youOwe = all.where((i) => !i.owedToMe).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
+        Divider(height: 1, color: AppColors.cardBorder(isDark)),
+        if (owedToMe.isNotEmpty)
+          _section(texts, texts.balanceOwedToYouLabel, owedToMe, true),
+        if (youOwe.isNotEmpty)
+          _section(texts, texts.balanceYouOweLabel, youOwe, false),
+      ],
+    );
+  }
+
+  Widget _section(
+    AppTexts texts,
+    String title,
+    List<BalanceItem> sectionItems,
+    bool owedToMe,
+  ) {
+    final color = owedToMe
+        ? AppColors.amountPositive
+        : AppColors.amountNegative;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 2),
+          child: Row(
+            children: [
+              Icon(
+                owedToMe
+                    ? Icons.south_west_rounded
+                    : Icons.north_east_rounded,
+                size: 13,
+                color: color,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                texts.expensesCount(sectionItems.length),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.cardSubtitle(isDark),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...sectionItems.map(
+          (item) => _BalanceItemRow(
+            item: item,
+            isDark: isDark,
+            color: color,
+            onTap: () => onOpenExpense(item),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Jeden wydatek pod saldem. Klikalny — prowadzi na ekran wydatku zwykłym
+/// `push`, więc cofnięcie wraca tutaj, na Rozliczenia.
+class _BalanceItemRow extends StatelessWidget {
+  final BalanceItem item;
+  final bool isDark;
+
+  /// Kolor kierunku — ten sam, co nagłówek sekcji, żeby po samej kwocie było
+  /// widać, czy to należność, czy zobowiązanie.
+  final Color color;
+  final VoidCallback onTap;
+
+  const _BalanceItemRow({
+    required this.item,
+    required this.isDark,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = AppTexts.of(context);
+    final meta = <String>[
+      '${item.date.day} ${texts.monthGenitive(item.date.month)}',
+      if (item.projectName != null && item.projectName!.isNotEmpty)
+        item.projectName!,
+      if (item.category.isNotEmpty)
+        localizedCategoryLabel(item.category, texts),
+    ].join(' · ');
+
+    // Udział to kwota DO ZAPŁATY, więc prowadzi waluta bazowa (formatSettlement).
+    // Bez kursu nie ma czego przeliczać — zostaje kwota z paragonu, wyraźnie
+    // opisana jako nieliczona do salda, żeby suma pozycji zgadzała się z liczbą
+    // na górze karty.
+    final amount = item.needsRate
+        ? formatMoney(item.shareAmount, item.currency)
+        : formatSettlement(
+            item.shareBaseAmount,
+            item.baseCurrency,
+            item.shareAmount,
+            item.currency,
+          );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      texts.expenseName(item.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.cardTitle(isDark),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      meta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.cardSubtitle(isDark),
+                      ),
+                    ),
+                    if (item.needsRate)
+                      Text(
+                        texts.balanceItemNotCounted,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.amountNegative,
+                        ),
+                      ),
+                    if (item.declaredPaid)
+                      Text(
+                        texts.expenseDeclaredBadge,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                amount,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: item.needsRate
+                      ? AppColors.cardSubtitle(isDark)
+                      : color,
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.cardSubtitle(isDark),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

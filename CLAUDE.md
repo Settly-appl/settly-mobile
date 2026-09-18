@@ -268,6 +268,29 @@ importing both causes an ambiguous-import error.
 - An author whose account was deleted renders as `suggestionsDeletedAuthor`;
   the suggestion itself survives (`user_id` is `ON DELETE SET NULL`).
 
+## Rozliczenia — domain notes
+
+- **A balance opens up into the expenses behind it.** Tapping a person's card on
+  Rozliczenia expands it into the unsettled shares that produced the number
+  (`GET /balances/{id}/expenses`), split into two labelled sections — money to
+  collect and money to pay back. The netted figure alone cannot be checked
+  against anything; the two sides can.
+- Direction labels are **impersonal** on purpose (`Do odebrania` / `Do oddania`).
+  Polish would otherwise need the friend's gender (`jest Ci winna` vs `winien`),
+  which the app does not know.
+- Items load **on expand, once**, not with the page: a request per friend on
+  every visit to a screen where most rows are never opened. Expansion state
+  lives in the page, not the card, so it survives a refresh and the return trip
+  from an expense; a reload drops the cached items (they would describe a state
+  that no longer exists) and re-fetches whatever is open.
+- Tapping an item opens the expense with a plain `push`, so **back returns to
+  Rozliczenia** (and from there to the main page). The row carries only an id —
+  `ExpenseRepository.fetchExpense` pulls the rest, behind a spinner.
+- A share with **no rate** shows the native amount, greyed, and says
+  `nie wchodzi do salda`. It is in the list and outside the sum, exactly as the
+  backend treats it — substituting its native amount would recreate the pounds
+  into złoty bug for the third time.
+
 ## Projects — domain notes
 
 A project groups expenses (a trip, a party). Any **member** — not just the owner —
@@ -553,3 +576,10 @@ Non-obvious and easy to break:
 
 - **2026-09-17 (4)** — Suggestion delete is a labelled red button, after the
   icon-only versions were twice reported invisible (see the Sugestie section).
+
+- **2026-09-18** — **Rozliczenia opens up**: each balance expands into the
+  unsettled expenses behind it, both directions labelled, each row tapping
+  through to the expense and back (see the Rozliczenia section). Backend adds
+  `GET /balances/{counterpartyId}/expenses`, reading the same splits the
+  balance sums. The card's direction line was also two hardcoded English
+  literals ("They owe you" / "You owe them") — now `AppTexts`.
