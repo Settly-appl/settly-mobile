@@ -973,7 +973,7 @@ class AppTexts {
 
   /// Kafelek wydatku z księgi projektu, w którym patrzący nie ma udziału.
   String get notParticipantBadge =>
-      _isEnglish ? 'not involved' : 'nie uczestniczysz';
+      _isEnglish ? 'Not involved' : 'Nie uczestniczysz';
 
   String get needsRateTitle =>
       _isEnglish ? 'Balance is incomplete' : 'Saldo jest niepełne';

@@ -258,12 +258,12 @@ importing both causes an ambiguous-import error.
   courtesy, the endpoint is the control — a non-admin who reaches the page
   gets the error state, not somebody else's feedback.
 - **Admins can delete one** — a filled red **"Usuń" button** on each card, not a
-  bare icon. Two icon-only attempts were reported invisible (first `cardSubtitle`,
-  the same muted tone as the metadata line; then a red 22 px outline glyph), so
-  the affordance stopped depending on a glyph at all: the word is drawn with the
-  normal text font and survives even a failed icon font. The confirm dialog is
-  not decoration: the delete is hard on the backend and there is no copy anywhere
-  else, so the dialog says so. On success the row is removed locally rather
+  bare icon. Two icon-only attempts were reported invisible; the second one was
+  not a colour problem at all but the stale tree-shaken icon font (see the PWA
+  section), which is also why the label is the right call regardless: the word is
+  drawn with the normal text font and survives even a failed icon font. The
+  confirm dialog is not decoration: the delete is hard on the backend and there
+  is no copy anywhere else, so the dialog says so. On success the row is removed locally rather
   than re-fetching — the backend already confirmed it.
 - An author whose account was deleted renders as `suggestionsDeletedAuthor`;
   the suggestion itself survives (`user_id` is `ON DELETE SET NULL`).
@@ -332,7 +332,7 @@ may add expenses to it.
 - **Someone else's expense says so on the tile.** `SingleExpense.isBystander(
   viewerId)` = not the owner **and** `!canSettle`, i.e. the viewer has no share
   and is only seeing the row because the project is a shared ledger. It renders
-  as the muted `NotParticipantBadge` ("nie uczestniczysz") in both places such a
+  as the muted `NotParticipantBadge` ("Nie uczestniczysz") in both places such a
   row can appear — `project_detail_page.dart` and `all_expenses_page.dart`
   filtered by project; the unscoped list never returns them. `canSettle` alone
   would not do: the viewer's own **personal** expense also has it `false`, which
@@ -458,11 +458,23 @@ Non-obvious and easy to break:
   `index.html`, `flutter_bootstrap.js`, **`main.dart.js`** (Flutter emits it
   under a stable name versioned only by a `?v=` query, so a heuristically
   cached copy is a stale app), `build-id.json`, `version.json`,
-  `manifest.json` and both service workers — and hard-caches only the
-  content-addressed `/assets/` and `/canvaskit/`. An earlier version merely
-  *claimed* in a comment to long-cache hashed assets and set no rule at all
-  for `main.dart.js`, which could serve a stale bundle even with the worker
-  out of the picture.
+  `manifest.json` and both service workers.
+- **Nothing Flutter emits is content-addressed — never mark `/assets/`
+  immutable.** This config did, on the stated belief that those paths carry a
+  content hash. They do not: `assets/fonts/MaterialIcons-Regular.otf` has the
+  same URL in every build while its *content* changes in every build, because
+  `flutter build web` **tree-shakes the icon font down to the glyphs that build
+  uses**. A browser told to keep it for a year kept the older, narrower font, so
+  every icon **added since that client last cached it rendered as nothing** —
+  while all the older icons kept working, which is what made this look twice
+  like a colour or a layout bug (the invisible bin, then the missing
+  `visibility_outlined` in `NotParticipantBadge`). `/assets/` and `/canvaskit/`
+  now revalidate (`Cache-Control: no-cache` — still stored, answered with 304
+  while unchanged).
+  Clients that already stored the font as immutable cannot be fixed by a header,
+  so `refreshFonts()` in `web/index.html` re-fetches every font in
+  `assets/FontManifest.json` with `cache: 'reload'` — the only way to replace an
+  already-stored response — just before the staleness reload.
 
 ## Conventions
 
@@ -583,3 +595,11 @@ Non-obvious and easy to break:
   `GET /balances/{counterpartyId}/expenses`, reading the same splits the
   balance sums. The card's direction line was also two hardcoded English
   literals ("They owe you" / "You owe them") — now `AppTexts`.
+
+- **2026-09-18 (2)** — **Newly added icons were invisible** — not a colour bug
+  either time. nginx served `/assets/` as immutable for a year although Flutter
+  gives those files stable names, and the icon font is re-subsetted on every
+  build, so clients kept an old font missing every glyph added since. Assets now
+  revalidate, and the staleness reload re-fetches the fonts with
+  `cache: 'reload'` for clients already holding an immutable copy (see the PWA
+  section). `Nie uczestniczysz` also gained its capital letter.
