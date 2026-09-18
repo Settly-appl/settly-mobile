@@ -474,7 +474,17 @@ Non-obvious and easy to break:
   Clients that already stored the font as immutable cannot be fixed by a header,
   so `refreshFonts()` in `web/index.html` re-fetches every font in
   `assets/FontManifest.json` with `cache: 'reload'` — the only way to replace an
-  already-stored response — just before the staleness reload.
+  already-stored response. It runs before the staleness reload **and** once per
+  build id (`ensureFontsForBuild`, keyed in `localStorage`), because an update
+  can also reach a client through the service worker on a fresh launch, with
+  `reloadOnce` never running at all — which is exactly how a client ended up
+  with a new `main.dart.js` drawing icons from the previous build's font.
+- The build passes **`--no-tree-shake-icons`** so the icon font is byte-identical
+  in every build. It costs ~1.6 MB downloaded once and it retires the whole bug
+  class: with the full font, even a stale cached copy contains every glyph, so
+  adding an icon can never again depend on a client's cache being refreshed.
+  Don't remove the flag to save bytes without putting something equivalent in
+  its place.
 
 ## Conventions
 
@@ -597,9 +607,12 @@ Non-obvious and easy to break:
   literals ("They owe you" / "You owe them") — now `AppTexts`.
 
 - **2026-09-18 (2)** — **Newly added icons were invisible** — not a colour bug
-  either time. nginx served `/assets/` as immutable for a year although Flutter
-  gives those files stable names, and the icon font is re-subsetted on every
-  build, so clients kept an old font missing every glyph added since. Assets now
-  revalidate, and the staleness reload re-fetches the fonts with
-  `cache: 'reload'` for clients already holding an immutable copy (see the PWA
-  section). `Nie uczestniczysz` also gained its capital letter.
+  any of the three times. nginx served `/assets/` as immutable for a year
+  although Flutter gives those files stable names, and the icon font is
+  re-subsetted on every build, so clients kept an old font missing every glyph
+  added since. Three fixes, because the first two alone left a hole: assets
+  revalidate; the fonts are re-fetched with `cache: 'reload'` once per build id,
+  not only on the staleness reload (an update can arrive via the service worker
+  with no reload of ours); and the build now uses `--no-tree-shake-icons`, so the
+  font is the same in every build and a stale copy is no longer a missing glyph.
+  See the PWA section. `Nie uczestniczysz` also gained its capital letter.

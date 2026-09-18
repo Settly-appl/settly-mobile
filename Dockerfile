@@ -18,7 +18,17 @@ ARG SETTLY_HOST=https://settly.duckdns.org
 ARG SETTLY_BUILD=dev
 RUN sed -i "s|__SETTLY_BUILD__|${SETTLY_BUILD}|g" web/index.html
 
-RUN flutter build web --release --dart-define=SETTLY_HOST=$SETTLY_HOST
+# --no-tree-shake-icons: font ikon jest w KAŻDYM buildzie taki sam.
+#
+# Domyślnie build przycina MaterialIcons do glifów użytych w danym buildzie i
+# zapisuje wynik pod niezmienną nazwą assets/fonts/MaterialIcons-Regular.otf.
+# Każdy klient, który ma w cache font ze starszego builda, rysuje więc jako nic
+# każdą ikonę dodaną od tamtej pory — a stare ikony działają, więc wygląda to
+# na błąd koloru albo układu (tak to wyglądało trzy razy: kosz w sugestiach,
+# potem plakietka „Nie uczestniczysz", potem strzałki w Rozliczeniach).
+# Pełny font waży ~1,6 MB, jest pobierany raz i od tej pory żadna nowa ikona
+# nie zależy od tego, czy klientowi odświeżył się cache.
+RUN flutter build web --release --no-tree-shake-icons --dart-define=SETTLY_HOST=$SETTLY_HOST
 
 RUN printf '{"buildId":"%s"}\n' "${SETTLY_BUILD}" > build/web/build-id.json
 

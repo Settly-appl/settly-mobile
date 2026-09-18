@@ -83,6 +83,9 @@
       var BUILD_ID = '__SETTLY_BUILD__';
       var hasBuildId = BUILD_ID.indexOf('__SETTLY') !== 0;
       var reloading = false;
+      // Stempel builda odczytany z serwera; potrzebny, żeby po odświeżeniu
+      // fontów zapisać, DLA KTÓREGO builda to zrobiliśmy.
+      var serverBuildId = null;
 
       // Bezpiecznik przed pętlą: wyczyszczenie Cache Storage sprawia, że worker
       // instaluje się od nowa i sam potrafi wywołać controllerchange już po
@@ -109,6 +112,16 @@
       // przez rok i zwykłe przeładowanie go nie ruszy, więc każda nowo dodana
       // ikona rysuje się jako nic. cache:'reload' to jedyny sposób, żeby
       // nadpisać już zapisaną odpowiedź w cache HTTP.
+      var FONTS_KEY = 'settlyFontsBuild';
+
+      function markFontsFresh(buildId) {
+        try {
+          localStorage.setItem(FONTS_KEY, buildId);
+        } catch (e) {
+          // brak localStorage — trudno, przy następnym wejściu spróbujemy raz jeszcze
+        }
+      }
+
       function refreshFonts() {
         if (!window.fetch) return Promise.resolve();
         return fetch('assets/FontManifest.json', { cache: 'reload' })
@@ -142,7 +155,34 @@
           .catch(function () {})
           .then(refreshFonts)
           .catch(function () {})
-          .then(function () { window.location.reload(); });
+          .then(function () {
+            markFontsFresh(serverBuildId || BUILD_ID);
+            window.location.reload();
+          });
+      }
+
+      // Font ikon dociągamy raz na build, niezależnie od tego, którędy przyszła
+      // aktualizacja.
+      //
+      // Samo przeładowanie przy zmianie build-id nie wystarczyło: nowa wersja
+      // potrafi dotrzeć do klienta również przez service workera, przy
+      // zamknięciu i ponownym otwarciu aplikacji, bez ani jednego przebiegu
+      // reloadOnce. Nowy main.dart.js rysował wtedy ikony starym fontem z cache
+      // HTTP i te dodane od poprzedniej wizyty były puste. Klucz w localStorage
+      // pilnuje, żeby działo się to raz na build, a nie przy każdym starcie.
+      function ensureFontsForBuild() {
+        if (!hasBuildId || reloading) return;
+        try {
+          if (localStorage.getItem(FONTS_KEY) === BUILD_ID) return;
+        } catch (e) {
+          return; // bez localStorage nie ma jak tego ograniczyć — nie ryzykujemy pętli
+        }
+        refreshFonts().then(function () {
+          markFontsFresh(BUILD_ID);
+          // Strona zdążyła się narysować starym fontem; dopiero przeładowanie
+          // pokaże świeżo pobrane glify.
+          reloadOnce('fonty');
+        });
       }
 
       if ('serviceWorker' in navigator) {
@@ -159,7 +199,9 @@
         fetch('build-id.json', { cache: 'no-store' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (data) {
-            if (data && data.buildId && data.buildId !== BUILD_ID) {
+            if (!data || !data.buildId) return;
+            serverBuildId = data.buildId;
+            if (data.buildId !== BUILD_ID) {
               reloadOnce('build-id');
             }
           })
@@ -171,6 +213,7 @@
 
       function refresh() {
         checkBuildId();
+        ensureFontsForBuild();
         if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
           navigator.serviceWorker.getRegistration()
             .then(function (reg) { if (reg) reg.update(); })
