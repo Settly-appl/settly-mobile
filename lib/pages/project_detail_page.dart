@@ -8,14 +8,17 @@ import 'package:settly_mobile/models/expenses/single_expense.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/expense_details_page.dart';
 import 'package:settly_mobile/pages/expense_form_page.dart';
+import 'package:settly_mobile/pages/project_form_sheet.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/repository/expense_repository.dart';
 import 'package:settly_mobile/utils/category_label.dart';
+import 'package:settly_mobile/utils/date_format.dart';
 import 'package:settly_mobile/widgets/settlement.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
 import 'package:settly_mobile/services/api_service/api_service_request.dart';
 import 'package:settly_mobile/services/api_service/balances_service.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
+import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/utils/money_format.dart';
 
@@ -191,37 +194,29 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
-  Future<void> _rename() async {
-    final texts = AppTexts.of(context);
-    final controller = TextEditingController(text: _project?.name ?? '');
-    final newName = await showDialog<String>(
+  /// Edycja wyjazdu — pełny formularz, ten sam co przy zakładaniu.
+  ///
+  /// Wcześniej było tu okienko „zmień nazwę", więc waluty wyjazdu, kursu ani
+  /// dat nie dało się już poprawić: wszystko, co dodano do projektów, dawało
+  /// się ustawić wyłącznie raz, przy tworzeniu.
+  Future<void> _editProject() async {
+    final project = _project;
+    if (project == null) return;
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(texts.projectRenameTitle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(texts.cancelAction),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: Text(texts.saveAction),
-          ),
-        ],
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.scaffold(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => ProjectFormSheet(
+        isDark: isDark,
+        service: _service,
+        project: project,
       ),
     );
-    if (newName == null || newName.isEmpty) return;
-    try {
-      await _service.updateProject(widget.projectId, name: newName);
-      await _load();
-    } catch (_) {
-      _toast(texts.projectRenameFailed);
-    }
+    if (saved == true) await _load();
   }
 
   Future<void> _deleteProject() async {
@@ -308,8 +303,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             PopupMenuButton<String>(
               onSelected: (v) {
                 switch (v) {
-                  case 'rename':
-                    _rename();
+                  case 'edit':
+                    _editProject();
                   case 'toggle':
                     _toggleSettled();
                   case 'delete':
@@ -321,8 +316,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               itemBuilder: (_) => [
                 if (_isOwner) ...[
                   PopupMenuItem(
-                    value: 'rename',
-                    child: Text(texts.projectRenameMenu),
+                    value: 'edit',
+                    child: Text(texts.projectEditMenu),
                   ),
                   PopupMenuItem(
                     value: 'toggle',
@@ -424,6 +419,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(height: 16),
         ],
 
+        // ── Czym jest ten wyjazd ──────────────────────────────────────────
+        // Termin i kurs dało się ustawić, ale nigdzie nie były widoczne — więc
+        // nie dało się sprawdzić, dlaczego wydatek sam wybrał ten projekt ani
+        // po jakim kursie liczą się jego kwoty.
+        _tripFacts(texts),
+
         // ── Podsumowanie ──────────────────────────────────────────────────
         _summaryCard(texts),
         const SizedBox(height: 20),
@@ -513,6 +514,62 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   /// Ile projekt kosztował i kto w nim jest — pierwsze, o co pyta się przy
   /// wspólnym wyjeździe.
+  Widget _tripFacts(AppTexts texts) {
+    final project = _project;
+    if (project == null) return const SizedBox.shrink();
+    final dateSpan = formatDateSpan(project.startDate, project.endDate);
+    final currency = project.defaultCurrency;
+    final rate = project.defaultRateToBase;
+    final rateLabel = (currency == null || rate == null)
+        ? null
+        : texts.tripRateSummary(
+            currency,
+            rate.toString(),
+            currencySymbol(UserSettingsService.baseCurrency),
+          );
+    if (dateSpan == null && rateLabel == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          if (dateSpan != null)
+            _factChip(Icons.date_range_outlined, dateSpan),
+          if (rateLabel != null)
+            _factChip(Icons.currency_exchange_rounded, rateLabel),
+        ],
+      ),
+    );
+  }
+
+  Widget _factChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg(isDark),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.cardBorder(isDark)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.cardSubtitle(isDark)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.cardTitle(isDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _summaryCard(AppTexts texts) {
     final total = _project?.totalAmount ?? 0;
     // Suma wyjazdu jest w walucie bazowej oglądającego — wyjazd opłacony

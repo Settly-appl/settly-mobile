@@ -18,6 +18,7 @@ import 'package:settly_mobile/services/api_service/projects_service.dart';
 import 'package:settly_mobile/services/auth_service.dart';
 import 'package:settly_mobile/utils/money_input.dart';
 import 'package:settly_mobile/widgets/user_avatar.dart';
+import 'package:settly_mobile/utils/date_format.dart';
 import 'package:settly_mobile/utils/money_format.dart';
 import 'package:settly_mobile/services/api_service/user_settings_service.dart';
 
@@ -2165,6 +2166,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage>
                                 color: AppColors.cardTitle(widget.isDark),
                               ),
                             ),
+                            // Termin wyjazdu: to on decyduje, czy wydatek z
+                            // danego dnia sam trafi do tego projektu, więc
+                            // przy wyborze warto go widzieć.
+                            subtitle: formatDateSpan(p.startDate, p.endDate) == null
+                                ? null
+                                : Text(
+                                    formatDateSpan(p.startDate, p.endDate)!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.cardSubtitle(
+                                        widget.isDark,
+                                      ),
+                                    ),
+                                  ),
                             trailing: _selectedProjectId == p.id
                                 ? Icon(
                                     Icons.check,

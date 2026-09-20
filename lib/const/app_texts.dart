@@ -942,6 +942,22 @@ class AppTexts {
 
   String get projectDatesClear => _isEnglish ? 'Clear' : 'Wyczyść';
 
+  /// Edycja wyjazdu — ten sam formularz co przy zakładaniu, więc i waluta,
+  /// kurs oraz daty dają się tu poprawić, nie tylko nazwa.
+  String get projectEditMenu =>
+      _isEnglish ? 'Edit project' : 'Edytuj projekt';
+  String get projectEditTitle =>
+      _isEnglish ? 'Edit project' : 'Edytuj projekt';
+  String get projectUpdateFailedError => _isEnglish
+      ? 'Failed to save the changes.'
+      : 'Nie udało się zapisać zmian.';
+  String get projectNameRequired =>
+      _isEnglish ? 'Enter a name' : 'Podaj nazwę';
+
+  /// Kurs wyjazdu na kafelku/nagłówku: „1 GBP = 4.85 zł".
+  String tripRateSummary(String currency, String rate, String base) =>
+      '1 $currency = $rate $base';
+
   String get suggestionsDeleteTooltip => _isEnglish ? 'Delete' : 'Usuń';
 
   String get suggestionsDeleteTitle =>

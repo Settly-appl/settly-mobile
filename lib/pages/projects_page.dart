@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:settly_mobile/const/app_texts.dart';
 import 'package:settly_mobile/models/project.dart';
 import 'package:settly_mobile/pages/project_detail_page.dart';
+import 'package:settly_mobile/pages/project_form_sheet.dart';
 import 'package:settly_mobile/projectColors/app_colors.dart';
 import 'package:settly_mobile/services/api_service/projects_service.dart';
+import 'package:settly_mobile/utils/date_format.dart';
 import 'package:settly_mobile/utils/money_format.dart';
-import 'package:settly_mobile/services/api_service/user_settings_service.dart';
-import 'package:settly_mobile/utils/money_input.dart';
 
 /// Lists the projects (groups) the current user belongs to and lets them
 /// create a new one.
@@ -59,7 +59,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: AppColors.scaffold(isDark),
-      builder: (_) => _CreateProjectSheet(isDark: isDark, service: _service),
+      builder: (_) => ProjectFormSheet(isDark: isDark, service: _service),
     );
     if (created == true) _load();
   }
@@ -196,6 +196,7 @@ class _ProjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final texts = AppTexts.of(context);
+    final dateSpan = formatDateSpan(project.startDate, project.endDate);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -252,6 +253,29 @@ class _ProjectCard extends StatelessWidget {
                       color: AppColors.cardSubtitle(isDark),
                     ),
                   ),
+                  // Termin wyjazdu. Dało się go ustawić i decydował o tym, do
+                  // którego wyjazdu trafi nowy wydatek, ale nigdzie nie było go
+                  // widać — nie dało się więc sprawdzić, czy jest poprawny.
+                  if (dateSpan != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.date_range_outlined,
+                          size: 12,
+                          color: AppColors.cardSubtitle(isDark),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          dateSpan,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.cardSubtitle(isDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -298,222 +322,6 @@ class _StatusChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: AppColors.amountPositive,
         ),
-      ),
-    );
-  }
-}
-
-class _CreateProjectSheet extends StatefulWidget {
-  final bool isDark;
-  final ProjectsService service;
-
-  const _CreateProjectSheet({required this.isDark, required this.service});
-
-  @override
-  State<_CreateProjectSheet> createState() => _CreateProjectSheetState();
-}
-
-class _CreateProjectSheetState extends State<_CreateProjectSheet> {
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
-  final _rateController = TextEditingController();
-
-  /// Waluta wyjazdu. `null` znaczy „ta sama co bazowa" — wtedy nie ma czego
-  /// przeliczać i pole kursu się nie pokazuje.
-  String? _tripCurrency;
-
-  /// Oba końce albo żaden — otwarty przedział zagarniałby każdy przyszły
-  /// wydatek, więc do automatycznego wyboru liczy się tylko pełny zakres.
-  DateTimeRange? _tripDates;
-
-  bool _saving = false;
-
-  String get _baseCurrency => UserSettingsService.baseCurrency;
-
-  double? get _tripRate {
-    final raw = _rateController.text.trim().replaceAll(',', '.');
-    if (raw.isEmpty) return null;
-    final value = double.tryParse(raw);
-    return (value == null || value <= 0) ? null : value;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descController.dispose();
-    _rateController.dispose();
-    super.dispose();
-  }
-
-  static String _formatDate(DateTime date) {
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d.$m.${date.year}';
-  }
-
-  Future<void> _pickTripDates() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(DateTime.now().year - 5),
-      lastDate: DateTime(DateTime.now().year + 5),
-      initialDateRange: _tripDates,
-    );
-    if (picked != null && mounted) setState(() => _tripDates = picked);
-  }
-
-  Future<void> _save() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) return;
-    setState(() => _saving = true);
-    try {
-      await widget.service.createProject(
-        name: name,
-        description: _descController.text.trim().isEmpty
-            ? null
-            : _descController.text.trim(),
-        defaultCurrency: _tripCurrency,
-        defaultRateToBase: _tripCurrency == null ? null : _tripRate,
-        startDate: _tripDates?.start,
-        endDate: _tripDates?.end,
-      );
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppTexts.of(context).projectCreateFailedError)),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final texts = AppTexts.of(context);
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottomInset),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            AppTexts.of(context).projectNewProject,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.username(widget.isDark),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _nameController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: texts.projectNameLabel,
-              hintText: texts.projectNameExample,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _descController,
-            maxLines: 2,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: texts.projectDescriptionLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _tripCurrency,
-            decoration: InputDecoration(
-              labelText: texts.projectCurrencyLabel,
-              border: const OutlineInputBorder(),
-            ),
-            items: [
-              DropdownMenuItem<String>(
-                value: null,
-                child: Text(texts.projectCurrencyNone),
-              ),
-              for (final c in kCurrencies)
-                if (c['code'] != _baseCurrency)
-                  DropdownMenuItem<String>(
-                    value: c['code'],
-                    child: Text('${c['code']} — ${c['name']}'),
-                  ),
-            ],
-            onChanged: (value) => setState(() => _tripCurrency = value),
-          ),
-          if (_tripCurrency != null) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _rateController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: [MoneyInputFormatter(decimalRange: 4)],
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: texts.formRateLabel(_tripCurrency!, _baseCurrency),
-                hintText: '0.0000',
-                helperText: texts.projectCurrencyHint,
-                helperMaxLines: 3,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: _pickTripDates,
-            borderRadius: BorderRadius.circular(4),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                labelText: texts.projectDatesLabel,
-                helperText: texts.projectDatesHint,
-                helperMaxLines: 2,
-                border: const OutlineInputBorder(),
-                suffixIcon: _tripDates == null
-                    ? const Icon(Icons.date_range_outlined)
-                    : IconButton(
-                        tooltip: texts.projectDatesClear,
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => setState(() => _tripDates = null),
-                      ),
-              ),
-              child: Text(
-                _tripDates == null
-                    ? texts.projectDatesNotSet
-                    : '${_formatDate(_tripDates!.start)} — '
-                          '${_formatDate(_tripDates!.end)}',
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.avatarFg(widget.isDark),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    AppTexts.of(context).createAction,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-          ),
-        ],
       ),
     );
   }
