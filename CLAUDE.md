@@ -309,6 +309,24 @@ may add expenses to it.
   weekend inside a month-long trip is the more specific answer — tie-broken by
   the later start. Picking a project also pulls in its currency and rate, via
   the existing `_applyProjectDefaults`.
+- **One form, create and edit.** `ProjectFormSheet` (`pages/project_form_sheet.dart`)
+  is the create sheet and the edit sheet — opened from the projects list with
+  `project: null`, and from the trip's menu ("Edytuj projekt") with the project.
+  Editing used to be a "rename" dialog, so everything added to projects since —
+  trip currency, rate, dates — could be set exactly once, when the project was
+  created, and never corrected. Anything added to the form now arrives in both
+  places at once.
+  Clearing works because the service has two escape hatches the PATCH needs:
+  an empty `defaultCurrency` string (which also drops the rate) and
+  `clearDateSpan: true`. An omitted field means "leave it alone", so neither
+  could be expressed by sending nothing.
+- **The date span is shown wherever it decides something**: on the project card
+  in the list, as a chip on the trip screen (next to the trip rate), and under
+  each project in the expense form's picker — that last one is where the span
+  actually acts, since it is what makes a new expense pick a trip by itself.
+  `formatDateSpan` (`utils/date_format.dart`) prints `12.09 – 20.09.2026` and
+  returns `null` for a half-open range, because half a range is not a trip's
+  dates and takes no part in automatic selection either.
 - **Pinning is type-aware.** `PinnedRepository` stores `expense:<id>` /
   `project:<id>` under `pinned_v3`; the old `pinned_ids_v2` list is migrated
   once, read as expenses. Before this, `getAll` always fetched
@@ -616,3 +634,10 @@ Non-obvious and easy to break:
   with no reload of ours); and the build now uses `--no-tree-shake-icons`, so the
   font is the same in every build and a stale copy is no longer a missing glyph.
   See the PWA section. `Nie uczestniczysz` also gained its capital letter.
+
+- **2026-09-20** — Projects are **editable**, not just renameable: one shared
+  `ProjectFormSheet` for create and edit, so the trip currency, rate and dates
+  can be corrected or removed (backend gains `clearDateSpan`, and clearing the
+  currency now drops the orphan rate). The **date span is displayed** — project
+  card, trip screen, and the expense form's project picker, where it is what
+  makes a trip claim an expense. See the Projects section.

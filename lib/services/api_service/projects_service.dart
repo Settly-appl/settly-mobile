@@ -64,6 +64,10 @@ class ProjectsService {
     throw Exception('Nie udało się utworzyć projektu');
   }
 
+  /// PATCH: klucz nieobecny znaczy „nie ruszaj". Stąd dwie furtki do
+  /// czyszczenia — pusty `defaultCurrency` (zabiera też kurs) i
+  /// [clearDateSpan], bo dla daty nie ma odpowiednika pustego napisu, a wyjazd
+  /// bez terminu musi dać się zrobić z wyjazdu z terminem.
   Future<Project> updateProject(
     String projectId, {
     String? name,
@@ -73,6 +77,7 @@ class ProjectsService {
     double? defaultRateToBase,
     DateTime? startDate,
     DateTime? endDate,
+    bool clearDateSpan = false,
   }) async {
     final res = await _api.request(
       endpoint: 'projects/$projectId',
@@ -85,6 +90,7 @@ class ProjectsService {
         'defaultRateToBase': ?defaultRateToBase,
         'startDate': ?_asApiDate(startDate),
         'endDate': ?_asApiDate(endDate),
+        if (clearDateSpan) 'clearDateSpan': true,
       },
     );
     if (res != null && res.statusCode == 200) {
