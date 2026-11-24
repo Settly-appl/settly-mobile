@@ -118,24 +118,36 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 16),
               ],
-              FilledButton(
-                onPressed: _isBusy ? null : _startLogin,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Center(
+                child: SizedBox(
+                  width: 100,
+                  child: FilledButton(
+                    onPressed: _isBusy ? null : _startLogin,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isBusy
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              texts.loginButton,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
                   ),
                 ),
-                child: _isBusy
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        texts.loginButton,
-                        style: const TextStyle(fontSize: 16),
-                      ),
               ),
               const SizedBox(height: 48),
             ],
